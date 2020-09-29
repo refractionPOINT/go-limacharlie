@@ -2,8 +2,11 @@ package limacharlie
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"os/user"
+	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // The actual config file format may seem a bit odd
@@ -21,7 +24,16 @@ type ConfigEnvironment struct {
 }
 
 func (o *ClientOptions) FromConfigFile(configFilePath string, environmentName string) error {
-	data, err := ioutil.ReadFile(configFilePath)
+	cleanPath := configFilePath
+	if strings.HasPrefix(cleanPath, "~/") {
+		usr, err := user.Current()
+		if err != nil {
+			return err
+		}
+		dir := usr.HomeDir
+		cleanPath = fmt.Sprintf("%s/%s", dir, cleanPath[2:])
+	}
+	data, err := ioutil.ReadFile(cleanPath)
 	if err != nil {
 		return err
 	}

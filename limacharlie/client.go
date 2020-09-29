@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -124,9 +123,10 @@ func (c *Client) refreshJWT(expiry time.Duration) error {
 		authData.Set("expiry", fmt.Sprintf("%d", int64(expiry.Seconds())))
 	}
 
-	client := &http.Client{}
-	r, _ := http.NewRequest(http.MethodPost, getJWTURL, strings.NewReader(authData.Encode())) // URL-encoded payload
-	resp, _ := client.Do(r)
+	resp, err := http.PostForm(getJWTURL, authData)
+	if err != nil {
+		return err
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
