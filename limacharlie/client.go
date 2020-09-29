@@ -1,8 +1,15 @@
 package limacharlie
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -30,6 +37,10 @@ type ClientOptions struct {
 	UID         string
 	JWT         string
 	Environment string
+}
+
+type jwtResponse struct {
+	JWT string `json:"jwt"`
 }
 
 func NewClient(opts ...ClientOptions) (*Client, error) {
@@ -94,5 +105,46 @@ func validateUUID(s string) error {
 	if _, err := uuid.Parse(s); err != nil {
 		return NewInvalidClientOptionsError(err.Error())
 	}
+	return nil
+}
+
+func (c *Client) refreshJWT(expiry time.Duration) error {
+	if c.options.APIKey == "" {
+		return NoAPIKeyConfiguredError
+	}
+	authData := url.Values{}
+	authData.Set("secret", c.options.APIKey)
+	if c.options.UID != "" {
+		authData.Set("uid", c.options.UID)
+	}
+	if c.options.OID != "" {
+		authData.Set("oid", c.options.OID)
+	}
+	if expiry != 0 {
+		authData.Set("expiry", fmt.Sprintf("%d", int64(expiry.Seconds())))
+	}
+
+	client := &http.Client{}
+	r, _ := http.NewRequest(http.MethodPost, getJWTURL, strings.NewReader(authData.Encode())) // URL-encoded payload
+	resp, _ := client.Do(r)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return NewRESTError(resp.Status)
+	}
+
+	respData := bytes.Buffer{}
+	if _, err := io.Copy(&respData, resp.Body); err != nil {
+		return err
+	}
+
+	// We should have a valid JWT.
+	jwtData := jwtResponse{}
+	if err := json.Unmarshal(respData.Bytes(), &jwtData); err != nil {
+		return err
+	}
+
+	c.options.JWT = jwtData.JWT
+
 	return nil
 }

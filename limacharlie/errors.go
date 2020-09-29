@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -14,4 +15,18 @@ func NewInvalidClientOptionsError(err string) InvalidClientOptionsError {
 
 func (e InvalidClientOptionsError) Error() string {
 	return fmt.Sprintf("invalid client options: %s", e.s)
+}
+
+var NoAPIKeyConfiguredError = errors.New("no api key configured")
+
+type RESTError struct {
+	s string
+}
+
+func NewRESTError(err string) RESTError {
+	return RESTError{s: err}
+}
+
+func (e RESTError) Error() string {
+	return fmt.Sprintf("api error: %s", e.s)
 }
