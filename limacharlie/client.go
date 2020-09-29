@@ -17,6 +17,7 @@ const (
 	oidEnvVar                 = "LC_OID"
 	uidEnvVar                 = "LC_UID"
 	keyEnvVar                 = "LC_API_KEY"
+	credsEnvVar               = "LC_CREDS_FILE"
 )
 
 type Client struct {
@@ -58,7 +59,11 @@ func NewClient(opts ...ClientOptions) (*Client, error) {
 	// If neither OrgID or UserID is specified
 	// we need to parse the config to auto-detect.
 	if c.options.OID == "" && c.options.UID == "" {
-		if err := c.options.FromConfigFile(defaultConfigFileLocation, c.options.Environment); err != nil {
+		configFile := defaultConfigFileLocation
+		if globalEnv := os.Getenv(credsEnvVar); globalEnv != "" {
+			configFile = globalEnv
+		}
+		if err := c.options.FromConfigFile(configFile, c.options.Environment); err != nil {
 			return nil, err
 		}
 	}
