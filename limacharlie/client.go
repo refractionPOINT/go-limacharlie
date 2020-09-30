@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,8 +50,8 @@ type restRequest struct {
 	nRetries int
 	timeout  time.Duration
 
-	queryData map[string]interface{}
-	formData  map[string]interface{}
+	queryData interface{}
+	formData  interface{}
 
 	response interface{}
 }
@@ -197,25 +199,67 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 	return err
 }
 
+func getStringKV(d interface{}) (map[string]string, error) {
+	b, err := json.Marshal(d)
+	if err != nil {
+		return nil, err
+	}
+	o := map[string]interface{}{}
+	if err := json.Unmarshal(b, &o); err != nil {
+		return nil, err
+	}
+	m := map[string]string{}
+	for k, v := range o {
+		m[k] = fmt.Sprintf("%v", v)
+	}
+	return m, nil
+}
+
 func (c *Client) request(verb string, path string, request restRequest) (int, error) {
-	r, err := http.NewRequest(verb, fmt.Sprintf("%s/%s/%s", rootURL, currentAPIVersion, path), nil)
+	headers := map[string]string{}
+	var body io.Reader
+	rawQuery := ""
+
+	fData, err := getStringKV(request.formData)
 	if err != nil {
 		return 0, err
 	}
-	for k, v := range request.formData {
-		s := fmt.Sprintf("%v", v)
-		r.Form.Add(k, s)
-	}
-	if len(request.queryData) != 0 {
-		q := r.URL.Query()
-		for k, v := range request.queryData {
-			s := fmt.Sprintf("%v", v)
-			q.Add(k, s)
+
+	if len(fData) != 0 {
+		vals := url.Values{}
+		for k, v := range fData {
+			vals.Set(k, v)
 		}
-		r.URL.RawQuery = q.Encode()
+		body = strings.NewReader(vals.Encode())
+		headers["Content-Type"] = "application/x-www-form-urlencoded"
 	}
+
+	qData, err := getStringKV(request.queryData)
+	if err != nil {
+		return 0, err
+	}
+	if len(qData) != 0 {
+		vals := url.Values{}
+		for k, v := range qData {
+			vals.Set(k, v)
+		}
+		rawQuery = vals.Encode()
+	}
+
+	r, err := http.NewRequest(verb, fmt.Sprintf("%s/%s/%s", rootURL, currentAPIVersion, path), body)
+	if err != nil {
+		return 0, err
+	}
+
 	r.Header.Set("User-Agent", "limacharlie-sdk")
 	r.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.options.JWT))
+	for k, v := range headers {
+		r.Header.Set(k, v)
+	}
+
+	if rawQuery != "" {
+		r.URL.RawQuery = rawQuery
+	}
 
 	resp, err := getHttpClient(request.timeout).Do(r)
 	if err != nil {
@@ -224,7 +268,12 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return resp.StatusCode, NewRESTError(resp.Status)
+		// The API gateway returns error details in the body.
+		errorStr := ""
+		if errorDetails, err := ioutil.ReadAll(resp.Body); err == nil {
+			errorStr = string(errorDetails)
+		}
+		return resp.StatusCode, NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
 	}
 
 	respData := bytes.Buffer{}

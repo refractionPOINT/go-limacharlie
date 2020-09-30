@@ -32,3 +32,15 @@ func (e RESTError) Error() string {
 }
 
 var ResourceNotFoundError = errors.New("resource not found")
+
+type BadRequestError struct {
+	s string
+}
+
+func NewBadRequestError(err string) BadRequestError {
+	return BadRequestError{s: err}
+}
+
+func (e BadRequestError) Error() string {
+	return fmt.Sprintf("bad request: %s", e.s)
+}
