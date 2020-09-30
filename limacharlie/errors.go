@@ -30,3 +30,5 @@ func NewRESTError(err string) RESTError {
 func (e RESTError) Error() string {
 	return fmt.Sprintf("api error: %s", e.s)
 }
+
+var ResourceNotFoundError = errors.New("resource not found")

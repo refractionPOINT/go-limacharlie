@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -31,15 +32,26 @@ type Client struct {
 }
 
 type ClientOptions struct {
-	OID         string
-	APIKey      string
-	UID         string
-	JWT         string
-	Environment string
+	OID           string
+	APIKey        string
+	UID           string
+	JWT           string
+	Environment   string
+	JWTExpiryTime time.Duration
 }
 
 type jwtResponse struct {
 	JWT string `json:"jwt"`
+}
+
+type restRequest struct {
+	nRetries int
+	timeout  time.Duration
+
+	queryData map[string]interface{}
+	formData  map[string]interface{}
+
+	response interface{}
 }
 
 func NewClient(opts ...ClientOptions) (*Client, error) {
@@ -147,4 +159,92 @@ func (c *Client) refreshJWT(expiry time.Duration) error {
 	c.options.JWT = jwtData.JWT
 
 	return nil
+}
+
+func getHttpClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: 10 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
+	}
+}
+
+func (c *Client) reliableRequest(verb string, path string, request restRequest) error {
+	request.nRetries += 1
+	var err error
+	for request.nRetries > 0 {
+		var statusCode int
+		statusCode, err = c.request(verb, path, request)
+		if err == nil && statusCode == 200 {
+			break
+		}
+		request.nRetries -= 1
+
+		if statusCode == 401 {
+			// Unauthorized, the JWT may have expired, refresh
+			// it and retry.
+			if err := c.refreshJWT(c.options.JWTExpiryTime); err != nil {
+				// If we cannot get a new JWT there is no point in
+				// retrying with bad creds.
+				return err
+			}
+		}
+	}
+	return err
+}
+
+func (c *Client) request(verb string, path string, request restRequest) (int, error) {
+	r, err := http.NewRequest(verb, fmt.Sprintf("%s/%s/%s", rootURL, currentAPIVersion, path), nil)
+	if err != nil {
+		return 0, err
+	}
+	for k, v := range request.formData {
+		s := fmt.Sprintf("%v", v)
+		r.Form.Add(k, s)
+	}
+	if len(request.queryData) != 0 {
+		q := r.URL.Query()
+		for k, v := range request.queryData {
+			s := fmt.Sprintf("%v", v)
+			q.Add(k, s)
+		}
+		r.URL.RawQuery = q.Encode()
+	}
+	r.Header.Set("User-Agent", "limacharlie-sdk")
+	r.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.options.JWT))
+
+	resp, err := getHttpClient(request.timeout).Do(r)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return resp.StatusCode, NewRESTError(resp.Status)
+	}
+
+	respData := bytes.Buffer{}
+	if _, err := io.Copy(&respData, resp.Body); err != nil {
+		return resp.StatusCode, err
+	}
+	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
+		return resp.StatusCode, err
+	}
+	return resp.StatusCode, nil
+}
+
+func (c *Client) WhoAmI() (map[string]interface{}, error) {
+	who := map[string]interface{}{}
+	if err := c.reliableRequest(http.MethodGet, "who", restRequest{
+		nRetries: 3,
+		timeout:  5 * time.Second,
+		response: &who,
+	}); err != nil {
+		return nil, err
+	}
+	return who, nil
 }
