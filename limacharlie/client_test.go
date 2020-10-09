@@ -43,7 +43,7 @@ func TestClientAndJWT(t *testing.T) {
 func TestWho(t *testing.T) {
 	c := getTestClient(t)
 
-	data, err := c.WhoAmI()
+	data, err := c.whoAmI()
 	if err != nil {
 		t.Errorf("failed to get JWT info: %v", err)
 	}

@@ -290,7 +290,7 @@ type whoAmIJsonResponse struct {
 	Permissions     *[]string            `json:"perms"`
 }
 
-func (c *Client) WhoAmI() (*whoAmIJsonResponse, error) {
+func (c *Client) whoAmI() (*whoAmIJsonResponse, error) {
 	who := whoAmIJsonResponse{}
 	if err := c.reliableRequest(http.MethodGet, "who", restRequest{
 		nRetries: 3,
