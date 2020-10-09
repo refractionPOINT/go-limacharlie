@@ -47,13 +47,11 @@ type jwtResponse struct {
 }
 
 type restRequest struct {
-	nRetries int
-	timeout  time.Duration
-
+	nRetries  int
+	timeout   time.Duration
 	queryData interface{}
 	formData  interface{}
-
-	response interface{}
+	response  interface{}
 }
 
 func NewClient(opts ...ClientOptions) (*Client, error) {
@@ -286,8 +284,14 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	return resp.StatusCode, nil
 }
 
-func (c *Client) WhoAmI() (map[string]interface{}, error) {
-	who := map[string]interface{}{}
+type whoAmIJsonResponse struct {
+	UserPermissions *map[string][]string `json:"user_perms"`
+	Organizations   *map[string][]string `json:"orgs"`
+	Permissions     *[]string            `json:"perms"`
+}
+
+func (c *Client) WhoAmI() (*whoAmIJsonResponse, error) {
+	who := whoAmIJsonResponse{}
 	if err := c.reliableRequest(http.MethodGet, "who", restRequest{
 		nRetries: 3,
 		timeout:  5 * time.Second,
@@ -295,5 +299,5 @@ func (c *Client) WhoAmI() (map[string]interface{}, error) {
 	}); err != nil {
 		return nil, err
 	}
-	return who, nil
+	return &who, nil
 }
