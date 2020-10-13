@@ -174,7 +174,7 @@ func getHttpClient(timeout time.Duration) *http.Client {
 }
 
 func (c *Client) reliableRequest(verb string, path string, request restRequest) error {
-	request.nRetries += 1
+	request.nRetries++
 	var err error
 	for request.nRetries > 0 {
 		var statusCode int
@@ -182,7 +182,7 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 		if err == nil && statusCode == 200 {
 			break
 		}
-		request.nRetries -= 1
+		request.nRetries--
 
 		if statusCode == 401 {
 			// Unauthorized, the JWT may have expired, refresh
