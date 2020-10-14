@@ -31,9 +31,9 @@ func Authorize(clientOpts ClientOptions, permissions []string) (*Organization, e
 
 	missing := []string{}
 	mapPermissions := mapFromArray(permissions)
-	for k := range mapPermissions {
-		if _, found := mapPermissions[k]; !found {
-			missing = append(missing, k)
+	for _, p := range permissions {
+		if _, found := mapPermissions[p]; !found {
+			missing = append(missing, p)
 		}
 	}
 
