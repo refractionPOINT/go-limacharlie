@@ -36,6 +36,14 @@ type Firehose struct {
 	Organization Organization
 }
 
+type firehoseHandler struct {
+	Options FirehoseOptions
+}
+
+func (firehoseHandler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
+
+}
+
 func createSelfSignedCertificate() (*tls.Certificate, error) {
 	certPrivateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
@@ -110,8 +118,10 @@ func Start(org Organization, opts FirehoseOptions) (*Firehose, error) {
 		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
 	}
 	srv := &http.Server{
-		Addr:      fmt.Sprintf("%s:%s", opts.ListenOnIP, opts.ListenOnPort),
-		TLSConfig: &tlsConfig,
+		Addr:        fmt.Sprintf("%s:%s", opts.ListenOnIP, opts.ListenOnPort),
+		TLSConfig:   &tlsConfig,
+		Handler:     firehoseHandler{opts},
+		IdleTimeout: time.Duration(5 * time.Second),
 	}
 	srv.ListenAndServeTLS("", "")
 	return nil, nil
