@@ -7,10 +7,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -50,7 +52,6 @@ func createSelfSignedCertificate() (*tls.Certificate, error) {
 		return nil, err
 	}
 	certTemplate := x509.Certificate{
-		// SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
 			CommonName:    "limacharlie_firehose",
 			Organization:  []string{"refractionPOINT"},
@@ -117,12 +118,54 @@ func Start(org Organization, opts FirehoseOptions) (*Firehose, error) {
 		Certificates: []tls.Certificate{*certificate},
 		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
 	}
-	srv := &http.Server{
-		Addr:        fmt.Sprintf("%s:%s", opts.ListenOnIP, opts.ListenOnPort),
-		TLSConfig:   &tlsConfig,
-		Handler:     firehoseHandler{opts},
-		IdleTimeout: time.Duration(5 * time.Second),
+	tlsListener, err := tls.Listen("tcp", fmt.Sprintf("%s:%s", opts.ListenOnIP, opts.ListenOnPort), &tlsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("could not start TLS listener: %s", err)
 	}
-	srv.ListenAndServeTLS("", "")
+	go handleConnections(tlsListener, opts)
+
+	// FIX return value
 	return nil, nil
+}
+
+func handleConnections(listener net.Listener, opts FirehoseOptions) {
+	readBufferSize := 1024 * 512
+	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
+	var currentData string
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			// TODO log error
+			continue
+		}
+		defer conn.Close()
+
+		sizeRead, err := conn.Read(readBuffer.Bytes())
+		if err != nil {
+			// TODO log error
+			continue
+		}
+		if sizeRead == 0 {
+			// TODO log
+			continue
+		}
+		chunks := strings.Split(readBuffer.String(), "\n")
+		isContinuation := len(chunks) == 1
+		if isContinuation {
+			currentData += chunks[0]
+			continue
+		}
+		for _, chunk := range chunks {
+			currentData += chunk
+			if len(currentData) == 0 {
+				continue
+			}
+			isValid := json.Valid([]byte(currentData))
+			if isValid {
+				// TODO add to queue
+			} else {
+				// TODO add to dropped
+			}
+		}
+	}
 }
