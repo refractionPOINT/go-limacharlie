@@ -34,8 +34,14 @@ type FirehoseOptions struct {
 	// on_dropped (func): callback called with a data item when the item will otherwise be dropped.
 }
 
+type FirehoseMessage struct {
+	Message string
+	IsValid bool
+}
+
 type Firehose struct {
 	Organization Organization
+	Messages     chan FirehoseMessage
 }
 
 type firehoseHandler struct {
@@ -122,13 +128,16 @@ func Start(org Organization, opts FirehoseOptions) (*Firehose, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not start TLS listener: %s", err)
 	}
-	go handleConnections(tlsListener, opts)
+	defer tlsListener.Close()
+
+	messages := make(chan FirehoseMessage, 64)
+	go handleConnections(tlsListener, opts, messages)
 
 	// FIX return value
 	return nil, nil
 }
 
-func handleConnections(listener net.Listener, opts FirehoseOptions) {
+func handleConnections(listener net.Listener, opts FirehoseOptions, messages chan FirehoseMessage) {
 	readBufferSize := 1024 * 512
 	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
 	var currentData string
@@ -161,11 +170,8 @@ func handleConnections(listener net.Listener, opts FirehoseOptions) {
 				continue
 			}
 			isValid := json.Valid([]byte(currentData))
-			if isValid {
-				// TODO add to queue
-			} else {
-				// TODO add to dropped
-			}
+			// TODO add dropped count
+			messages <- FirehoseMessage{currentData, isValid}
 		}
 	}
 }
