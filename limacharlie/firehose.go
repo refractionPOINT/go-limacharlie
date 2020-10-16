@@ -40,16 +40,15 @@ type FirehoseMessage struct {
 }
 
 type Firehose struct {
-	Organization Organization
-	Messages     chan FirehoseMessage
+	Organization     Organization
+	Messages         chan FirehoseMessage
+	messageDropCount *int
+	listener         net.Listener
+	isRunning        bool
 }
 
 type firehoseHandler struct {
 	Options FirehoseOptions
-}
-
-func (firehoseHandler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
-
 }
 
 func createSelfSignedCertificate() (*tls.Certificate, error) {
@@ -95,27 +94,27 @@ func createSelfSignedCertificate() (*tls.Certificate, error) {
 	return &cert, nil
 }
 
-func Start(org Organization, opts FirehoseOptions) (*Firehose, error) {
+func Start(org Organization, opts FirehoseOptions) (Firehose, error) {
 	createTempCert := len(opts.SSLCertPath) == 0
 	createTempKey := len(opts.SSLCertKeyPath) == 0
 	if createTempCert && !createTempKey {
-		return nil, fmt.Errorf("certificate key path missing")
+		return Firehose{}, fmt.Errorf("certificate key path missing")
 	}
 	if !createTempCert && createTempKey {
-		return nil, fmt.Errorf("certificate path missing")
+		return Firehose{}, fmt.Errorf("certificate path missing")
 	}
 
 	var certificate *tls.Certificate = nil
 	if createTempCert && createTempKey {
 		tempCert, err := createSelfSignedCertificate()
 		if err != nil {
-			return nil, fmt.Errorf("could not create self signed certificate: %s", err)
+			return Firehose{}, fmt.Errorf("could not create self signed certificate: %s", err)
 		}
 		certificate = tempCert
 	} else {
 		tempCert, err := tls.LoadX509KeyPair(opts.SSLCertPath, opts.SSLCertKeyPath)
 		if err != nil {
-			return nil, fmt.Errorf("error loading certificate with cert path '%s' and key path '%s': %s", opts.SSLCertPath, opts.SSLCertKeyPath, err)
+			return Firehose{}, fmt.Errorf("error loading certificate with cert path '%s' and key path '%s': %s", opts.SSLCertPath, opts.SSLCertKeyPath, err)
 		}
 		certificate = &tempCert
 	}
@@ -126,18 +125,16 @@ func Start(org Organization, opts FirehoseOptions) (*Firehose, error) {
 	}
 	tlsListener, err := tls.Listen("tcp", fmt.Sprintf("%s:%s", opts.ListenOnIP, opts.ListenOnPort), &tlsConfig)
 	if err != nil {
-		return nil, fmt.Errorf("could not start TLS listener: %s", err)
+		return Firehose{}, fmt.Errorf("could not start TLS listener: %s", err)
 	}
-	defer tlsListener.Close()
 
 	messages := make(chan FirehoseMessage, 64)
-	go handleConnections(tlsListener, opts, messages)
-
-	// FIX return value
-	return nil, nil
+	var messageDropCount int = 0
+	go handleConnections(tlsListener, opts, messages, &messageDropCount)
+	return Firehose{org, messages, &messageDropCount, tlsListener, true}, nil
 }
 
-func handleConnections(listener net.Listener, opts FirehoseOptions, messages chan FirehoseMessage) {
+func handleConnections(listener net.Listener, opts FirehoseOptions, messages chan FirehoseMessage, messageDropCount *int) {
 	readBufferSize := 1024 * 512
 	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
 	var currentData string
@@ -170,8 +167,27 @@ func handleConnections(listener net.Listener, opts FirehoseOptions, messages cha
 				continue
 			}
 			isValid := json.Valid([]byte(currentData))
-			// TODO add dropped count
+			if !isValid {
+				*messageDropCount++
+			}
 			messages <- FirehoseMessage{currentData, isValid}
 		}
 	}
+}
+
+func (fh Firehose) Shutdown() {
+	if !fh.isRunning {
+		return
+	}
+	fh.isRunning = false
+
+	defer fh.listener.Close()
+}
+
+func (fh Firehose) GetMessageDropCount() int {
+	return *fh.messageDropCount
+}
+
+func (fh Firehose) ResetMessageDropCount() {
+	*fh.messageDropCount = 0
 }
