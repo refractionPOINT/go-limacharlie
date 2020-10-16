@@ -5,28 +5,53 @@ import (
 )
 
 type Organization struct {
-	Permissions []string
+	client     Client
+	clientOpts ClientOptions
 }
 
-func Authorize(clientOpts ClientOptions, permissions []string) (Organization, error) {
+type Permission struct {
+	Name string
+}
+
+// NoPermission is an empty permission slice
+func NoPermission() []Permission {
+	return make([]Permission, 0)
+}
+
+// MakePermissions create a permission slice based on permissions name
+func MakePermissions(arr []string) []Permission {
+	permissions := make([]Permission, len(arr))
+	for _, p := range arr {
+		permissions = append(permissions, Permission{p})
+	}
+	return permissions
+}
+
+func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
 	c, err := NewClient(clientOpts)
 	if err != nil {
 		return Organization{}, fmt.Errorf("Could not initialize client: %s", err)
 	}
-	result, err := c.whoAmI()
+	return Organization{*c, clientOpts}, nil
+}
+
+// Authorize validate requested permissions for the organization
+func (org Organization) Authorize(permissions []string) ([]Permission, error) {
+	effective := NoPermission()
+	result, err := org.client.whoAmI()
 	if err != nil {
-		return Organization{}, fmt.Errorf("Error with WhoAmI request: %s", err)
+		return effective, fmt.Errorf("Error with WhoAmI request: %s", err)
 	}
 
-	effective := []string{}
 	if result.UserPermissions != nil && len(*result.UserPermissions) > 1 {
 		// permissions for multiple orgs
-		effective, _ = (*result.UserPermissions)[clientOpts.OID]
+		effectiveNames, _ := (*result.UserPermissions)[org.clientOpts.OID]
+		effective = MakePermissions(effectiveNames)
 	} else if result.Organizations != nil {
 		// machine permissions
-		if _, found := (*result.Organizations)[clientOpts.OID]; found {
+		if _, found := (*result.Organizations)[org.clientOpts.OID]; found {
 			if result.Permissions != nil {
-				effective = *result.Permissions
+				effective = MakePermissions(*result.Permissions)
 			}
 		}
 	}
@@ -40,9 +65,9 @@ func Authorize(clientOpts ClientOptions, permissions []string) (Organization, er
 	}
 
 	if len(missing) > 1 {
-		return Organization{}, fmt.Errorf("Unauthorized, missing permissions: %q", missing)
+		return NoPermission(), fmt.Errorf("Unauthorized, missing permissions: %q", missing)
 	}
-	return Organization{effective}, nil
+	return effective, nil
 }
 
 func mapFromArray(arr []string) map[string]int {
