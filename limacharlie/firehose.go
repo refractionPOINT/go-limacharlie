@@ -17,34 +17,35 @@ import (
 )
 
 type FirehoseOptions struct {
-	Name              string
-	ListenOnPort      int
-	ListenOnIP        net.IP
-	ConnectToPort     int
-	ConnectToIP       net.IP
-	SSLCertPath       string
-	SSLCertKeyPath    string
-	MaxMessageCount   int
-	InvestigationID   string
-	EventTag          string
-	DetectionCategory string
-	SensorID          string
-	DeleteOnFailure   bool
+	Name                 string
+	ListenOnPort         int
+	ListenOnIP           net.IP
+	ConnectToPort        int
+	ConnectToIP          net.IP
+	SSLCertPath          string
+	SSLCertKeyPath       string
+	MaxMessageCount      int
+	MaxErrorMessageCount int
+	InvestigationID      string
+	EventTag             string
+	DetectionCategory    string
+	SensorID             string
+	DeleteOnFailure      bool
 	// is_parse (bool): if set to True (default) the data will be parsed as JSON to native Python.
 	// on_dropped (func): callback called with a data item when the item will otherwise be dropped.
 }
 
 type FirehoseMessage struct {
 	Message string
-	IsValid bool
 }
 
 type Firehose struct {
 	Organization     Organization
 	Messages         chan FirehoseMessage
+	ErrorMessages    chan FirehoseMessage
 	messageDropCount *int
 	listener         net.Listener
-	isRunning        bool
+	isRunning        *bool
 }
 
 type firehoseHandler struct {
@@ -128,17 +129,20 @@ func Start(org Organization, opts FirehoseOptions) (Firehose, error) {
 		return Firehose{}, fmt.Errorf("could not start TLS listener: %s", err)
 	}
 
-	messages := make(chan FirehoseMessage, 64)
+	messages := make(chan FirehoseMessage, opts.MaxMessageCount)
+	errorMessages := make(chan FirehoseMessage, opts.MaxErrorMessageCount)
+
+	var isRunning = true
 	var messageDropCount int = 0
-	go handleConnections(tlsListener, opts, messages, &messageDropCount)
-	return Firehose{org, messages, &messageDropCount, tlsListener, true}, nil
+	go handleConnections(tlsListener, &isRunning, opts, messages, errorMessages, &messageDropCount)
+	return Firehose{org, messages, errorMessages, &messageDropCount, tlsListener, &isRunning}, nil
 }
 
-func handleConnections(listener net.Listener, opts FirehoseOptions, messages chan FirehoseMessage, messageDropCount *int) {
+func handleConnections(listener net.Listener, isRunning *bool, opts FirehoseOptions, messages chan FirehoseMessage, errorMessages chan FirehoseMessage, messageDropCount *int) {
 	readBufferSize := 1024 * 512
 	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
 	var currentData string
-	for {
+	for *isRunning {
 		conn, err := listener.Accept()
 		if err != nil {
 			// TODO log error
@@ -166,20 +170,27 @@ func handleConnections(listener net.Listener, opts FirehoseOptions, messages cha
 			if len(currentData) == 0 {
 				continue
 			}
+			message := FirehoseMessage{currentData}
 			isValid := json.Valid([]byte(currentData))
-			if !isValid {
+			if isValid && len(messages) < opts.MaxMessageCount {
+				messages <- message
+			} else {
 				*messageDropCount++
+				if len(errorMessages) < opts.MaxErrorMessageCount {
+					errorMessages <- message
+				} else {
+					// TODO log
+				}
 			}
-			messages <- FirehoseMessage{currentData, isValid}
 		}
 	}
 }
 
 func (fh Firehose) Shutdown() {
-	if !fh.isRunning {
+	if !*fh.isRunning {
 		return
 	}
-	fh.isRunning = false
+	*fh.isRunning = false
 
 	defer fh.listener.Close()
 }
