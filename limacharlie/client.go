@@ -27,6 +27,9 @@ const (
 	uidEnvVar                 = "LC_UID"
 	keyEnvVar                 = "LC_API_KEY"
 	credsEnvVar               = "LC_CREDS_FILE"
+
+	restRetries = 3
+	restTimeout = 5 * time.Second
 )
 
 type Client struct {
@@ -52,6 +55,14 @@ type restRequest struct {
 	queryData interface{}
 	formData  interface{}
 	response  interface{}
+}
+
+func makeDefaultRequest(response interface{}) restRequest {
+	return restRequest{
+		nRetries: restRetries,
+		timeout:  restTimeout,
+		response: response,
+	}
 }
 
 func NewClient(opts ...ClientOptions) (*Client, error) {
@@ -285,18 +296,17 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 }
 
 type whoAmIJsonResponse struct {
-	UserPermissions *map[string][]string `json:"user_perms"`
-	Organizations   *map[string][]string `json:"orgs"`
+	UserPermissions *map[string][]string `json:"user_perms:omitempty"`
+	Organizations   *[]string            `json:"orgs"`
 	Permissions     *[]string            `json:"perms"`
+	Identity        *string              `json:"ident"`
 }
+
+type outputJsonResponse map[string]interface{}
 
 func (c *Client) whoAmI() (whoAmIJsonResponse, error) {
 	who := whoAmIJsonResponse{}
-	if err := c.reliableRequest(http.MethodGet, "who", restRequest{
-		nRetries: 3,
-		timeout:  5 * time.Second,
-		response: &who,
-	}); err != nil {
+	if err := c.reliableRequest(http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
 		return whoAmIJsonResponse{}, err
 	}
 	return who, nil

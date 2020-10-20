@@ -6,6 +6,18 @@ import (
 	"time"
 )
 
+func assert(t *testing.T, message string) {
+	t.Errorf(message)
+	t.FailNow()
+}
+
+func AssertIsNotError(t *testing.T, err error, message string) {
+	if err != nil {
+		t.Errorf("%s: %v", message, err)
+		t.FailNow()
+	}
+}
+
 func getTestOptions(t *testing.T) ClientOptions {
 	testOID := os.Getenv("_OID")
 	testKey := os.Getenv("_KEY")
@@ -13,8 +25,7 @@ func getTestOptions(t *testing.T) ClientOptions {
 	if testKey == "" || testOID == "" {
 		// Looks like test credentials
 		// are not configured.
-		t.Errorf("test credentials not provided")
-		t.FailNow()
+		assert(t, "test credentials not provided")
 	}
 
 	return ClientOptions{
@@ -25,29 +36,22 @@ func getTestOptions(t *testing.T) ClientOptions {
 
 func getTestClient(t *testing.T) *Client {
 	c, err := NewClient(getTestOptions(t))
-	if err != nil {
-		t.Errorf("failed to create client: %v", err)
-		t.FailNow()
-	}
+	AssertIsNotError(t, err, "failed to create client")
 	return c
 }
 
 func TestClientAndJWT(t *testing.T) {
 	c := getTestClient(t)
-
-	if err := c.refreshJWT(60 * 30 * time.Second); err != nil {
-		t.Errorf("failed to get jwt: %v", err)
-	}
+	err := c.refreshJWT(60 * 30 * time.Second)
+	AssertIsNotError(t, err, "failed to get jwt")
 }
 
 func TestWho(t *testing.T) {
 	c := getTestClient(t)
+	who, err := c.whoAmI()
+	AssertIsNotError(t, err, "failed to get WhoAmI response")
 
-	data, err := c.whoAmI()
-	if err != nil {
-		t.Errorf("failed to get JWT info: %v", err)
-	}
-	if ident, ok := data["ident"]; !ok || ident == "" {
-		t.Errorf("error getting basic JWT info: %+v", data)
+	if *who.Identity == "" {
+		t.Errorf("error getting basic JWT info")
 	}
 }
