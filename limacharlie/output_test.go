@@ -5,7 +5,7 @@ import (
 )
 
 func TestOutputList(t *testing.T) {
-	c := getTestClient(t)
+	c := getTestClientFromEnv(t)
 	outputs, err := c.Outputs()
 	if err != nil {
 		t.Errorf("failed to get outputs: %v", err)
@@ -16,7 +16,7 @@ func TestOutputList(t *testing.T) {
 }
 
 func TestOutputAddDelete(t *testing.T) {
-	c := getTestClient(t)
+	c := getTestClientFromEnv(t)
 	outputs, err := c.Outputs()
 	if err != nil {
 		t.Errorf("failed to get outputs: %v", err)
