@@ -9,6 +9,14 @@ type Organization struct {
 	clientOpts ClientOptions
 }
 
+func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
+	c, err := NewClient(clientOpts)
+	if err != nil {
+		return Organization{}, fmt.Errorf("Could not initialize client: %s", err)
+	}
+	return Organization{*c, clientOpts}, nil
+}
+
 type Permission struct {
 	Name string
 }
@@ -21,18 +29,19 @@ func NoPermission() []Permission {
 // MakePermissions create a permission slice based on permissions name
 func MakePermissions(arr []string) []Permission {
 	permissions := make([]Permission, len(arr))
-	for _, p := range arr {
-		permissions = append(permissions, Permission{p})
+	for i, p := range arr {
+		permissions[i] = Permission{p}
 	}
 	return permissions
 }
 
-func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
-	c, err := NewClient(clientOpts)
-	if err != nil {
-		return Organization{}, fmt.Errorf("Could not initialize client: %s", err)
+func arrayExistsInString(key string, arr []string) bool {
+	searchMap := map[string]interface{}{}
+	for _, v := range arr {
+		searchMap[v] = v
 	}
-	return Organization{*c, clientOpts}, nil
+	_, found := searchMap[key]
+	return found
 }
 
 // Authorize validate requested permissions for the organization
@@ -48,8 +57,10 @@ func (org Organization) Authorize(permissions []string) ([]Permission, error) {
 		effectiveNames, _ := (*result.UserPermissions)[org.clientOpts.OID]
 		effective = MakePermissions(effectiveNames)
 	} else if result.Organizations != nil {
-		// machine permissions
-		if _, found := (*result.Organizations)[org.clientOpts.OID]; found {
+		// machine token
+		orgs := *result.Organizations
+		found := arrayExistsInString(org.clientOpts.OID, orgs)
+		if found {
 			if result.Permissions != nil {
 				effective = MakePermissions(*result.Permissions)
 			}

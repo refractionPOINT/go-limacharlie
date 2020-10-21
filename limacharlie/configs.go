@@ -2,11 +2,10 @@ package limacharlie
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os/user"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
 // The actual config file format may seem a bit odd
