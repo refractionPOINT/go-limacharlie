@@ -65,6 +65,16 @@ func makeDefaultRequest(response interface{}) restRequest {
 	}
 }
 
+func (r restRequest) withTimeout(timeout time.Duration) restRequest {
+	r.timeout = timeout
+	return r
+}
+
+func (r restRequest) withFormData(formData interface{}) restRequest {
+	r.formData = formData
+	return r
+}
+
 func NewClient(opts ...ClientOptions) (*Client, error) {
 	c := &Client{}
 
@@ -289,6 +299,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	if _, err := io.Copy(&respData, resp.Body); err != nil {
 		return resp.StatusCode, err
 	}
+
 	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
 		return resp.StatusCode, err
 	}
@@ -304,10 +315,14 @@ type whoAmIJsonResponse struct {
 
 type outputJsonResponse map[string]interface{}
 
-func (c *Client) whoAmI() (whoAmIJsonResponse, error) {
+func (c Client) whoAmI() (whoAmIJsonResponse, error) {
 	who := whoAmIJsonResponse{}
 	if err := c.reliableRequest(http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
 		return whoAmIJsonResponse{}, err
 	}
 	return who, nil
+}
+
+func (c Client) outputs(verb string, request restRequest) error {
+	return c.reliableRequest(verb, fmt.Sprintf("outputs/%s", c.options.OID), request)
 }

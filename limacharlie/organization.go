@@ -5,8 +5,7 @@ import (
 )
 
 type Organization struct {
-	client     Client
-	clientOpts ClientOptions
+	client Client
 }
 
 func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
@@ -14,7 +13,7 @@ func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
 	if err != nil {
 		return Organization{}, fmt.Errorf("Could not initialize client: %s", err)
 	}
-	return Organization{*c, clientOpts}, nil
+	return Organization{*c}, nil
 }
 
 type Permission struct {
@@ -54,12 +53,12 @@ func (org Organization) Authorize(permissionsNeeded []string) ([]Permission, err
 
 	if result.UserPermissions != nil && len(*result.UserPermissions) > 1 {
 		// permissions for multiple orgs
-		effectiveNames, _ := (*result.UserPermissions)[org.clientOpts.OID]
+		effectiveNames, _ := (*result.UserPermissions)[org.client.options.OID]
 		effective = MakePermissions(effectiveNames)
 	} else if result.Organizations != nil {
 		// machine token
 		orgs := *result.Organizations
-		found := arrayExistsInString(org.clientOpts.OID, orgs)
+		found := arrayExistsInString(org.client.options.OID, orgs)
 		if found {
 			if result.Permissions != nil {
 				effective = MakePermissions(*result.Permissions)

@@ -17,7 +17,7 @@ func assertIsError(t *testing.T, err error, expectedErr error) {
 }
 
 func assertIsErrorMessage(t *testing.T, err error, expectedMessage string) {
-	// assertIsNotError(t, err, "Error is nil")
+	assert(t, err != nil, "error is nil")
 	actualMessage := err.Error()
 	assert(t, actualMessage != expectedMessage, fmt.Sprintf("Actual != expected ('%s' != '%s')", actualMessage, expectedMessage))
 }
@@ -30,7 +30,7 @@ func assertNotNil(t *testing.T, ptr *interface{}) {
 	assert(t, ptr == nil, "pointer is nil")
 }
 
-func assertNotEmptyString(t *testing.T, str string) {
+func assertEmptyString(t *testing.T, str string) {
 	l := len(str)
 	assert(t, l != 0, fmt.Sprintf("String not empty, length %d", l))
 }

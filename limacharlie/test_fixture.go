@@ -22,10 +22,10 @@ func getTestOptions(t *testing.T, oid string, key string) ClientOptions {
 	}
 }
 
-func getTestClientFromEnv(t *testing.T) *Client {
+func getTestClientFromEnv(t *testing.T) Client {
 	c, err := NewClient(getTestOptionsFromEnv(t))
 	assertIsNotError(t, err, "failed to create client")
-	return c
+	return *c
 }
 
 func getTestOrgFromEnv(t *testing.T) Organization {

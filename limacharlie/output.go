@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 )
@@ -55,8 +54,8 @@ type GenericOutputConfig struct {
 	Module OutputModuleType   `json:"module"`
 	Stream OutputModuleStream `json:"type"`
 
-	PrefixData        bool   `json:"is_prefix_data,omitempty"`
-	DeleteInFailure   bool   `json:"is_delete_on_failure,omitempty"`
+	PrefixData        bool   `json:"is_prefix_data,omitempty,string"`
+	DeleteInFailure   bool   `json:"is_delete_on_failure,omitempty,string"`
 	InvestigationID   string `json:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty"`
 	Category          string `json:"cat,omitempty"`
@@ -69,9 +68,9 @@ type GenericOutputConfig struct {
 	Bucket            string `json:"bucket,omitempty"`
 	UserName          string `json:"username,omitempty"`
 	Password          string `json:"password,omitempty"`
-	TLS               bool   `json:"is_tls,omitempty"`
-	StrictTLS         bool   `json:"is_strict_tls,omitempty"`
-	NoHeader          bool   `json:"is_no_header,omitempty"`
+	TLS               bool   `json:"is_tls,omitempty,string"`
+	StrictTLS         bool   `json:"is_strict_tls,omitempty,string"`
+	NoHeader          bool   `json:"is_no_header,omitempty,string"`
 	StructuredData    string `json:"structured_data,omitempty"`
 	SecretKey         string `json:"secret_key,omitempty"`
 	EventWhiteList    string `json:"event_white_list,omitempty"`
@@ -96,49 +95,37 @@ type GenericOutputConfig struct {
 	HumioToken        string `json:"humio_api_token,omitempty"`
 }
 
-func (c *Client) Outputs() (map[string]interface{}, error) {
-	outputs := map[string]map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodGet, fmt.Sprintf("outputs/%s", c.options.OID), restRequest{
-		nRetries: 3,
-		timeout:  10 * time.Second,
-		response: &outputs,
-	}); err != nil {
+type OutputsByName map[string]GenericOutputConfig
+type outputsByOrgID map[string]OutputsByName
+
+func (org Organization) Outputs() (OutputsByName, error) {
+	outputs := outputsByOrgID{}
+	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
+	if err := org.client.outputs(http.MethodGet, request); err != nil {
 		return nil, err
 	}
 
-	orgOutputs, ok := outputs[c.options.OID]
+	orgOutputs, ok := outputs[org.client.options.OID]
 	if !ok {
 		return nil, ResourceNotFoundError
 	}
 	return orgOutputs, nil
 }
 
-func (c *Client) OutputAdd(config interface{}) (map[string]interface{}, error) {
+func (org Organization) OutputAdd(config interface{}) (map[string]interface{}, error) {
 	resp := map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodPost, fmt.Sprintf("outputs/%s", c.options.OID), restRequest{
-		nRetries: 3,
-		timeout:  10 * time.Second,
-		response: &resp,
-		formData: config,
-	}); err != nil {
+	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(config)
+	if err := org.client.outputs(http.MethodPost, request); err != nil {
 		return nil, err
 	}
-
 	return resp, nil
 }
 
-func (c *Client) OutputDel(name string) (map[string]interface{}, error) {
+func (org Organization) OutputDel(name string) (map[string]interface{}, error) {
 	resp := map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodDelete, fmt.Sprintf("outputs/%s", c.options.OID), restRequest{
-		nRetries: 3,
-		timeout:  10 * time.Second,
-		response: &resp,
-		formData: map[string]string{
-			"name": name,
-		},
-	}); err != nil {
+	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(map[string]string{"name": name})
+	if err := org.client.outputs(http.MethodDelete, request); err != nil {
 		return nil, err
 	}
-
 	return resp, nil
 }
