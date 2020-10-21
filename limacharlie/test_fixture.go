@@ -13,7 +13,8 @@ func getTestOptionsFromEnv(t *testing.T) ClientOptions {
 
 func getTestOptions(t *testing.T, oid string, key string) ClientOptions {
 	// Looks like test credentials are not configured.
-	assert(t, key == "" || oid == "", "test credentials not provided")
+	assert(t, key != "", "key not provided")
+	assert(t, oid != "", "oid not provided")
 
 	return ClientOptions{
 		OID:    oid,

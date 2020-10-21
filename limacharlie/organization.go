@@ -45,7 +45,7 @@ func arrayExistsInString(key string, arr []string) bool {
 }
 
 // Authorize validate requested permissions for the organization
-func (org Organization) Authorize(permissions []string) ([]Permission, error) {
+func (org Organization) Authorize(permissionsNeeded []string) ([]Permission, error) {
 	effective := NoPermission()
 	result, err := org.client.whoAmI()
 	if err != nil {
@@ -68,23 +68,23 @@ func (org Organization) Authorize(permissions []string) ([]Permission, error) {
 	}
 
 	missing := []string{}
-	mapPermissions := mapFromArray(permissions)
-	for _, p := range permissions {
-		if _, found := mapPermissions[p]; !found {
+	mapEffective := mapFromArray(effective)
+	for _, p := range permissionsNeeded {
+		if _, found := mapEffective[p]; !found {
 			missing = append(missing, p)
 		}
 	}
 
-	if len(missing) > 1 {
-		return NoPermission(), fmt.Errorf("Unauthorized, missing permissions: %q", missing)
+	if len(missing) > 0 {
+		return NoPermission(), fmt.Errorf("Unauthorized, missing permissions: '%q'", missing)
 	}
 	return effective, nil
 }
 
-func mapFromArray(arr []string) map[string]int {
+func mapFromArray(arr []Permission) map[string]int {
 	m := map[string]int{}
 	for i, v := range arr {
-		m[v] = i
+		m[v.Name] = i
 	}
 	return m
 }

@@ -15,5 +15,5 @@ func TestWho(t *testing.T) {
 	c := getTestClientFromEnv(t)
 	who, err := c.whoAmI()
 	assertIsNotError(t, err, "failed to get WhoAmI response")
-	assert(t, *who.Identity == "", "error getting basic JWT info")
+	assert(t, *who.Identity != "", "error getting basic JWT info")
 }
