@@ -55,7 +55,7 @@ type GenericOutputConfig struct {
 	Stream OutputModuleStream `json:"type"`
 
 	PrefixData        bool   `json:"is_prefix_data,omitempty,string"`
-	DeleteInFailure   bool   `json:"is_delete_on_failure,omitempty,string"`
+	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string"`
 	InvestigationID   string `json:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty"`
 	Category          string `json:"cat,omitempty"`
@@ -112,11 +112,11 @@ func (org Organization) Outputs() (OutputsByName, error) {
 	return orgOutputs, nil
 }
 
-func (org Organization) OutputAdd(config interface{}) (map[string]interface{}, error) {
-	resp := map[string]interface{}{}
-	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(config)
+func (org Organization) OutputAdd(output GenericOutputConfig) (GenericOutputConfig, error) {
+	resp := GenericOutputConfig{}
+	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
 	if err := org.client.outputs(http.MethodPost, request); err != nil {
-		return nil, err
+		return GenericOutputConfig{}, err
 	}
 	return resp, nil
 }
