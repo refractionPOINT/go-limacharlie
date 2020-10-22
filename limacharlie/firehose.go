@@ -11,14 +11,44 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 )
 
+type FirehoseOutputOptions struct {
+	UniqueName string
+	DataStream OutputModuleStream
+
+	InvestigationID   *string // optional
+	Tag               *string // optional
+	Category          *string // optional
+	IsDeleteOnFailure *bool   // optional
+	// SensorID
+}
+
+func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
+	output := GenericOutputConfig{
+		Name:   opts.UniqueName,
+		Module: OutputTypes.Syslog,
+		Stream: opts.DataStream,
+	}
+	if opts.InvestigationID != nil {
+		output.InvestigationID = *opts.InvestigationID
+	}
+	if opts.Tag != nil {
+		output.Tag = *opts.Tag
+	}
+	if opts.Category != nil {
+		output.Category = *opts.Category
+	}
+	if opts.IsDeleteOnFailure != nil {
+		output.DeleteOnFailure = *opts.IsDeleteOnFailure
+	}
+	return output
+}
+
 type FirehoseOptions struct {
-	Name                 string
-	ListenOnPort         int
+	ListenOnPort         uint16
 	ListenOnIP           net.IP
 	ConnectToPort        int
 	ConnectToIP          net.IP
@@ -41,6 +71,8 @@ type FirehoseMessage struct {
 
 type Firehose struct {
 	Organization     Organization
+	opts             FirehoseOptions
+	outputOpts       *FirehoseOutputOptions
 	Messages         chan FirehoseMessage
 	ErrorMessages    chan FirehoseMessage
 	messageDropCount *int
@@ -95,27 +127,27 @@ func createSelfSignedCertificate() (*tls.Certificate, error) {
 	return &cert, nil
 }
 
-func Start(org Organization, opts FirehoseOptions) (Firehose, error) {
-	createTempCert := len(opts.SSLCertPath) == 0
-	createTempKey := len(opts.SSLCertKeyPath) == 0
+func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, sslCertKeyPath string) (*net.Listener, error) {
+	createTempCert := len(sslCertPath) == 0
+	createTempKey := len(sslCertKeyPath) == 0
 	if createTempCert && !createTempKey {
-		return Firehose{}, fmt.Errorf("certificate key path missing")
+		return nil, fmt.Errorf("certificate key path missing")
 	}
 	if !createTempCert && createTempKey {
-		return Firehose{}, fmt.Errorf("certificate path missing")
+		return nil, fmt.Errorf("certificate path missing")
 	}
 
 	var certificate *tls.Certificate = nil
 	if createTempCert && createTempKey {
 		tempCert, err := createSelfSignedCertificate()
 		if err != nil {
-			return Firehose{}, fmt.Errorf("could not create self signed certificate: %s", err)
+			return nil, fmt.Errorf("could not create self signed certificate: %s", err)
 		}
 		certificate = tempCert
 	} else {
-		tempCert, err := tls.LoadX509KeyPair(opts.SSLCertPath, opts.SSLCertKeyPath)
+		tempCert, err := tls.LoadX509KeyPair(sslCertPath, sslCertKeyPath)
 		if err != nil {
-			return Firehose{}, fmt.Errorf("error loading certificate with cert path '%s' and key path '%s': %s", opts.SSLCertPath, opts.SSLCertKeyPath, err)
+			return nil, fmt.Errorf("error loading certificate with cert path '%s' and key path '%s': %s", sslCertPath, sslCertKeyPath, err)
 		}
 		certificate = &tempCert
 	}
@@ -124,18 +156,63 @@ func Start(org Organization, opts FirehoseOptions) (Firehose, error) {
 		Certificates: []tls.Certificate{*certificate},
 		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
 	}
-	tlsListener, err := tls.Listen("tcp", fmt.Sprintf("%s:%s", opts.ListenOnIP, opts.ListenOnPort), &tlsConfig)
+	tlsListener, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", listenOnIP, listenOnPort), &tlsConfig)
 	if err != nil {
-		return Firehose{}, fmt.Errorf("could not start TLS listener: %s", err)
+		return nil, fmt.Errorf("could not start TLS listener: %s", err)
+	}
+	return &tlsListener, nil
+}
+
+func registerOutput(org Organization, outputOpts FirehoseOutputOptions) error {
+	if len(outputOpts.UniqueName) == 0 {
+		// TODO log registration not required
+		return nil
 	}
 
-	messages := make(chan FirehoseMessage, opts.MaxMessageCount)
-	errorMessages := make(chan FirehoseMessage, opts.MaxErrorMessageCount)
+	outputName := "tmp_live_" + outputOpts.UniqueName
+	allOutputs, err := org.Outputs()
+	if err != nil {
+		return fmt.Errorf("could not register output with name '%s': %s", outputName, err)
+	}
 
+	_, found := allOutputs[outputName]
+	if found {
+		// TODO log registration already done
+		return nil
+	}
+
+	output := makeGenericOutput(outputOpts)
+	_, err = org.OutputAdd(output)
+	if err != nil {
+		return fmt.Errorf("could not add output: %s", err)
+	}
+	// TODO log registration done
+	return nil
+}
+
+func Start(org Organization, fhOpts FirehoseOptions) (Firehose, error) {
+	return StartAndRegisterOutput(org, fhOpts, nil)
+}
+
+func StartAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (Firehose, error) {
+	if fhOutputOpts != nil {
+		err := registerOutput(org, *fhOutputOpts)
+		if err != nil {
+			return Firehose{}, err
+		}
+	}
+
+	listener, err := startListener(fhOpts.ListenOnIP, fhOpts.ListenOnPort, fhOpts.SSLCertPath, fhOpts.SSLCertKeyPath)
+	if err != nil {
+		return Firehose{}, err
+	}
+
+	messages := make(chan FirehoseMessage, fhOpts.MaxMessageCount)
+	errorMessages := make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount)
 	var isRunning = true
 	var messageDropCount int = 0
-	go handleConnections(tlsListener, &isRunning, opts, messages, errorMessages, &messageDropCount)
-	return Firehose{org, messages, errorMessages, &messageDropCount, tlsListener, &isRunning}, nil
+	go handleConnections(*listener, &isRunning, fhOpts, messages, errorMessages, &messageDropCount)
+	return Firehose{org, fhOpts, fhOutputOpts, messages, errorMessages, &messageDropCount, *listener, &isRunning}, nil
 }
 
 func handleConnections(listener net.Listener, isRunning *bool, opts FirehoseOptions, messages chan FirehoseMessage, errorMessages chan FirehoseMessage, messageDropCount *int) {
@@ -191,8 +268,16 @@ func (fh Firehose) Shutdown() {
 		return
 	}
 	*fh.isRunning = false
-
 	defer fh.listener.Close()
+
+	if fh.outputOpts != nil {
+		// TODO log unregistering
+		_, err := fh.Organization.OutputDel(fh.outputOpts.UniqueName)
+		if err != nil {
+			// TODO log error deleting output
+		}
+	}
+	// TODO log closed
 }
 
 func (fh Firehose) GetMessageDropCount() int {
