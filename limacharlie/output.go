@@ -33,26 +33,28 @@ var OutputTypes = struct {
 	Kafka:       "kafka",
 }
 
-type OutputModuleStream string
+type OutputDataType string
 
-var OutputStreams = struct {
-	Event      OutputModuleStream
-	Detect     OutputModuleStream
-	Audit      OutputModuleStream
-	Deployment OutputModuleStream
-	Artifact   OutputModuleStream
+var OutputDataTypes = []OutputDataType{"event", "detect", "audit", "deployment", "artifact"}
+
+var OutputType = struct {
+	Event      OutputDataType
+	Detect     OutputDataType
+	Audit      OutputDataType
+	Deployment OutputDataType
+	Artifact   OutputDataType
 }{
-	Event:      "event",
-	Detect:     "detect",
-	Audit:      "audit",
-	Deployment: "deployment",
-	Artifact:   "artifact",
+	Event:      OutputDataTypes[0],
+	Detect:     OutputDataTypes[1],
+	Audit:      OutputDataTypes[2],
+	Deployment: OutputDataTypes[3],
+	Artifact:   OutputDataTypes[4],
 }
 
 type GenericOutputConfig struct {
-	Name   string             `json:"name"`
-	Module OutputModuleType   `json:"module"`
-	Stream OutputModuleStream `json:"type"`
+	Name   string           `json:"name"`
+	Module OutputModuleType `json:"module"`
+	Type   OutputDataType   `json:"type"`
 
 	PrefixData        bool   `json:"is_prefix_data,omitempty,string"`
 	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string"`

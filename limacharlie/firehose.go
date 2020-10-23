@@ -18,7 +18,7 @@ import (
 
 type FirehoseOutputOptions struct {
 	UniqueName string
-	DataStream OutputModuleStream
+	Type       OutputDataType
 
 	InvestigationID   *string // optional
 	Tag               *string // optional
@@ -31,7 +31,7 @@ func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
 	output := GenericOutputConfig{
 		Name:   opts.UniqueName,
 		Module: OutputTypes.Syslog,
-		Stream: opts.DataStream,
+		Type:   opts.Type,
 	}
 	if opts.InvestigationID != nil {
 		output.InvestigationID = *opts.InvestigationID
@@ -191,11 +191,11 @@ func registerOutput(org Organization, outputOpts FirehoseOutputOptions) error {
 	return nil
 }
 
-func Start(org Organization, fhOpts FirehoseOptions) (Firehose, error) {
-	return StartAndRegisterOutput(org, fhOpts, nil)
+func StartFirehose(org Organization, fhOpts FirehoseOptions) (Firehose, error) {
+	return StartFirehoseAndRegisterOutput(org, fhOpts, nil)
 }
 
-func StartAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (Firehose, error) {
+func StartFirehoseAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (Firehose, error) {
 	if fhOutputOpts != nil {
 		err := registerOutput(org, *fhOutputOpts)
 		if err != nil {

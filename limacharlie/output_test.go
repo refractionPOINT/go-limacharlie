@@ -26,7 +26,7 @@ func TestOutputAddDelete(t *testing.T) {
 	testOutput := GenericOutputConfig{
 		Name:   testOutputName,
 		Module: OutputTypes.Syslog,
-		Stream: OutputStreams.Event,
+		Type:   OutputType.Event,
 
 		DestinationHost: "1.1.1.1:22",
 		TLS:             true,
