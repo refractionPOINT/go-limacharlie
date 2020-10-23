@@ -51,7 +51,7 @@ func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
 type FirehoseOptions struct {
 	ListenOnPort         uint16
 	ListenOnIP           net.IP
-	ConnectToPort        int
+	ConnectToPort        uint16
 	ConnectToIP          net.IP
 	SSLCertPath          string
 	SSLCertKeyPath       string

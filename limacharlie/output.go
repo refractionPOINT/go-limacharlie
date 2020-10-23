@@ -51,6 +51,16 @@ var OutputType = struct {
 	Artifact:   OutputDataTypes[4],
 }
 
+func ParseOutputType(s string) *OutputDataType {
+	for _, o := range OutputDataTypes {
+		output := OutputDataType(s)
+		if o == output {
+			return &output
+		}
+	}
+	return nil
+}
+
 type GenericOutputConfig struct {
 	Name   string           `json:"name"`
 	Module OutputModuleType `json:"module"`
