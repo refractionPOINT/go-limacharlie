@@ -16,14 +16,29 @@ import (
 	"time"
 )
 
+// FirehoseOutputOptions holds the optional parameter for firehose output
 type FirehoseOutputOptions struct {
+	// Name to register as an Output
 	UniqueName string
-	Type       OutputDataType
 
-	InvestigationID   *string // optional
-	Tag               *string // optional
-	Category          *string // optional
-	IsDeleteOnFailure *bool   // optional
+	// Type of data received from the cloud as specified in Output
+	Type OutputDataType
+
+	// Only receive events marked with this investigation ID
+	// Optional
+	InvestigationID *string
+
+	// Only receive events from sensor with this tag
+	// Optional
+	Tag *string
+
+	// Only receive detections of this category
+	// Optional
+	Category *string
+
+	// If set to true, delete the firehose output on failure (in LC cloud)
+	// Optional
+	IsDeleteOnFailure *bool
 }
 
 func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
