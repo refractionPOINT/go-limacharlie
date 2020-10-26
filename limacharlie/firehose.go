@@ -221,8 +221,6 @@ func StartFirehoseAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fh
 
 func (fh Firehose) handleConnections() {
 	readBufferSize := 1024 * 512
-
-	// var currentData string
 	currentData := make([]byte, readBufferSize*2)
 
 	log.Debug().Msg("listening for connections")
