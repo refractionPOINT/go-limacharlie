@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"math/big"
 	"net"
 	"strings"
 	"time"
@@ -76,9 +77,9 @@ type Firehose struct {
 	outputOpts       *FirehoseOutputOptions // optional
 	Messages         chan FirehoseMessage
 	ErrorMessages    chan FirehoseMessage
-	messageDropCount *int
+	messageDropCount int
 	listener         net.Listener
-	isRunning        *bool
+	shutdownMessage  chan bool
 }
 
 type firehoseHandler struct {
@@ -91,6 +92,7 @@ func createSelfSignedCertificate() (*tls.Certificate, error) {
 		return nil, err
 	}
 	certTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
 			CommonName:    "limacharlie_firehose",
 			Organization:  []string{"refractionPOINT"},
@@ -107,7 +109,7 @@ func createSelfSignedCertificate() (*tls.Certificate, error) {
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		IsCA:        true,
 	}
-	certBytes, err := x509.CreateCertificate(rand.Reader, &certTemplate, &certTemplate, certPrivateKey.PublicKey, certPrivateKey)
+	certBytes, err := x509.CreateCertificate(rand.Reader, &certTemplate, &certTemplate, &certPrivateKey.PublicKey, certPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +167,8 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 }
 
 func registerOutput(org Organization, outputOpts FirehoseOutputOptions) error {
-	if len(outputOpts.UniqueName) == 0 {
-		log.Debug().Msg("output registration required")
+	if outputOpts.UniqueName == "" {
+		log.Info().Msg("output registration not required")
 		return nil
 	}
 
@@ -208,26 +210,77 @@ func StartFirehoseAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fh
 		return Firehose{}, err
 	}
 
-	messages := make(chan FirehoseMessage, fhOpts.MaxMessageCount)
-	errorMessages := make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount)
-	var isRunning = true
-	var messageDropCount int = 0
-	go handleConnections(*listener, &isRunning, fhOpts, messages, errorMessages, &messageDropCount)
+	fh := Firehose{org,
+		fhOpts,
+		fhOutputOpts,
+		make(chan FirehoseMessage, fhOpts.MaxMessageCount),
+		make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount),
+		0,
+		*listener,
+		make(chan bool, 1)}
+	go fh.handle()
 	log.Debug().Msg("listening for connections")
-	return Firehose{org, fhOpts, fhOutputOpts, messages, errorMessages, &messageDropCount, *listener, &isRunning}, nil
+	return fh, nil
 }
 
-func handleConnections(listener net.Listener, isRunning *bool, opts FirehoseOptions, messages chan FirehoseMessage, errorMessages chan FirehoseMessage, messageDropCount *int) {
+func (fh Firehose) handle() {
 	readBufferSize := 1024 * 512
 	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
 	var currentData string
-	for *isRunning {
-		conn, err := listener.Accept()
-		log.Debug().Msg("new incoming connection")
+	for fh.IsRunning() {
+		conn, err := fh.listener.Accept()
 		if err != nil {
-			log.Err(err).Msg("cannot accept incoming connection")
 			continue
 		}
+		log.Debug().Msg("new incoming connection")
+		defer conn.Close()
+
+		sizeRead, err := conn.Read(readBuffer.Bytes())
+		if err != nil {
+			log.Err(err).Msg("error reading from connection")
+			continue
+		}
+		if sizeRead == 0 {
+			log.Debug().Msg("empty body read")
+			continue
+		}
+		chunks := strings.Split(readBuffer.String(), "\n")
+		isContinuation := len(chunks) == 1
+		if isContinuation {
+			currentData += chunks[0]
+			continue
+		}
+		for _, chunk := range chunks {
+			currentData += chunk
+			if len(currentData) == 0 {
+				continue
+			}
+			message := FirehoseMessage{currentData}
+			isValid := json.Valid([]byte(currentData))
+			if isValid && len(fh.Messages) < fh.opts.MaxMessageCount {
+				fh.Messages <- message
+			} else {
+				fh.messageDropCount++
+				if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
+					fh.ErrorMessages <- message
+				} else {
+					log.Warn().Msg("maximum error message count reached")
+				}
+			}
+		}
+	}
+}
+
+func handleConnections(listener net.Listener, isRunning *bool, opts FirehoseOptions, messages chan FirehoseMessage, errorMessages chan FirehoseMessage, messageDropCount *int, fh Firehose) {
+	readBufferSize := 1024 * 512
+	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
+	var currentData string
+	for fh.IsRunning() {
+		conn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+		log.Debug().Msg("new incoming connection")
 		defer conn.Close()
 
 		sizeRead, err := conn.Read(readBuffer.Bytes())
@@ -267,13 +320,13 @@ func handleConnections(listener net.Listener, isRunning *bool, opts FirehoseOpti
 }
 
 func (fh Firehose) Shutdown() {
-	if !*fh.isRunning {
+	if !fh.IsRunning() {
 		return
 	}
-	*fh.isRunning = false
+	fh.shutdownMessage <- true
 	defer fh.listener.Close()
 
-	if fh.outputOpts != nil {
+	if fh.outputOpts != nil && fh.outputOpts.UniqueName != "" {
 		log.Debug().Msg("unregistering output")
 		_, err := fh.Organization.OutputDel(fh.outputOpts.UniqueName)
 		if err != nil {
@@ -283,10 +336,14 @@ func (fh Firehose) Shutdown() {
 	log.Debug().Msg("firehose closed")
 }
 
+func (fh Firehose) IsRunning() bool {
+	return len(fh.shutdownMessage) == 0
+}
+
 func (fh Firehose) GetMessageDropCount() int {
-	return *fh.messageDropCount
+	return fh.messageDropCount
 }
 
 func (fh Firehose) ResetMessageDropCount() {
-	*fh.messageDropCount = 0
+	fh.messageDropCount = 0
 }
