@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"math/big"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -25,7 +24,6 @@ type FirehoseOutputOptions struct {
 	Tag               *string // optional
 	Category          *string // optional
 	IsDeleteOnFailure *bool   // optional
-	// SensorID
 }
 
 func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
@@ -223,8 +221,10 @@ func StartFirehoseAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fh
 
 func (fh Firehose) handleConnections() {
 	readBufferSize := 1024 * 512
-	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
-	var currentData string
+
+	// var currentData string
+	currentData := make([]byte, readBufferSize*2)
+
 	log.Debug().Msg("listening for connections")
 	for fh.IsRunning() {
 		conn, err := fh.listener.Accept()
@@ -234,7 +234,8 @@ func (fh Firehose) handleConnections() {
 		log.Debug().Msg("new incoming connection")
 		defer conn.Close()
 
-		sizeRead, err := conn.Read(readBuffer.Bytes())
+		readBuffer := make([]byte, readBufferSize)
+		sizeRead, err := conn.Read(readBuffer)
 		if err != nil {
 			log.Err(err).Msg("error reading from connection")
 			continue
@@ -243,26 +244,27 @@ func (fh Firehose) handleConnections() {
 			log.Debug().Msg("empty body read")
 			continue
 		}
-		chunks := strings.Split(readBuffer.String(), "\n")
+		chunks := bytes.Split(readBuffer, []byte{0x0a})
 		isContinuation := len(chunks) == 1
 		if isContinuation {
-			currentData += chunks[0]
+			currentData = append(currentData[:len(currentData)], chunks[0]...)
 			continue
 		}
 		for _, chunk := range chunks {
-			currentData += chunk
+			currentData = append(currentData[:len(currentData)], chunk...)
 			if len(currentData) == 0 {
 				continue
 			}
 			fh.handleMessage(currentData)
+			currentData = append(currentData[:0], currentData[len(currentData):]...)
 		}
 	}
 }
 
-func (fh Firehose) handleMessage(raw string) {
-	fhMessage := FirehoseMessage{raw}
+func (fh Firehose) handleMessage(raw []byte) {
+	fhMessage := FirehoseMessage{string(raw)}
 	if fh.opts.ParseMessage {
-		isValid := json.Valid([]byte(raw))
+		isValid := json.Valid(raw)
 		if isValid && len(fh.Messages) < fh.opts.MaxMessageCount {
 			fh.Messages <- fhMessage
 		} else {
