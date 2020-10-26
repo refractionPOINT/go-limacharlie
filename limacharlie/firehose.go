@@ -63,8 +63,7 @@ type FirehoseOptions struct {
 	DetectionCategory    string
 	SensorID             string
 	DeleteOnFailure      bool
-	// is_parse (bool): if set to True (default) the data will be parsed as JSON to native Python.
-	// on_dropped (func): callback called with a data item when the item will otherwise be dropped.
+	ParseMessage         bool
 }
 
 type FirehoseMessage struct {
@@ -218,15 +217,15 @@ func StartFirehoseAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fh
 		0,
 		*listener,
 		make(chan bool, 1)}
-	go fh.handle()
-	log.Debug().Msg("listening for connections")
+	go fh.handleConnections()
 	return fh, nil
 }
 
-func (fh Firehose) handle() {
+func (fh Firehose) handleConnections() {
 	readBufferSize := 1024 * 512
 	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
 	var currentData string
+	log.Debug().Msg("listening for connections")
 	for fh.IsRunning() {
 		conn, err := fh.listener.Accept()
 		if err != nil {
@@ -255,67 +254,27 @@ func (fh Firehose) handle() {
 			if len(currentData) == 0 {
 				continue
 			}
-			message := FirehoseMessage{currentData}
-			isValid := json.Valid([]byte(currentData))
-			if isValid && len(fh.Messages) < fh.opts.MaxMessageCount {
-				fh.Messages <- message
-			} else {
-				fh.messageDropCount++
-				if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
-					fh.ErrorMessages <- message
-				} else {
-					log.Warn().Msg("maximum error message count reached")
-				}
-			}
+			fh.handleMessage(currentData)
 		}
 	}
 }
 
-func handleConnections(listener net.Listener, isRunning *bool, opts FirehoseOptions, messages chan FirehoseMessage, errorMessages chan FirehoseMessage, messageDropCount *int, fh Firehose) {
-	readBufferSize := 1024 * 512
-	readBuffer := bytes.NewBuffer(make([]byte, readBufferSize))
-	var currentData string
-	for fh.IsRunning() {
-		conn, err := listener.Accept()
-		if err != nil {
-			continue
-		}
-		log.Debug().Msg("new incoming connection")
-		defer conn.Close()
-
-		sizeRead, err := conn.Read(readBuffer.Bytes())
-		if err != nil {
-			log.Err(err).Msg("error reading from connection")
-			continue
-		}
-		if sizeRead == 0 {
-			log.Debug().Msg("empty body read")
-			continue
-		}
-		chunks := strings.Split(readBuffer.String(), "\n")
-		isContinuation := len(chunks) == 1
-		if isContinuation {
-			currentData += chunks[0]
-			continue
-		}
-		for _, chunk := range chunks {
-			currentData += chunk
-			if len(currentData) == 0 {
-				continue
-			}
-			message := FirehoseMessage{currentData}
-			isValid := json.Valid([]byte(currentData))
-			if isValid && len(messages) < opts.MaxMessageCount {
-				messages <- message
+func (fh Firehose) handleMessage(raw string) {
+	fhMessage := FirehoseMessage{raw}
+	if fh.opts.ParseMessage {
+		isValid := json.Valid([]byte(raw))
+		if isValid && len(fh.Messages) < fh.opts.MaxMessageCount {
+			fh.Messages <- fhMessage
+		} else {
+			fh.messageDropCount++
+			if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
+				fh.ErrorMessages <- fhMessage
 			} else {
-				*messageDropCount++
-				if len(errorMessages) < opts.MaxErrorMessageCount {
-					errorMessages <- message
-				} else {
-					log.Warn().Msg("maximum error message count reached")
-				}
+				log.Warn().Msg("maximum error message count reached")
 			}
 		}
+	} else {
+		fh.Messages <- fhMessage
 	}
 }
 
