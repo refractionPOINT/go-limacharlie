@@ -129,7 +129,7 @@ func consumeMessages(fh lc.Firehose) {
 			time.Sleep(1 * time.Second)
 		} else {
 			message := <-fh.Messages
-			log.Info().Msg(message.Message)
+			log.Info().Msg(message.Content)
 		}
 	}
 }

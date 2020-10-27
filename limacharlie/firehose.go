@@ -98,8 +98,10 @@ type FirehoseOptions struct {
 	ParseMessage bool
 }
 
+// FirehoseMessage holds the content of a message received from a firehose
 type FirehoseMessage struct {
-	Message string
+	// Message content
+	Content string
 }
 
 type Firehose struct {
