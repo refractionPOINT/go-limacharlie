@@ -121,7 +121,6 @@ type Firehose struct {
 	messageDropCount int
 	listenerConfig   *tls.Config
 	listener         *net.Listener
-	shutdownMessage  chan bool
 }
 
 type firehoseHandler struct {
@@ -286,15 +285,15 @@ func MakeFirehose(org Organization, fhOpts FirehoseOptions, fhOutputOpts *Fireho
 	if err != nil {
 		return Firehose{}, fmt.Errorf("could not make tls config: %s", err)
 	}
-	fh := Firehose{org,
-		fhOpts,
-		fhOutputOpts,
-		make(chan FirehoseMessage, fhOpts.MaxMessageCount),
-		make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount),
-		0,
-		tlsConfig,
-		nil,
-		make(chan bool, 1)}
+	fh := Firehose{
+		Organization:     org,
+		opts:             fhOpts,
+		outputOpts:       fhOutputOpts,
+		Messages:         make(chan FirehoseMessage, fhOpts.MaxMessageCount),
+		ErrorMessages:    make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount),
+		messageDropCount: 0,
+		listenerConfig:   tlsConfig,
+		listener:         nil}
 	return fh, nil
 }
 
@@ -388,7 +387,6 @@ func (fh Firehose) Shutdown() {
 	if !fh.IsRunning() {
 		return
 	}
-	fh.shutdownMessage <- true
 	defer (*fh.listener).Close()
 
 	if fh.outputOpts != nil {
