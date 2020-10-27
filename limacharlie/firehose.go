@@ -209,13 +209,13 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 	return &tlsListener, nil
 }
 
-func registerOutput(org Organization, outputOpts FirehoseOutputOptions) error {
-	if outputOpts.UniqueName == "" {
+func (org Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
+	if fhOpts.UniqueName == "" {
 		log.Info().Msg("output registration not required")
 		return nil
 	}
 
-	outputName := "tmp_live_" + outputOpts.UniqueName
+	outputName := "tmp_live_" + fhOpts.UniqueName
 	allOutputs, err := org.Outputs()
 	if err != nil {
 		return fmt.Errorf("could not register output with name '%s': %s", outputName, err)
@@ -227,13 +227,25 @@ func registerOutput(org Organization, outputOpts FirehoseOutputOptions) error {
 		return nil
 	}
 
-	output := makeGenericOutput(outputOpts)
+	output := makeGenericOutput(fhOpts)
 	_, err = org.OutputAdd(output)
 	if err != nil {
 		return fmt.Errorf("could not add output: %s", err)
 	}
 	log.Debug().Msg("output registration done")
 	return nil
+}
+
+func (org Organization) unregisterOutput(fhOutputOpts FirehoseOutputOptions) {
+	if fhOutputOpts.UniqueName == "" {
+		return
+	}
+
+	log.Debug().Msg("unregistering output")
+	_, err := org.OutputDel(fhOutputOpts.UniqueName)
+	if err != nil {
+		log.Err(err).Msg("could not delete output")
+	}
 }
 
 func (fhOpts FirehoseOptions) makeTLSConfig() (*tls.Config, error) {
@@ -298,9 +310,8 @@ func (fh Firehose) Start() error {
 		return fmt.Errorf("could not start TLS listener: %s", err)
 	}
 
-	// TODO move to FirehoseOutputOptions
 	if fh.outputOpts != nil {
-		err := registerOutput(fh.Organization, *fh.outputOpts)
+		err := fh.Organization.registerOutput(*fh.outputOpts)
 		if err != nil {
 			log.Info().Msg("shutting down listener")
 			listener.Close()
@@ -380,13 +391,8 @@ func (fh Firehose) Shutdown() {
 	fh.shutdownMessage <- true
 	defer (*fh.listener).Close()
 
-	// TODO move to FirehoseOutputOptions
-	if fh.outputOpts != nil && fh.outputOpts.UniqueName != "" {
-		log.Debug().Msg("unregistering output")
-		_, err := fh.Organization.OutputDel(fh.outputOpts.UniqueName)
-		if err != nil {
-			log.Err(err).Msg("could not delete output")
-		}
+	if fh.outputOpts != nil {
+		fh.Organization.unregisterOutput(*fh.outputOpts)
 	}
 	log.Debug().Msg("firehose closed")
 }
