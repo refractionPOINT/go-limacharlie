@@ -160,6 +160,11 @@ func main() {
 	bytesAPIKey, err := terminal.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		log.Err(err).Msg("could not read API key")
+		return
+	}
+	if len(bytesAPIKey) == 0 {
+		log.Error().Msg("api key is empty")
+		return
 	}
 	clientOpts.APIKey = string(bytesAPIKey)
 
