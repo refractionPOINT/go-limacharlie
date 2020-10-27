@@ -104,12 +104,20 @@ type FirehoseMessage struct {
 	Content string
 }
 
+// Firehose is a listener to receive data from a limacharlie.io organization in push mode
 type Firehose struct {
-	Organization     Organization
-	opts             FirehoseOptions
-	outputOpts       *FirehoseOutputOptions // optional
-	Messages         chan FirehoseMessage
-	ErrorMessages    chan FirehoseMessage
+	// Organization linked to this firehose
+	Organization Organization
+	opts         FirehoseOptions
+	outputOpts   *FirehoseOutputOptions
+
+	// Channel to receive the message from
+	Messages chan FirehoseMessage
+
+	// Channel to receive messages that could not be parsed
+	// It will only be used if the supplied FirehoseOptions require message to be parsed
+	ErrorMessages chan FirehoseMessage
+
 	messageDropCount int
 	listener         net.Listener
 	shutdownMessage  chan bool
