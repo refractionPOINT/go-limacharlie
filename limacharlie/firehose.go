@@ -119,7 +119,8 @@ type Firehose struct {
 	ErrorMessages chan FirehoseMessage
 
 	messageDropCount int
-	listener         net.Listener
+	listenerConfig   *tls.Config
+	listener         *net.Listener
 	shutdownMessage  chan bool
 }
 
@@ -200,6 +201,7 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 		Certificates: []tls.Certificate{*certificate},
 		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
 	}
+
 	tlsListener, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", listenOnIP, listenOnPort), &tlsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not start TLS listener: %s", err)
@@ -234,33 +236,81 @@ func registerOutput(org Organization, outputOpts FirehoseOutputOptions) error {
 	return nil
 }
 
-func StartFirehose(org Organization, fhOpts FirehoseOptions) (Firehose, error) {
-	return StartFirehoseAndRegisterOutput(org, fhOpts, nil)
+func (fhOpts FirehoseOptions) makeTLSConfig() (*tls.Config, error) {
+	createTempCert := len(fhOpts.SSLCertPath) == 0
+	createTempKey := len(fhOpts.SSLCertKeyPath) == 0
+	if createTempCert && !createTempKey {
+		return nil, fmt.Errorf("certificate key path missing")
+	}
+	if !createTempCert && createTempKey {
+		return nil, fmt.Errorf("certificate path missing")
+	}
+
+	var certificate *tls.Certificate = nil
+	if createTempCert && createTempKey {
+		tempCert, err := createSelfSignedCertificate()
+		if err != nil {
+			return nil, fmt.Errorf("could not create self signed certificate: %s", err)
+		}
+		certificate = tempCert
+	} else {
+		tempCert, err := tls.LoadX509KeyPair(fhOpts.SSLCertPath, fhOpts.SSLCertKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("error loading certificate with cert path '%s' and key path '%s': %s", fhOpts.SSLCertPath, fhOpts.SSLCertKeyPath, err)
+		}
+		certificate = &tempCert
+	}
+
+	tlsConfig := tls.Config{
+		Certificates: []tls.Certificate{*certificate},
+		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
+	}
+	return &tlsConfig, nil
 }
 
-func StartFirehoseAndRegisterOutput(org Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (Firehose, error) {
-	if fhOutputOpts != nil {
-		err := registerOutput(org, *fhOutputOpts)
-		if err != nil {
-			return Firehose{}, err
-		}
-	}
-
-	listener, err := startListener(fhOpts.ListenOnIP, fhOpts.ListenOnPort, fhOpts.SSLCertPath, fhOpts.SSLCertKeyPath)
+// MakeFirehose initialize the firehose
+func MakeFirehose(org Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (Firehose, error) {
+	tlsConfig, err := fhOpts.makeTLSConfig()
 	if err != nil {
-		return Firehose{}, err
+		return Firehose{}, fmt.Errorf("could not make tls config: %s", err)
 	}
-
 	fh := Firehose{org,
 		fhOpts,
 		fhOutputOpts,
 		make(chan FirehoseMessage, fhOpts.MaxMessageCount),
 		make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount),
 		0,
-		*listener,
+		tlsConfig,
+		nil,
 		make(chan bool, 1)}
-	go fh.handleConnections()
 	return fh, nil
+}
+
+// Start register the optional output to limacharlie.io and start listening for data
+func (fh Firehose) Start() error {
+	if fh.listener != nil {
+		return fmt.Errorf("firehose already started")
+	}
+
+	// start the listener
+	listener, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort), fh.listenerConfig)
+	if err != nil {
+		return fmt.Errorf("could not start TLS listener: %s", err)
+	}
+
+	// TODO move to FirehoseOutputOptions
+	if fh.outputOpts != nil {
+		err := registerOutput(fh.Organization, *fh.outputOpts)
+		if err != nil {
+			log.Info().Msg("shutting down listener")
+			listener.Close()
+			return err
+		}
+	}
+
+	fh.listener = &listener
+	go fh.handleConnections()
+	return nil
 }
 
 func (fh Firehose) handleConnections() {
@@ -269,7 +319,7 @@ func (fh Firehose) handleConnections() {
 
 	log.Debug().Msg("listening for connections")
 	for fh.IsRunning() {
-		conn, err := fh.listener.Accept()
+		conn, err := (*fh.listener).Accept()
 		if err != nil {
 			continue
 		}
@@ -322,13 +372,15 @@ func (fh Firehose) handleMessage(raw []byte) {
 	}
 }
 
+// Shutdown stops the listener and delete the output previsouly registered if any
 func (fh Firehose) Shutdown() {
 	if !fh.IsRunning() {
 		return
 	}
 	fh.shutdownMessage <- true
-	defer fh.listener.Close()
+	defer (*fh.listener).Close()
 
+	// TODO move to FirehoseOutputOptions
 	if fh.outputOpts != nil && fh.outputOpts.UniqueName != "" {
 		log.Debug().Msg("unregistering output")
 		_, err := fh.Organization.OutputDel(fh.outputOpts.UniqueName)
@@ -339,14 +391,17 @@ func (fh Firehose) Shutdown() {
 	log.Debug().Msg("firehose closed")
 }
 
+// IsRunning will return true if firehose has been started
 func (fh Firehose) IsRunning() bool {
-	return len(fh.shutdownMessage) == 0
+	return fh.listener != nil
 }
 
+// GetMessageDropCount returns the current count of dropped messages
 func (fh Firehose) GetMessageDropCount() int {
 	return fh.messageDropCount
 }
 
+// ResetMessageDropCount reset the count of dropped messages
 func (fh Firehose) ResetMessageDropCount() {
 	fh.messageDropCount = 0
 }

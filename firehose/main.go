@@ -174,8 +174,12 @@ func main() {
 		return
 	}
 
-	fh, err := lc.StartFirehoseAndRegisterOutput(org, fhOpts, &fhOutputOpts)
+	fh, err := lc.MakeFirehose(org, fhOpts, &fhOutputOpts)
 	if err != nil {
+		log.Err(err).Msg("could not make firehose")
+	}
+
+	if err := fh.Start(); err != nil {
 		log.Err(err).Msg("could not start firehose")
 		return
 	}
