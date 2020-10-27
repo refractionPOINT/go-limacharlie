@@ -395,6 +395,7 @@ func (fh Firehose) Shutdown() {
 		fh.Organization.unregisterOutput(*fh.outputOpts)
 	}
 	log.Debug().Msg("firehose closed")
+	fh.listener = nil
 }
 
 // IsRunning will return true if firehose has been started
