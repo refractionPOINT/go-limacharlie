@@ -62,21 +62,40 @@ func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
 	return output
 }
 
+// FirehoseOptions holds the parameters for the firehose
 type FirehoseOptions struct {
-	ListenOnPort         uint16
-	ListenOnIP           net.IP
-	ConnectToPort        uint16
-	ConnectToIP          net.IP
-	SSLCertPath          string
-	SSLCertKeyPath       string
-	MaxMessageCount      int
+	// IP to listen on
+	ListenOnPort uint16
+
+	// Port to listen on
+	ListenOnIP net.IP
+
+	// IP that LC should use to connect to this object
+	ConnectToPort uint16
+
+	// Port that LC should use to connect to this object
+	ConnectToIP net.IP
+
+	// Path to the SSL cert file (PEM) to use to receive from the cloud
+	// Optional
+	// If not set, generates self-signed certificate
+	SSLCertPath string
+
+	// Path to the SSL key file (PEM) to use to receive from the cloud
+	// Optional
+	// If not set, generates self-signed certificate
+	SSLCertKeyPath string
+
+	// Maximum number of message to buffer in the queue
+	// Once the queue is full, messages will be considered as dropped
+	MaxMessageCount int
+
+	// Maximum number of dropped message to buffer
+	// Once the queue is full, dropped count will continue to raise but will not be sent to the queue
 	MaxErrorMessageCount int
-	InvestigationID      string
-	EventTag             string
-	DetectionCategory    string
-	SensorID             string
-	DeleteOnFailure      bool
-	ParseMessage         bool
+
+	// If set to true, the data received will be parsed to json
+	ParseMessage bool
 }
 
 type FirehoseMessage struct {
