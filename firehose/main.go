@@ -65,7 +65,19 @@ func getIPPort(s string) (net.IP, uint16) {
 	return listenOnIP, uint16(listenOnPort)
 }
 
-func parseArgs() (lc.ClientOptions, lc.FirehoseOptions, lc.FirehoseOutputOptions, error) {
+// FirehoseCLIOptions holds all options entered at the CLI
+type FirehoseCLIOptions struct {
+	// Options for the LC client
+	ClientOpts lc.ClientOptions
+	// Options for the LC firehose
+	FirehoseOpts lc.FirehoseOptions
+	// Options for the LC firehose output
+	FirehoseOutputOpts lc.FirehoseOutputOptions
+	// If true, use environment variable for reading api key
+	UseEnvironment bool
+}
+
+func parseArgs() (FirehoseCLIOptions, error) {
 	argParser := argparse.NewParser("firehose", "limacharlie.io firehose")
 
 	argListenOn := argParser.String("", "listen_interface", &argparse.Options{Required: true, Help: "the local interface to listen on for firehose connections, like '0.0.0.0:4444'.", Validate: validateIPPort})
@@ -83,12 +95,12 @@ func parseArgs() (lc.ClientOptions, lc.FirehoseOptions, lc.FirehoseOutputOptions
 	argInvestigationID := argParser.String("i", "investigation-id", &argparse.Options{Required: false, Help: "firehose should only receive events marked with this investigation id."})
 	argTag := argParser.String("t", "tag", &argparse.Options{Required: false, Help: "firehose should only receive events from sensors tagged with this tag."})
 	argCategory := argParser.String("c", "category", &argparse.Options{Required: false, Help: "firehose should only receive detections from this category."})
-	// argSensorID := argParser.String("s", "sensor_id", &argparse.Options{Required: false, Help: "firehose should only receive detections and events from this sensor."})
+	argUseEnvironment := argParser.Flag("", "use-env", &argparse.Options{Required: false, Help: "do not prompt for api key and use environment variable instead."})
 
 	err := argParser.Parse(os.Args)
 	if err != nil {
 		fmt.Print(argParser.Usage(err))
-		return lc.ClientOptions{}, lc.FirehoseOptions{}, lc.FirehoseOutputOptions{}, err
+		return FirehoseCLIOptions{}, err
 	}
 
 	oid := ""
@@ -103,22 +115,26 @@ func parseArgs() (lc.ClientOptions, lc.FirehoseOptions, lc.FirehoseOutputOptions
 	}
 
 	isDeleteOnFailure := true
-	return lc.ClientOptions{
-			OID: oid,
-		},
-		lc.FirehoseOptions{
-			ListenOnIP:    listenOnIP,
-			ListenOnPort:  listenOnPort,
-			ConnectToIP:   destinationIP,
-			ConnectToPort: destinationPort,
-		},
-		lc.FirehoseOutputOptions{
-			UniqueName:        *outputName,
-			Type:              *lc.ParseOutputType(*argOutputType),
-			InvestigationID:   argInvestigationID,
-			Tag:               argTag,
-			Category:          argCategory,
-			IsDeleteOnFailure: &isDeleteOnFailure,
+
+	return FirehoseCLIOptions{
+			ClientOpts: lc.ClientOptions{
+				OID: oid,
+			},
+			FirehoseOpts: lc.FirehoseOptions{
+				ListenOnIP:    listenOnIP,
+				ListenOnPort:  listenOnPort,
+				ConnectToIP:   destinationIP,
+				ConnectToPort: destinationPort,
+			},
+			FirehoseOutputOpts: lc.FirehoseOutputOptions{
+				UniqueName:        *outputName,
+				Type:              *lc.ParseOutputType(*argOutputType),
+				InvestigationID:   argInvestigationID,
+				Tag:               argTag,
+				Category:          argCategory,
+				IsDeleteOnFailure: &isDeleteOnFailure,
+			},
+			UseEnvironment: *argUseEnvironment,
 		},
 		nil
 }
@@ -150,31 +166,33 @@ func main() {
 	interruptChannel := make(chan os.Signal, 1)
 	signal.Notify(interruptChannel, os.Interrupt)
 
-	clientOpts, fhOpts, fhOutputOpts, err := parseArgs()
+	cliOpts, err := parseArgs()
 	if err != nil {
 		log.Err(err).Msg("error parsing arguments")
 		return
 	}
 
-	fmt.Println("Enter secret API key: ")
-	bytesAPIKey, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		log.Err(err).Msg("could not read API key")
-		return
+	if !cliOpts.UseEnvironment {
+		fmt.Println("Enter secret API key: ")
+		bytesAPIKey, err := terminal.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Err(err).Msg("could not read API key")
+			return
+		}
+		if len(bytesAPIKey) == 0 {
+			log.Error().Msg("api key is empty")
+			return
+		}
+		cliOpts.ClientOpts.APIKey = string(bytesAPIKey)
 	}
-	if len(bytesAPIKey) == 0 {
-		log.Error().Msg("api key is empty")
-		return
-	}
-	clientOpts.APIKey = string(bytesAPIKey)
 
-	org, err := lc.MakeOrganization(clientOpts)
+	org, err := lc.MakeOrganization(cliOpts.ClientOpts)
 	if err != nil {
 		log.Err(err).Msg("could not make organization")
 		return
 	}
 
-	fh, err := lc.MakeFirehose(org, fhOpts, &fhOutputOpts)
+	fh, err := lc.MakeFirehose(org, cliOpts.FirehoseOpts, &cliOpts.FirehoseOutputOpts)
 	if err != nil {
 		log.Err(err).Msg("could not make firehose")
 	}
