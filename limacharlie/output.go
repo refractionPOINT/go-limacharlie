@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type OutputModuleType string
+type OutputModuleType = string
 
 var OutputTypes = struct {
 	S3          OutputModuleType
@@ -33,9 +33,15 @@ var OutputTypes = struct {
 	Kafka:       "kafka",
 }
 
-type OutputDataType string
+type OutputDataType = string
 
-var OutputDataTypes = []OutputDataType{"event", "detect", "audit", "deployment", "artifact"}
+var OutputDataTypes = []OutputDataType{
+	OutputType.Event,
+	OutputType.Detect,
+	OutputType.Audit,
+	OutputType.Deployment,
+	OutputType.Artifact,
+}
 
 var OutputType = struct {
 	Event      OutputDataType
@@ -44,21 +50,11 @@ var OutputType = struct {
 	Deployment OutputDataType
 	Artifact   OutputDataType
 }{
-	Event:      OutputDataTypes[0],
-	Detect:     OutputDataTypes[1],
-	Audit:      OutputDataTypes[2],
-	Deployment: OutputDataTypes[3],
-	Artifact:   OutputDataTypes[4],
-}
-
-func ParseOutputType(s string) *OutputDataType {
-	for _, o := range OutputDataTypes {
-		output := OutputDataType(s)
-		if o == output {
-			return &output
-		}
-	}
-	return nil
+	Event:      "event",
+	Detect:     "detect",
+	Audit:      "audit",
+	Deployment: "deployment",
+	Artifact:   "artifact",
 }
 
 type GenericOutputConfig struct {

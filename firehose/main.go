@@ -26,11 +26,12 @@ func addParserRequiredOptionsInt(p *argparse.Parser, long string, help string) *
 }
 
 func validateOutputType(s []string) error {
-	parsedType := lc.ParseOutputType(s[0])
-	if parsedType == nil {
-		return fmt.Errorf("output type is not supported")
+	for _, v := range lc.OutputDataTypes {
+		if v == s[0] {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("output type is not supported")
 }
 
 func validateUUID(s []string) error {
@@ -128,7 +129,7 @@ func parseArgs() (FirehoseCLIOptions, error) {
 			},
 			FirehoseOutputOpts: lc.FirehoseOutputOptions{
 				UniqueName:        *outputName,
-				Type:              *lc.ParseOutputType(*argOutputType),
+				Type:              lc.OutputDataType(*argOutputType),
 				InvestigationID:   argInvestigationID,
 				Tag:               argTag,
 				Category:          argCategory,
