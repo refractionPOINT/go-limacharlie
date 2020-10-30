@@ -4,10 +4,12 @@ import (
 	"fmt"
 )
 
+// Organization holds a connection to the LC cloud organization
 type Organization struct {
 	client Client
 }
 
+// MakeOrganization creates an Organization
 func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
 	c, err := NewClient(clientOpts)
 	if err != nil {
@@ -16,6 +18,7 @@ func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
 	return Organization{*c}, nil
 }
 
+// Permission represents the permission granted in LC
 type Permission struct {
 	Name string
 }
