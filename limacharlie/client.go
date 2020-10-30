@@ -32,10 +32,12 @@ const (
 	restTimeout = 5 * time.Second
 )
 
+// Client makes raw request to LC cloud
 type Client struct {
 	options ClientOptions
 }
 
+// ClientOptions holds all options for Client
 type ClientOptions struct {
 	OID           string
 	APIKey        string
@@ -75,6 +77,8 @@ func (r restRequest) withFormData(formData interface{}) restRequest {
 	return r
 }
 
+// NewClient creates a new client
+// If options are not provided, will use those from environment
 func NewClient(opts ...ClientOptions) (*Client, error) {
 	c := &Client{}
 
@@ -182,7 +186,7 @@ func (c *Client) refreshJWT(expiry time.Duration) error {
 	return nil
 }
 
-func getHttpClient(timeout time.Duration) *http.Client {
+func getHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
@@ -280,7 +284,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		r.URL.RawQuery = rawQuery
 	}
 
-	resp, err := getHttpClient(request.timeout).Do(r)
+	resp, err := getHTTPClient(request.timeout).Do(r)
 	if err != nil {
 		return 0, err
 	}
@@ -313,6 +317,7 @@ type whoAmIJsonResponse struct {
 	Identity        *string              `json:"ident"`
 }
 
+// GenericJSON is the default format for json data
 type GenericJSON = map[string]interface{}
 
 func (c Client) whoAmI() (whoAmIJsonResponse, error) {
