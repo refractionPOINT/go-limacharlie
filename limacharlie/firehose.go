@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"math/big"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -293,12 +294,16 @@ func MakeFirehose(org Organization, fhOpts FirehoseOptions, fhOutputOpts *Fireho
 		ErrorMessages:    make(chan FirehoseMessage, fhOpts.MaxErrorMessageCount),
 		messageDropCount: 0,
 		listenerConfig:   tlsConfig,
-		listener:         nil}
+		listener:         nil,
+	}
 	return fh, nil
 }
 
 // Start register the optional output to limacharlie.io and start listening for data
 func (fh Firehose) Start() error {
+	var mutex sync.Mutex
+	mutex.Lock()
+	defer mutex.Unlock()
 	if fh.listener != nil {
 		return fmt.Errorf("firehose already started")
 	}
@@ -384,16 +389,19 @@ func (fh Firehose) handleMessage(raw []byte) {
 
 // Shutdown stops the listener and delete the output previsouly registered if any
 func (fh Firehose) Shutdown() {
+	var mutex sync.Mutex
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !fh.IsRunning() {
 		return
 	}
 	defer (*fh.listener).Close()
+	fh.listener = nil
 
 	if fh.outputOpts != nil {
 		fh.Organization.unregisterOutput(*fh.outputOpts)
 	}
 	log.Debug().Msg("firehose closed")
-	fh.listener = nil
 }
 
 // IsRunning will return true if firehose has been started
