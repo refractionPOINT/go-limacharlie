@@ -146,7 +146,7 @@ func validateUUID(s string) error {
 
 func (c *Client) refreshJWT(expiry time.Duration) error {
 	if c.options.APIKey == "" {
-		return NoAPIKeyConfiguredError
+		return ErrorNoAPIKeyConfigured
 	}
 	authData := url.Values{}
 	authData.Set("secret", c.options.APIKey)

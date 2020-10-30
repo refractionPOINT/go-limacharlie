@@ -125,7 +125,7 @@ func (org Organization) OutputsGeneric(outputs interface{}) error {
 
 	orgOutputs, ok := outputsByOrgID[org.client.options.OID]
 	if !ok {
-		return ResourceNotFoundError
+		return ErrorResourceNotFound
 	}
 
 	switch t := outputs.(type) {
