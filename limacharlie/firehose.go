@@ -181,7 +181,7 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 		return nil, fmt.Errorf("certificate path missing")
 	}
 
-	var certificate *tls.Certificate = nil
+	var certificate *tls.Certificate
 	if createTempCert && createTempKey {
 		tempCert, err := createSelfSignedCertificate()
 		if err != nil {

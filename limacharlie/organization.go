@@ -67,7 +67,7 @@ func (org Organization) Authorize(permissionsNeeded []string) ([]Permission, err
 	}
 
 	missing := []string{}
-	mapEffective := mapFromArray(effective)
+	mapEffective := makeSet(effective)
 	for _, p := range permissionsNeeded {
 		if _, found := mapEffective[p]; !found {
 			missing = append(missing, p)
@@ -80,10 +80,10 @@ func (org Organization) Authorize(permissionsNeeded []string) ([]Permission, err
 	return effective, nil
 }
 
-func mapFromArray(arr []Permission) map[string]int {
-	m := map[string]int{}
-	for i, v := range arr {
-		m[v.Name] = i
+func makeSet(arr []Permission) map[string]struct{} {
+	m := map[string]struct{}{}
+	for _, v := range arr {
+		m[v.Name] = struct{}{}
 	}
 	return m
 }
