@@ -115,8 +115,6 @@ func parseArgs() (FirehoseCLIOptions, error) {
 		destinationIP, destinationPort = getIPPort(*argDestination)
 	}
 
-	isDeleteOnFailure := true
-
 	return FirehoseCLIOptions{
 			ClientOpts: lc.ClientOptions{
 				OID: oid,
@@ -130,10 +128,10 @@ func parseArgs() (FirehoseCLIOptions, error) {
 			FirehoseOutputOpts: lc.FirehoseOutputOptions{
 				UniqueName:        *outputName,
 				Type:              lc.OutputDataType(*argOutputType),
-				InvestigationID:   argInvestigationID,
-				Tag:               argTag,
-				Category:          argCategory,
-				IsDeleteOnFailure: &isDeleteOnFailure,
+				InvestigationID:   *argInvestigationID,
+				Tag:               *argTag,
+				Category:          *argCategory,
+				IsDeleteOnFailure: true,
 			},
 			UseEnvironment: *argUseEnvironment,
 		},

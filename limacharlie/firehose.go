@@ -27,40 +27,19 @@ type FirehoseOutputOptions struct {
 
 	// Only receive events marked with this investigation ID
 	// Optional
-	InvestigationID *string
+	InvestigationID string
 
 	// Only receive events from sensor with this tag
 	// Optional
-	Tag *string
+	Tag string
 
 	// Only receive detections of this category
 	// Optional
-	Category *string
+	Category string
 
 	// If set to true, delete the firehose output on failure (in LC cloud)
 	// Optional
-	IsDeleteOnFailure *bool
-}
-
-func makeGenericOutput(opts FirehoseOutputOptions) OutputConfig {
-	output := OutputConfig{
-		Name:   opts.UniqueName,
-		Module: OutputTypes.Syslog,
-		Type:   opts.Type,
-	}
-	if opts.InvestigationID != nil {
-		output.InvestigationID = *opts.InvestigationID
-	}
-	if opts.Tag != nil {
-		output.Tag = *opts.Tag
-	}
-	if opts.Category != nil {
-		output.Category = *opts.Category
-	}
-	if opts.IsDeleteOnFailure != nil {
-		output.DeleteOnFailure = *opts.IsDeleteOnFailure
-	}
-	return output
+	IsDeleteOnFailure bool
 }
 
 // FirehoseOptions holds the parameters for the firehose
@@ -227,7 +206,15 @@ func (org Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
 		return nil
 	}
 
-	output := makeGenericOutput(fhOpts)
+	output := OutputConfig{
+		Name:            fhOpts.UniqueName,
+		Module:          OutputTypes.Syslog,
+		Type:            fhOpts.Type,
+		InvestigationID: fhOpts.InvestigationID,
+		Tag:             fhOpts.Tag,
+		Category:        fhOpts.Category,
+		DeleteOnFailure: fhOpts.IsDeleteOnFailure,
+	}
 	_, err = org.OutputAdd(output)
 	if err != nil {
 		return fmt.Errorf("could not add output: %s", err)
