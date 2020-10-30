@@ -41,8 +41,8 @@ type FirehoseOutputOptions struct {
 	IsDeleteOnFailure *bool
 }
 
-func makeGenericOutput(opts FirehoseOutputOptions) GenericOutputConfig {
-	output := GenericOutputConfig{
+func makeGenericOutput(opts FirehoseOutputOptions) OutputConfig {
+	output := OutputConfig{
 		Name:   opts.UniqueName,
 		Module: OutputTypes.Syslog,
 		Type:   opts.Type,

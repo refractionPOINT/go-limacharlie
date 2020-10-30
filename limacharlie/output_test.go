@@ -23,7 +23,7 @@ func TestOutputAddDelete(t *testing.T) {
 
 	testOutputName := "test-lc-go-sdk-out"
 
-	testOutput := GenericOutputConfig{
+	testOutput := OutputConfig{
 		Name:   testOutputName,
 		Module: OutputTypes.Syslog,
 		Type:   OutputType.Event,
@@ -41,7 +41,7 @@ func TestOutputAddDelete(t *testing.T) {
 	assertIsNotError(t, err, "failed to get outputs")
 
 	if len(outputs) != 1 {
-		t.Errorf("unexpected preexisting outputs: %+v", outputs)
+		t.Errorf("outputs is empty")
 	} else if _, ok := outputs[testOutputName]; !ok {
 		t.Errorf("test output not found: %+v", outputs)
 	}

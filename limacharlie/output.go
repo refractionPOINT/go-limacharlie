@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -57,7 +58,7 @@ var OutputType = struct {
 	Artifact:   "artifact",
 }
 
-type GenericOutputConfig struct {
+type OutputConfig struct {
 	Name   string           `json:"name"`
 	Module OutputModuleType `json:"module"`
 	Type   OutputDataType   `json:"type"`
@@ -103,34 +104,65 @@ type GenericOutputConfig struct {
 	HumioToken        string `json:"humio_api_token,omitempty"`
 }
 
-type OutputsByName map[string]GenericOutputConfig
-type outputsByOrgID map[string]OutputsByName
+type OutputsByName = map[string]OutputConfig
 
-func (org Organization) Outputs() (OutputsByName, error) {
-	outputs := outputsByOrgID{}
-	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
-	if err := org.client.outputs(http.MethodGet, request); err != nil {
-		return nil, err
-	}
+type outputsByOrgID = map[string]OutputsByName
 
-	orgOutputs, ok := outputs[org.client.options.OID]
-	if !ok {
-		return nil, ResourceNotFoundError
+type GenericJSON = map[string]interface{}
+type genericOutputsByOrgId = map[string]GenericJSON
+
+func (org Organization) OutputsGeneric(outputsByName interface{}) error {
+	switch t := outputsByName.(type) {
+	case GenericJSON:
+		outputs := genericOutputsByOrgId{}
+		request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
+		if err := org.client.outputs(http.MethodGet, request); err != nil {
+			return err
+		}
+
+		orgOutputs, ok := outputs[org.client.options.OID]
+		if !ok {
+			return ResourceNotFoundError
+		}
+		outputsByName = orgOutputs
+		return nil
+	case *OutputsByName:
+		outputs := outputsByOrgID{}
+		request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
+		if err := org.client.outputs(http.MethodGet, request); err != nil {
+			return err
+		}
+
+		orgOutputs, ok := outputs[org.client.options.OID]
+		if !ok {
+			return ResourceNotFoundError
+		}
+		*(outputsByName.(*OutputsByName)) = orgOutputs
+		return nil
+	default:
+		return fmt.Errorf("Unsupported type: %T", t)
 	}
-	return orgOutputs, nil
 }
 
-func (org Organization) OutputAdd(output GenericOutputConfig) (GenericOutputConfig, error) {
-	resp := GenericOutputConfig{}
+func (org Organization) Outputs() (OutputsByName, error) {
+	outByName := OutputsByName{}
+	if err := org.OutputsGeneric(&outByName); err != nil {
+		return OutputsByName{}, err
+	}
+	return outByName, nil
+}
+
+func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
+	resp := OutputConfig{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
 	if err := org.client.outputs(http.MethodPost, request); err != nil {
-		return GenericOutputConfig{}, err
+		return OutputConfig{}, err
 	}
 	return resp, nil
 }
 
-func (org Organization) OutputDel(name string) (map[string]interface{}, error) {
-	resp := map[string]interface{}{}
+func (org Organization) OutputDel(name string) (GenericJSON, error) {
+	resp := GenericJSON{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(map[string]string{"name": name})
 	if err := org.client.outputs(http.MethodDelete, request); err != nil {
 		return nil, err
