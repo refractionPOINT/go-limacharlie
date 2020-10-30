@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+// OutputModuleType is the type of module
 type OutputModuleType = string
 
+// OutputTypes is all supported modules
 var OutputTypes = struct {
 	S3          OutputModuleType
 	GCS         OutputModuleType
@@ -35,8 +37,10 @@ var OutputTypes = struct {
 	Kafka:       "kafka",
 }
 
+// OutputDataType is the type of data
 type OutputDataType = string
 
+// OutputDataTypes is slice of all supported type of data
 var OutputDataTypes = []OutputDataType{
 	OutputType.Event,
 	OutputType.Detect,
@@ -45,6 +49,7 @@ var OutputDataTypes = []OutputDataType{
 	OutputType.Artifact,
 }
 
+// OutputType is all supported type of data
 var OutputType = struct {
 	Event      OutputDataType
 	Detect     OutputDataType
@@ -59,6 +64,7 @@ var OutputType = struct {
 	Artifact:   "artifact",
 }
 
+// OutputConfig hold all the possible options used to configure an output
 type OutputConfig struct {
 	Name   string           `json:"name"`
 	Module OutputModuleType `json:"module"`
@@ -105,24 +111,26 @@ type OutputConfig struct {
 	HumioToken        string `json:"humio_api_token,omitempty"`
 }
 
+// OutputsByName represents OutputConfig where the key is the name of the OutputConfig
 type OutputsByName = map[string]OutputConfig
-type genericOutputsByOrgId = map[string]GenericJSON
+type genericOutputsByOrgID = map[string]GenericJSON
 
-func (org Organization) OutputsGeneric(outputsByName interface{}) error {
-	outputs := genericOutputsByOrgId{}
-	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
+// OutputsGeneric fetches all outputs and returns it in outputs
+func (org Organization) OutputsGeneric(outputs interface{}) error {
+	outputsByOrgID := genericOutputsByOrgID{}
+	request := makeDefaultRequest(&outputsByOrgID).withTimeout(10 * time.Second)
 	if err := org.client.outputs(http.MethodGet, request); err != nil {
 		return err
 	}
 
-	orgOutputs, ok := outputs[org.client.options.OID]
+	orgOutputs, ok := outputsByOrgID[org.client.options.OID]
 	if !ok {
 		return ResourceNotFoundError
 	}
 
-	switch t := outputsByName.(type) {
+	switch t := outputs.(type) {
 	case *GenericJSON:
-		*(outputsByName.(*GenericJSON)) = orgOutputs
+		*(outputs.(*GenericJSON)) = orgOutputs
 		return nil
 	case *OutputsByName:
 		all := OutputsByName{}
@@ -137,13 +145,14 @@ func (org Organization) OutputsGeneric(outputsByName interface{}) error {
 			}
 			all[k] = c
 		}
-		*(outputsByName.(*OutputsByName)) = all
+		*(outputs.(*OutputsByName)) = all
 		return nil
 	default:
 		return fmt.Errorf("unsupported type, expected pointer, got %t", t)
 	}
 }
 
+// Outputs returns all outputs by name
 func (org Organization) Outputs() (OutputsByName, error) {
 	outByName := OutputsByName{}
 	if err := org.OutputsGeneric(&outByName); err != nil {
@@ -152,6 +161,7 @@ func (org Organization) Outputs() (OutputsByName, error) {
 	return outByName, nil
 }
 
+// OutputAdd add an output to the LC organization
 func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
 	resp := OutputConfig{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
@@ -161,6 +171,7 @@ func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
 	return resp, nil
 }
 
+// OutputDel deletes an output from the LC organization
 func (org Organization) OutputDel(name string) (GenericJSON, error) {
 	resp := GenericJSON{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(map[string]string{"name": name})
