@@ -313,7 +313,7 @@ type whoAmIJsonResponse struct {
 	Identity        *string              `json:"ident"`
 }
 
-type outputJsonResponse map[string]interface{}
+type GenericJSON = map[string]interface{}
 
 func (c Client) whoAmI() (whoAmIJsonResponse, error) {
 	who := whoAmIJsonResponse{}

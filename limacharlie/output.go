@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -105,42 +106,41 @@ type OutputConfig struct {
 }
 
 type OutputsByName = map[string]OutputConfig
-
-type outputsByOrgID = map[string]OutputsByName
-
-type GenericJSON = map[string]interface{}
 type genericOutputsByOrgId = map[string]GenericJSON
 
 func (org Organization) OutputsGeneric(outputsByName interface{}) error {
-	switch t := outputsByName.(type) {
-	case GenericJSON:
-		outputs := genericOutputsByOrgId{}
-		request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
-		if err := org.client.outputs(http.MethodGet, request); err != nil {
-			return err
-		}
+	outputs := genericOutputsByOrgId{}
+	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
+	if err := org.client.outputs(http.MethodGet, request); err != nil {
+		return err
+	}
 
-		orgOutputs, ok := outputs[org.client.options.OID]
-		if !ok {
-			return ResourceNotFoundError
-		}
-		outputsByName = orgOutputs
+	orgOutputs, ok := outputs[org.client.options.OID]
+	if !ok {
+		return ResourceNotFoundError
+	}
+
+	switch t := outputsByName.(type) {
+	case *GenericJSON:
+		*(outputsByName.(*GenericJSON)) = orgOutputs
 		return nil
 	case *OutputsByName:
-		outputs := outputsByOrgID{}
-		request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
-		if err := org.client.outputs(http.MethodGet, request); err != nil {
-			return err
+		all := OutputsByName{}
+		for k, v := range orgOutputs {
+			jsonBytes, err := json.Marshal(v)
+			if err != nil {
+				return fmt.Errorf("cannot marshal to json: %s", err)
+			}
+			c := OutputConfig{}
+			if err := json.Unmarshal(jsonBytes, &c); err != nil {
+				return fmt.Errorf("cannot unmarshal to OutputConfig: %s", err)
+			}
+			all[k] = c
 		}
-
-		orgOutputs, ok := outputs[org.client.options.OID]
-		if !ok {
-			return ResourceNotFoundError
-		}
-		*(outputsByName.(*OutputsByName)) = orgOutputs
+		*(outputsByName.(*OutputsByName)) = all
 		return nil
 	default:
-		return fmt.Errorf("Unsupported type: %T", t)
+		return fmt.Errorf("unsupported type, expected pointer, got %t", t)
 	}
 }
 
