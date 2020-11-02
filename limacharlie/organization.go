@@ -38,12 +38,12 @@ func MakePermissions(arr []string) []Permission {
 }
 
 func arrayExistsInString(key string, arr []string) bool {
-	searchMap := map[string]interface{}{}
 	for _, v := range arr {
-		searchMap[v] = v
+		if key == v {
+			return true
+		}
 	}
-	_, found := searchMap[key]
-	return found
+	return false
 }
 
 // Authorize validate requested permissions for the organization
