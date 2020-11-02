@@ -39,11 +39,17 @@ func TestOutputAddDelete(t *testing.T) {
 
 	outputs, err = org.Outputs()
 	assertIsNotError(t, err, "failed to get outputs")
-
-	if len(outputs) != 1 {
+	if len(outputs) == 0 {
 		t.Errorf("outputs is empty")
 	} else if _, ok := outputs[testOutputName]; !ok {
 		t.Errorf("test output not found: %+v", outputs)
+	}
+
+	var rawJSON GenericJSON
+	err = org.OutputsGeneric(&rawJSON)
+	assertIsNotError(t, err, "failed to get generic ouputs")
+	if len(rawJSON) == 0 {
+		t.Errorf("generic outputs is empty")
 	}
 
 	_, err = org.OutputDel(testOutputName)

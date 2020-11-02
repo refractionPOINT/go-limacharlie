@@ -1,8 +1,6 @@
 package limacharlie
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 )
@@ -113,51 +111,30 @@ type OutputConfig struct {
 
 // OutputsByName represents OutputConfig where the key is the name of the OutputConfig
 type OutputsByName = map[string]OutputConfig
+type outputsByOrgID = map[string]OutputsByName
 type genericOutputsByOrgID = map[string]GenericJSON
 
 // OutputsGeneric fetches all outputs and returns it in outputs
 func (org Organization) OutputsGeneric(outputs interface{}) error {
-	outputsByOrgID := genericOutputsByOrgID{}
-	request := makeDefaultRequest(&outputsByOrgID).withTimeout(10 * time.Second)
+	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
 	if err := org.client.outputs(http.MethodGet, request); err != nil {
 		return err
 	}
-
-	orgOutputs, ok := outputsByOrgID[org.client.options.OID]
-	if !ok {
-		return ErrorResourceNotFound
-	}
-
-	switch t := outputs.(type) {
-	case *GenericJSON:
-		*(outputs.(*GenericJSON)) = orgOutputs
-		return nil
-	case *OutputsByName:
-		all := OutputsByName{}
-		for k, v := range orgOutputs {
-			jsonBytes, err := json.Marshal(v)
-			if err != nil {
-				return fmt.Errorf("cannot marshal to json: %s", err)
-			}
-			c := OutputConfig{}
-			if err := json.Unmarshal(jsonBytes, &c); err != nil {
-				return fmt.Errorf("cannot unmarshal to OutputConfig: %s", err)
-			}
-			all[k] = c
-		}
-		*(outputs.(*OutputsByName)) = all
-		return nil
-	default:
-		return fmt.Errorf("unsupported type, expected pointer, got %t", t)
-	}
+	return nil
 }
 
 // Outputs returns all outputs by name
 func (org Organization) Outputs() (OutputsByName, error) {
-	outByName := OutputsByName{}
-	if err := org.OutputsGeneric(&outByName); err != nil {
+	outputsByOrg := outputsByOrgID{}
+	if err := org.OutputsGeneric(&outputsByOrg); err != nil {
 		return OutputsByName{}, err
 	}
+
+	outByName, ok := outputsByOrg[org.client.options.OID]
+	if !ok {
+		return OutputsByName{}, ErrorResourceNotFound
+	}
+
 	return outByName, nil
 }
 
