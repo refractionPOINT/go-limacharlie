@@ -27,12 +27,17 @@ const (
 	uidEnvVar                 = "LC_UID"
 	keyEnvVar                 = "LC_API_KEY"
 	credsEnvVar               = "LC_CREDS_FILE"
+
+	restRetries = 3
+	restTimeout = 5 * time.Second
 )
 
+// Client makes raw request to LC cloud
 type Client struct {
 	options ClientOptions
 }
 
+// ClientOptions holds all options for Client
 type ClientOptions struct {
 	OID           string
 	APIKey        string
@@ -47,15 +52,33 @@ type jwtResponse struct {
 }
 
 type restRequest struct {
-	nRetries int
-	timeout  time.Duration
-
+	nRetries  int
+	timeout   time.Duration
 	queryData interface{}
 	formData  interface{}
-
-	response interface{}
+	response  interface{}
 }
 
+func makeDefaultRequest(response interface{}) restRequest {
+	return restRequest{
+		nRetries: restRetries,
+		timeout:  restTimeout,
+		response: response,
+	}
+}
+
+func (r restRequest) withTimeout(timeout time.Duration) restRequest {
+	r.timeout = timeout
+	return r
+}
+
+func (r restRequest) withFormData(formData interface{}) restRequest {
+	r.formData = formData
+	return r
+}
+
+// NewClient creates a new client
+// If options are not provided, will use those from environment
 func NewClient(opts ...ClientOptions) (*Client, error) {
 	c := &Client{}
 
@@ -123,7 +146,7 @@ func validateUUID(s string) error {
 
 func (c *Client) refreshJWT(expiry time.Duration) error {
 	if c.options.APIKey == "" {
-		return NoAPIKeyConfiguredError
+		return ErrorNoAPIKeyConfigured
 	}
 	authData := url.Values{}
 	authData.Set("secret", c.options.APIKey)
@@ -163,7 +186,7 @@ func (c *Client) refreshJWT(expiry time.Duration) error {
 	return nil
 }
 
-func getHttpClient(timeout time.Duration) *http.Client {
+func getHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
@@ -176,7 +199,7 @@ func getHttpClient(timeout time.Duration) *http.Client {
 }
 
 func (c *Client) reliableRequest(verb string, path string, request restRequest) error {
-	request.nRetries += 1
+	request.nRetries++
 	var err error
 	for request.nRetries > 0 {
 		var statusCode int
@@ -184,7 +207,7 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 		if err == nil && statusCode == 200 {
 			break
 		}
-		request.nRetries -= 1
+		request.nRetries--
 
 		if statusCode == 401 {
 			// Unauthorized, the JWT may have expired, refresh
@@ -261,7 +284,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		r.URL.RawQuery = rawQuery
 	}
 
-	resp, err := getHttpClient(request.timeout).Do(r)
+	resp, err := getHTTPClient(request.timeout).Do(r)
 	if err != nil {
 		return 0, err
 	}
@@ -280,20 +303,31 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	if _, err := io.Copy(&respData, resp.Body); err != nil {
 		return resp.StatusCode, err
 	}
+
 	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
 		return resp.StatusCode, err
 	}
 	return resp.StatusCode, nil
 }
 
-func (c *Client) WhoAmI() (map[string]interface{}, error) {
-	who := map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodGet, "who", restRequest{
-		nRetries: 3,
-		timeout:  5 * time.Second,
-		response: &who,
-	}); err != nil {
-		return nil, err
+type whoAmIJsonResponse struct {
+	UserPermissions *map[string][]string `json:"user_perms:omitempty"`
+	Organizations   *[]string            `json:"orgs"`
+	Permissions     *[]string            `json:"perms"`
+	Identity        *string              `json:"ident"`
+}
+
+// GenericJSON is the default format for json data
+type GenericJSON = map[string]interface{}
+
+func (c Client) whoAmI() (whoAmIJsonResponse, error) {
+	who := whoAmIJsonResponse{}
+	if err := c.reliableRequest(http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
+		return whoAmIJsonResponse{}, err
 	}
 	return who, nil
+}
+
+func (c Client) outputs(verb string, request restRequest) error {
+	return c.reliableRequest(verb, fmt.Sprintf("outputs/%s", c.options.OID), request)
 }

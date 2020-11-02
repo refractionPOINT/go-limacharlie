@@ -1,13 +1,14 @@
 package limacharlie
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 )
 
-type OutputModuleType string
+// OutputModuleType is the type of module
+type OutputModuleType = string
 
+// OutputTypes is all supported modules
 var OutputTypes = struct {
 	S3          OutputModuleType
 	GCS         OutputModuleType
@@ -34,14 +35,25 @@ var OutputTypes = struct {
 	Kafka:       "kafka",
 }
 
-type OutputModuleStream string
+// OutputDataType is the type of data
+type OutputDataType = string
 
-var OutputStreams = struct {
-	Event      OutputModuleStream
-	Detect     OutputModuleStream
-	Audit      OutputModuleStream
-	Deployment OutputModuleStream
-	Artifact   OutputModuleStream
+// OutputDataTypes is slice of all supported type of data
+var OutputDataTypes = []OutputDataType{
+	OutputType.Event,
+	OutputType.Detect,
+	OutputType.Audit,
+	OutputType.Deployment,
+	OutputType.Artifact,
+}
+
+// OutputType is all supported type of data
+var OutputType = struct {
+	Event      OutputDataType
+	Detect     OutputDataType
+	Audit      OutputDataType
+	Deployment OutputDataType
+	Artifact   OutputDataType
 }{
 	Event:      "event",
 	Detect:     "detect",
@@ -50,13 +62,14 @@ var OutputStreams = struct {
 	Artifact:   "artifact",
 }
 
-type GenericOutputConfig struct {
-	Name   string             `json:"name"`
-	Module OutputModuleType   `json:"module"`
-	Stream OutputModuleStream `json:"type"`
+// OutputConfig hold all the possible options used to configure an output
+type OutputConfig struct {
+	Name   string           `json:"name"`
+	Module OutputModuleType `json:"module"`
+	Type   OutputDataType   `json:"type"`
 
-	PrefixData        bool   `json:"is_prefix_data,omitempty"`
-	DeleteInFailure   bool   `json:"is_delete_on_failure,omitempty"`
+	PrefixData        bool   `json:"is_prefix_data,omitempty,string"`
+	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string"`
 	InvestigationID   string `json:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty"`
 	Category          string `json:"cat,omitempty"`
@@ -69,9 +82,9 @@ type GenericOutputConfig struct {
 	Bucket            string `json:"bucket,omitempty"`
 	UserName          string `json:"username,omitempty"`
 	Password          string `json:"password,omitempty"`
-	TLS               bool   `json:"is_tls,omitempty"`
-	StrictTLS         bool   `json:"is_strict_tls,omitempty"`
-	NoHeader          bool   `json:"is_no_header,omitempty"`
+	TLS               bool   `json:"is_tls,omitempty,string"`
+	StrictTLS         bool   `json:"is_strict_tls,omitempty,string"`
+	NoHeader          bool   `json:"is_no_header,omitempty,string"`
 	StructuredData    string `json:"structured_data,omitempty"`
 	SecretKey         string `json:"secret_key,omitempty"`
 	EventWhiteList    string `json:"event_white_list,omitempty"`
@@ -96,49 +109,51 @@ type GenericOutputConfig struct {
 	HumioToken        string `json:"humio_api_token,omitempty"`
 }
 
-func (c *Client) Outputs() (map[string]interface{}, error) {
-	outputs := map[string]map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodGet, fmt.Sprintf("outputs/%s", c.options.OID), restRequest{
-		nRetries: 3,
-		timeout:  10 * time.Second,
-		response: &outputs,
-	}); err != nil {
-		return nil, err
-	}
+// OutputsByName represents OutputConfig where the key is the name of the OutputConfig
+type OutputsByName = map[string]OutputConfig
+type outputsByOrgID = map[string]OutputsByName
+type genericOutputsByOrgID = map[string]GenericJSON
 
-	orgOutputs, ok := outputs[c.options.OID]
-	if !ok {
-		return nil, ResourceNotFoundError
+// OutputsGeneric fetches all outputs and returns it in outputs
+func (org Organization) OutputsGeneric(outputs interface{}) error {
+	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
+	if err := org.client.outputs(http.MethodGet, request); err != nil {
+		return err
 	}
-	return orgOutputs, nil
+	return nil
 }
 
-func (c *Client) OutputAdd(config interface{}) (map[string]interface{}, error) {
-	resp := map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodPost, fmt.Sprintf("outputs/%s", c.options.OID), restRequest{
-		nRetries: 3,
-		timeout:  10 * time.Second,
-		response: &resp,
-		formData: config,
-	}); err != nil {
-		return nil, err
+// Outputs returns all outputs by name
+func (org Organization) Outputs() (OutputsByName, error) {
+	outputsByOrg := outputsByOrgID{}
+	if err := org.OutputsGeneric(&outputsByOrg); err != nil {
+		return OutputsByName{}, err
 	}
 
+	outByName, ok := outputsByOrg[org.client.options.OID]
+	if !ok {
+		return OutputsByName{}, ErrorResourceNotFound
+	}
+
+	return outByName, nil
+}
+
+// OutputAdd add an output to the LC organization
+func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
+	resp := OutputConfig{}
+	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
+	if err := org.client.outputs(http.MethodPost, request); err != nil {
+		return OutputConfig{}, err
+	}
 	return resp, nil
 }
 
-func (c *Client) OutputDel(name string) (map[string]interface{}, error) {
-	resp := map[string]interface{}{}
-	if err := c.reliableRequest(http.MethodDelete, fmt.Sprintf("outputs/%s", c.options.OID), restRequest{
-		nRetries: 3,
-		timeout:  10 * time.Second,
-		response: &resp,
-		formData: map[string]string{
-			"name": name,
-		},
-	}); err != nil {
+// OutputDel deletes an output from the LC organization
+func (org Organization) OutputDel(name string) (GenericJSON, error) {
+	resp := GenericJSON{}
+	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(map[string]string{"name": name})
+	if err := org.client.outputs(http.MethodDelete, request); err != nil {
 		return nil, err
 	}
-
 	return resp, nil
 }

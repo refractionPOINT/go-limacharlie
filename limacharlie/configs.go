@@ -2,14 +2,13 @@ package limacharlie
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os/user"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
-// The actual config file format may seem a bit odd
+// ConfigFile is the actual config file format may seem a bit odd
 // but it is structured to maintain backwards compatibility
 // with the Python SDK/CLI format.
 type ConfigFile struct {
@@ -17,12 +16,14 @@ type ConfigFile struct {
 	Environments map[string]ConfigEnvironment `yaml:"env"`
 }
 
+// ConfigEnvironment holds the different values parsed from the environment
 type ConfigEnvironment struct {
 	OID    string `yaml:"oid"`
 	UID    string `yaml:"uid"`
 	APIKey string `yaml:"api_key"`
 }
 
+// FromConfigFile updates self from the file path
 func (o *ClientOptions) FromConfigFile(configFilePath string, environmentName string) error {
 	cleanPath := configFilePath
 	if strings.HasPrefix(cleanPath, "~/") {
@@ -40,6 +41,7 @@ func (o *ClientOptions) FromConfigFile(configFilePath string, environmentName st
 	return o.FromConfigString(data, environmentName)
 }
 
+// FromConfigString updates self from strings
 func (o *ClientOptions) FromConfigString(configFileString []byte, environmentName string) error {
 	cfg := ConfigFile{}
 	if err := yaml.Unmarshal(configFileString, &cfg); err != nil {
@@ -51,6 +53,7 @@ func (o *ClientOptions) FromConfigString(configFileString []byte, environmentNam
 	return o.FromConfig(cfg, environmentName)
 }
 
+// FromConfig updates self from a config file
 func (o *ClientOptions) FromConfig(cfg ConfigFile, environmentName string) error {
 	// An empty environment name defaults.
 	if environmentName == "" {
