@@ -1,0 +1,7 @@
+steps:
+- name: 'golang'
+  dir: limacharlie
+  args: ['go', 'test', '.', '-v']
+  env:
+    - '_KEY=${_KEY}'
+    - '_OID=${_OID}'
