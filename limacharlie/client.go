@@ -320,7 +320,7 @@ type whoAmIJsonResponse struct {
 // GenericJSON is the default format for json data
 type GenericJSON = map[string]interface{}
 
-func (c Client) whoAmI() (whoAmIJsonResponse, error) {
+func (c *Client) whoAmI() (whoAmIJsonResponse, error) {
 	who := whoAmIJsonResponse{}
 	if err := c.reliableRequest(http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
 		return whoAmIJsonResponse{}, err
@@ -328,6 +328,6 @@ func (c Client) whoAmI() (whoAmIJsonResponse, error) {
 	return who, nil
 }
 
-func (c Client) GetCurrentJWT() string {
+func (c *Client) GetCurrentJWT() string {
 	return c.options.JWT
 }

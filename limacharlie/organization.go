@@ -6,16 +6,16 @@ import (
 
 // Organization holds a connection to the LC cloud organization
 type Organization struct {
-	client Client
+	client *Client
 }
 
-// MakeOrganization creates an Organization
-func MakeOrganization(clientOpts ClientOptions) (Organization, error) {
+// NewOrganization creates an Organization
+func NewOrganization(clientOpts ClientOptions) (*Organization, error) {
 	c, err := NewClient(clientOpts)
 	if err != nil {
-		return Organization{}, fmt.Errorf("Could not initialize client: %s", err)
+		return nil, fmt.Errorf("Could not initialize client: %s", err)
 	}
-	return Organization{*c}, nil
+	return &Organization{c}, nil
 }
 
 // Permission represents the permission granted in LC
@@ -47,7 +47,7 @@ func arrayExistsInString(key string, arr []string) bool {
 }
 
 // Authorize validate requested permissions for the organization
-func (org Organization) Authorize(permissionsNeeded []string) ([]Permission, error) {
+func (org *Organization) Authorize(permissionsNeeded []string) ([]Permission, error) {
 	effective := NoPermission()
 	result, err := org.client.whoAmI()
 	if err != nil {
@@ -91,6 +91,6 @@ func makeSet(arr []Permission) map[string]struct{} {
 	return m
 }
 
-func (org Organization) GetCurrentJWT() string {
+func (org *Organization) GetCurrentJWT() string {
 	return org.client.GetCurrentJWT()
 }

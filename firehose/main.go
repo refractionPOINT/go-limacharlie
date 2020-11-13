@@ -138,7 +138,7 @@ func parseArgs() (FirehoseCLIOptions, error) {
 		nil
 }
 
-func consumeMessages(fh lc.Firehose) {
+func consumeMessages(fh *lc.Firehose) {
 	for !fh.IsRunning() {
 		if len(fh.Messages) == 0 {
 			time.Sleep(1 * time.Second)
@@ -149,7 +149,7 @@ func consumeMessages(fh lc.Firehose) {
 	}
 }
 
-func consumeDroppedMessages(fh lc.Firehose) {
+func consumeDroppedMessages(fh *lc.Firehose) {
 	for !fh.IsRunning() {
 		if len(fh.Messages) == 0 {
 			time.Sleep(1 * time.Second)
@@ -185,13 +185,13 @@ func main() {
 		cliOpts.ClientOpts.APIKey = string(bytesAPIKey)
 	}
 
-	org, err := lc.MakeOrganization(cliOpts.ClientOpts)
+	org, err := lc.NewOrganization(cliOpts.ClientOpts)
 	if err != nil {
 		log.Err(err).Msg("could not make organization")
 		return
 	}
 
-	fh, err := lc.MakeFirehose(org, cliOpts.FirehoseOpts, &cliOpts.FirehoseOutputOpts)
+	fh, err := lc.NewFirehose(org, cliOpts.FirehoseOpts, &cliOpts.FirehoseOutputOpts)
 	if err != nil {
 		log.Err(err).Msg("could not make firehose")
 	}
