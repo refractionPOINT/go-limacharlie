@@ -28,8 +28,8 @@ func getTestClientFromEnv(t *testing.T) Client {
 	return *c
 }
 
-func getTestOrgFromEnv(t *testing.T) Organization {
-	org, err := MakeOrganization(getTestOptionsFromEnv(t))
+func getTestOrgFromEnv(t *testing.T) *Organization {
+	org, err := NewOrganization(getTestOptionsFromEnv(t))
 	assertIsNotError(t, err, "failed to make organization")
 	return org
 }

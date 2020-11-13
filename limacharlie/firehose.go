@@ -87,7 +87,7 @@ type FirehoseMessage struct {
 // Firehose is a listener to receive data from a limacharlie.io organization in push mode
 type Firehose struct {
 	// Organization linked to this firehose
-	Organization Organization
+	Organization *Organization
 	opts         FirehoseOptions
 	outputOpts   *FirehoseOutputOptions
 
@@ -188,7 +188,7 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 	return &tlsListener, nil
 }
 
-func (org Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
+func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
 	if fhOpts.UniqueName == "" {
 		log.Info().Msg("output registration not required")
 		return nil
@@ -223,7 +223,7 @@ func (org Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
 	return nil
 }
 
-func (org Organization) unregisterOutput(fhOutputOpts FirehoseOutputOptions) {
+func (org *Organization) unregisterOutput(fhOutputOpts FirehoseOutputOptions) {
 	if fhOutputOpts.UniqueName == "" {
 		return
 	}
@@ -267,13 +267,13 @@ func (fhOpts FirehoseOptions) makeTLSConfig() (*tls.Config, error) {
 	return &tlsConfig, nil
 }
 
-// MakeFirehose initialize the firehose
-func MakeFirehose(org Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (Firehose, error) {
+// NewFirehose initialize the firehose
+func NewFirehose(org *Organization, fhOpts FirehoseOptions, fhOutputOpts *FirehoseOutputOptions) (*Firehose, error) {
 	tlsConfig, err := fhOpts.makeTLSConfig()
 	if err != nil {
-		return Firehose{}, fmt.Errorf("could not make tls config: %s", err)
+		return nil, fmt.Errorf("could not make tls config: %s", err)
 	}
-	fh := Firehose{
+	fh := &Firehose{
 		Organization:     org,
 		opts:             fhOpts,
 		outputOpts:       fhOutputOpts,
@@ -287,7 +287,7 @@ func MakeFirehose(org Organization, fhOpts FirehoseOptions, fhOutputOpts *Fireho
 }
 
 // Start register the optional output to limacharlie.io and start listening for data
-func (fh Firehose) Start() error {
+func (fh *Firehose) Start() error {
 	var mutex sync.Mutex
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -315,7 +315,7 @@ func (fh Firehose) Start() error {
 	return nil
 }
 
-func (fh Firehose) handleConnections() {
+func (fh *Firehose) handleConnections() {
 	readBufferSize := 1024 * 512
 	currentData := make([]byte, readBufferSize*2)
 
@@ -355,7 +355,7 @@ func (fh Firehose) handleConnections() {
 	}
 }
 
-func (fh Firehose) handleMessage(raw []byte) {
+func (fh *Firehose) handleMessage(raw []byte) {
 	fhMessage := FirehoseMessage{string(raw)}
 	if fh.opts.ParseMessage {
 		isValid := json.Valid(raw)
@@ -375,7 +375,7 @@ func (fh Firehose) handleMessage(raw []byte) {
 }
 
 // Shutdown stops the listener and delete the output previsouly registered if any
-func (fh Firehose) Shutdown() {
+func (fh *Firehose) Shutdown() {
 	var mutex sync.Mutex
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -392,16 +392,16 @@ func (fh Firehose) Shutdown() {
 }
 
 // IsRunning will return true if firehose has been started
-func (fh Firehose) IsRunning() bool {
+func (fh *Firehose) IsRunning() bool {
 	return fh.listener != nil
 }
 
 // GetMessageDropCount returns the current count of dropped messages
-func (fh Firehose) GetMessageDropCount() int {
+func (fh *Firehose) GetMessageDropCount() int {
 	return fh.messageDropCount
 }
 
 // ResetMessageDropCount reset the count of dropped messages
-func (fh Firehose) ResetMessageDropCount() {
+func (fh *Firehose) ResetMessageDropCount() {
 	fh.messageDropCount = 0
 }
