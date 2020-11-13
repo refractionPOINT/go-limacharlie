@@ -328,6 +328,6 @@ func (c Client) whoAmI() (whoAmIJsonResponse, error) {
 	return who, nil
 }
 
-func (c Client) outputs(verb string, request restRequest) error {
-	return c.reliableRequest(verb, fmt.Sprintf("outputs/%s", c.options.OID), request)
+func (c Client) GetCurrentJWT() string {
+	return c.options.JWT
 }

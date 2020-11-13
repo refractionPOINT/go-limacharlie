@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -117,7 +118,7 @@ type genericOutputsByOrgID = map[string]GenericJSON
 // OutputsGeneric fetches all outputs and returns it in outputs
 func (org Organization) OutputsGeneric(outputs interface{}) error {
 	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
-	if err := org.client.outputs(http.MethodGet, request); err != nil {
+	if err := org.outputs(http.MethodGet, request); err != nil {
 		return err
 	}
 	return nil
@@ -142,7 +143,7 @@ func (org Organization) Outputs() (OutputsByName, error) {
 func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
 	resp := OutputConfig{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
-	if err := org.client.outputs(http.MethodPost, request); err != nil {
+	if err := org.outputs(http.MethodPost, request); err != nil {
 		return OutputConfig{}, err
 	}
 	return resp, nil
@@ -152,8 +153,12 @@ func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
 func (org Organization) OutputDel(name string) (GenericJSON, error) {
 	resp := GenericJSON{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(map[string]string{"name": name})
-	if err := org.client.outputs(http.MethodDelete, request); err != nil {
+	if err := org.outputs(http.MethodDelete, request); err != nil {
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (org Organization) outputs(verb string, request restRequest) error {
+	return org.client.reliableRequest(verb, fmt.Sprintf("outputs/%s", org.client.options.OID), request)
 }

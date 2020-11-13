@@ -90,3 +90,7 @@ func makeSet(arr []Permission) map[string]struct{} {
 	}
 	return m
 }
+
+func (org Organization) GetCurrentJWT() string {
+	return org.client.GetCurrentJWT()
+}
