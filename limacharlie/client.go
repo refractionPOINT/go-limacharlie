@@ -327,3 +327,7 @@ func (c Client) whoAmI() (whoAmIJsonResponse, error) {
 	}
 	return who, nil
 }
+
+func (c Client) GetCurrentJWT() string {
+	return c.options.JWT
+}
