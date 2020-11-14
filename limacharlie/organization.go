@@ -47,11 +47,11 @@ func arrayExistsInString(key string, arr []string) bool {
 }
 
 // Authorize validate requested permissions for the organization
-func (org *Organization) Authorize(permissionsNeeded []string) ([]Permission, error) {
+func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permission, error) {
 	effective := NoPermission()
 	result, err := org.client.whoAmI()
 	if err != nil {
-		return effective, fmt.Errorf("Error with WhoAmI request: %s", err)
+		return "", effective, fmt.Errorf("Error with WhoAmI request: %s", err)
 	}
 
 	if result.UserPermissions != nil && len(*result.UserPermissions) > 1 {
@@ -78,9 +78,14 @@ func (org *Organization) Authorize(permissionsNeeded []string) ([]Permission, er
 	}
 
 	if len(missing) > 0 {
-		return NoPermission(), fmt.Errorf("Unauthorized, missing permissions: '%q'", missing)
+		return "", NoPermission(), fmt.Errorf("Unauthorized, missing permissions: '%q'", missing)
 	}
-	return effective, nil
+
+	ident := ""
+	if result.Identity != nil {
+		ident = *result.Identity
+	}
+	return ident, effective, nil
 }
 
 func makeSet(arr []Permission) map[string]struct{} {
