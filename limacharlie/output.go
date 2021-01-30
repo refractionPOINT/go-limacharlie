@@ -1,8 +1,10 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -96,6 +98,7 @@ type OutputConfig struct {
 	Readable          bool   `json:"is_readable,omitempty"`
 	Subject           string `json:"subject,omitempty"`
 	StartTLS          bool   `json:"is_starttls,omitempty"`
+	AuthLogin         bool   `json:"is_authlogin,omitempty"`
 	Indexing          bool   `json:"is_indexing,omitempty"`
 	Compressing       bool   `json:"is_compression,omitempty"`
 	CategoryBlackList string `json:"cat_black_list,omitempty"`
@@ -110,9 +113,12 @@ type OutputConfig struct {
 	HumioToken        string `json:"humio_api_token,omitempty"`
 }
 
+type apiOutputConfig OutputConfig
+
 // OutputsByName represents OutputConfig where the key is the name of the OutputConfig
 type OutputsByName = map[string]OutputConfig
-type outputsByOrgID = map[string]OutputsByName
+type apiOutputsByName = map[string]apiOutputConfig
+type outputsByOrgID = map[string]apiOutputsByName
 type genericOutputsByOrgID = map[string]GenericJSON
 
 // OutputsGeneric fetches all outputs and returns it in outputs
@@ -136,7 +142,12 @@ func (org Organization) Outputs() (OutputsByName, error) {
 		return OutputsByName{}, ErrorResourceNotFound
 	}
 
-	return outByName, nil
+	cleanOutByName := OutputsByName{}
+	for k, v := range outByName {
+		cleanOutByName[k] = OutputConfig(v)
+	}
+
+	return cleanOutByName, nil
 }
 
 // OutputAdd add an output to the LC organization
@@ -161,4 +172,53 @@ func (org Organization) OutputDel(name string) (GenericJSON, error) {
 
 func (org Organization) outputs(verb string, request restRequest) error {
 	return org.client.reliableRequest(verb, fmt.Sprintf("outputs/%s", org.client.options.OID), request)
+}
+
+func (o *apiOutputConfig) UnmarshalJSON(b []byte) error {
+	clean := map[string]interface{}{}
+	d := map[string]interface{}{}
+
+	defer func() {
+		if e := recover(); e != nil {
+			fmt.Println(d)
+		}
+	}()
+
+	if err := json.Unmarshal(b, &d); err != nil {
+		return err
+	}
+	for k, v := range d {
+		if v == nil {
+			continue
+		}
+		if !strings.HasPrefix(k, "is_") {
+			clean[k] = v
+			continue
+		}
+		val, ok := v.(string)
+		if !ok {
+			if val, ok := v.(bool); ok && val {
+				clean[k] = true
+				continue
+			}
+			return &json.UnmarshalTypeError{
+				Field: k,
+				Value: fmt.Sprintf("%#v", v),
+			}
+		}
+		if val == "true" || val == "1" {
+			clean[k] = true
+		}
+	}
+
+	tmp, err := json.Marshal(clean)
+	if err != nil {
+		return err
+	}
+	oc := OutputConfig{}
+	if err := json.Unmarshal(tmp, &oc); err != nil {
+		return err
+	}
+	*o = apiOutputConfig(oc)
+	return nil
 }
