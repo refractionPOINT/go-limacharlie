@@ -17,6 +17,10 @@ import (
 	"time"
 )
 
+const (
+	readBufferSize = 512 * 1024
+)
+
 // FirehoseOutputOptions holds the optional parameter for firehose output
 type FirehoseOutputOptions struct {
 	// Name to register as an Output
@@ -322,27 +326,32 @@ func (fh *Firehose) Start() error {
 }
 
 func (fh *Firehose) handleConnections() {
-	readBufferSize := 1024 * 512
-	currentData := make([]byte, readBufferSize*2)
-
 	log.Debug().Msg("listening for connections")
 	for fh.IsRunning() {
 		conn, err := fh.listener.Accept()
 		if err != nil {
-			continue
+			break
 		}
-		log.Debug().Msg("new incoming connection")
-		defer conn.Close()
+		go fh.handleConnection(conn)
+	}
+}
 
-		readBuffer := make([]byte, readBufferSize)
+func (fh *Firehose) handleConnection(conn net.Conn) {
+	log.Debug().Msg("new incoming connection")
+	defer conn.Close()
+
+	readBuffer := make([]byte, readBufferSize)
+	currentData := make([]byte, readBufferSize*2)
+	for fh.IsRunning() {
+		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		sizeRead, err := conn.Read(readBuffer)
 		if err != nil {
 			log.Err(err).Msg("error reading from connection")
-			continue
+			return
 		}
 		if sizeRead == 0 {
 			log.Debug().Msg("empty body read")
-			continue
+			return
 		}
 		chunks := bytes.Split(readBuffer, []byte{0x0a})
 		isContinuation := len(chunks) == 1
