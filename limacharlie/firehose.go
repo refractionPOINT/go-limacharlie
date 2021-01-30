@@ -40,6 +40,9 @@ type FirehoseOutputOptions struct {
 	// If set to true, delete the firehose output on failure (in LC cloud)
 	// Optional
 	IsDeleteOnFailure bool
+
+	// If set to true, do not validate certs, useful for self-signed certs.
+	IsNotStrictSSL bool
 }
 
 // FirehoseOptions holds the parameters for the firehose
@@ -214,6 +217,7 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
 		Tag:             fhOpts.Tag,
 		Category:        fhOpts.Category,
 		DeleteOnFailure: fhOpts.IsDeleteOnFailure,
+		StrictTLS:       !fhOpts.IsNotStrictSSL,
 	}
 	_, err = org.OutputAdd(output)
 	if err != nil {
