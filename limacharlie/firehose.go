@@ -103,7 +103,9 @@ type Firehose struct {
 
 	messageDropCount int
 	listenerConfig   *tls.Config
-	listener         *net.Listener
+	listener         net.Listener
+
+	mutex sync.Mutex
 }
 
 type firehoseHandler struct {
@@ -314,7 +316,7 @@ func (fh *Firehose) Start() error {
 		}
 	}
 
-	fh.listener = &listener
+	fh.listener = listener
 	go fh.handleConnections()
 	return nil
 }
@@ -325,7 +327,7 @@ func (fh *Firehose) handleConnections() {
 
 	log.Debug().Msg("listening for connections")
 	for fh.IsRunning() {
-		conn, err := (*fh.listener).Accept()
+		conn, err := fh.listener.Accept()
 		if err != nil {
 			continue
 		}
@@ -380,14 +382,16 @@ func (fh *Firehose) handleMessage(raw []byte) {
 
 // Shutdown stops the listener and delete the output previsouly registered if any
 func (fh *Firehose) Shutdown() {
-	var mutex sync.Mutex
-	mutex.Lock()
-	defer mutex.Unlock()
+	fh.mutex.Lock()
+	defer fh.mutex.Unlock()
+
 	if !fh.IsRunning() {
 		return
 	}
-	defer (*fh.listener).Close()
+
+	listener := fh.listener
 	fh.listener = nil
+	go listener.Close()
 
 	if fh.outputOpts != nil {
 		fh.Organization.unregisterOutput(*fh.outputOpts)
@@ -397,6 +401,8 @@ func (fh *Firehose) Shutdown() {
 
 // IsRunning will return true if firehose has been started
 func (fh *Firehose) IsRunning() bool {
+	fh.mutex.Lock()
+	defer fh.mutex.Unlock()
 	return fh.listener != nil
 }
 
