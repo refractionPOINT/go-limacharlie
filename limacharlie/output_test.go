@@ -9,7 +9,7 @@ func TestOutputList(t *testing.T) {
 	outputs, err := org.Outputs()
 	assertIsNotError(t, err, "failed to get outputs")
 	if len(outputs) != 0 {
-		t.Errorf("unexpected preexisting outputs: %+v", outputs)
+		t.Errorf("unexpected preexisting outputs in list: %+v", outputs)
 	}
 }
 
@@ -18,7 +18,7 @@ func TestOutputAddDelete(t *testing.T) {
 	outputs, err := org.Outputs()
 	assertIsNotError(t, err, "failed to get outputs")
 	if len(outputs) != 0 {
-		t.Errorf("unexpected preexisting outputs: %+v", outputs)
+		t.Errorf("unexpected preexisting outputs in add/delete: %+v", outputs)
 	}
 
 	testOutputName := "test-lc-go-sdk-out"
