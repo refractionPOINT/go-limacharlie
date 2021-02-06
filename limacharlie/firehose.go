@@ -88,7 +88,8 @@ type FirehoseOptions struct {
 // FirehoseMessage holds the content of a message received from a firehose
 type FirehoseMessage struct {
 	// Message content
-	Content string
+	RawContent string
+	Content    map[string]interface{}
 }
 
 // Firehose is a listener to receive data from a limacharlie.io organization in push mode
@@ -109,7 +110,9 @@ type Firehose struct {
 	listenerConfig   *tls.Config
 	listener         net.Listener
 
-	mutex sync.Mutex
+	mutex     sync.Mutex
+	wgFeeders sync.WaitGroup
+	isRunning bool
 }
 
 type firehoseHandler struct {
@@ -301,9 +304,10 @@ func (fh *Firehose) Start() error {
 	var mutex sync.Mutex
 	mutex.Lock()
 	defer mutex.Unlock()
-	if fh.listener != nil {
+	if fh.isRunning {
 		return fmt.Errorf("firehose already started")
 	}
+	fh.isRunning = true
 
 	// start the listener
 	listener, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort), fh.listenerConfig)
@@ -322,30 +326,40 @@ func (fh *Firehose) Start() error {
 
 	fh.listener = listener
 	go fh.handleConnections()
+	log.Info().Msg("firehose started")
 	return nil
 }
 
 func (fh *Firehose) handleConnections() {
-	log.Debug().Msg("listening for connections")
+	log.Debug().Msg(fmt.Sprintf("listening for connections on %s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort))
 	for fh.IsRunning() {
 		conn, err := fh.listener.Accept()
 		if err != nil {
 			break
 		}
+		fh.wgFeeders.Add(1)
 		go fh.handleConnection(conn)
 	}
 }
 
 func (fh *Firehose) handleConnection(conn net.Conn) {
 	log.Debug().Msg("new incoming connection")
+	defer log.Debug().Msg("incoming connection disconnected")
 	defer conn.Close()
+	defer fh.wgFeeders.Done()
 
 	readBuffer := make([]byte, readBufferSize)
-	currentData := make([]byte, readBufferSize*2)
+	currentData := make([]byte, 0, readBufferSize*2)
+	lastReceived := time.Now()
 	for fh.IsRunning() {
-		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		sizeRead, err := conn.Read(readBuffer)
-		if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			if time.Now().After(lastReceived.Add(5 * time.Minute)) {
+				log.Debug().Msg("incoming connection timed out")
+				break
+			}
+		} else if err != nil {
 			log.Err(err).Msg("error reading from connection")
 			return
 		}
@@ -353,29 +367,51 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 			log.Debug().Msg("empty body read")
 			return
 		}
-		chunks := bytes.Split(readBuffer, []byte{0x0a})
-		isContinuation := len(chunks) == 1
-		if isContinuation {
-			currentData = append(currentData[:len(currentData)], chunks[0]...)
-			continue
-		}
-		for _, chunk := range chunks {
-			currentData = append(currentData[:len(currentData)], chunk...)
-			if len(currentData) == 0 {
+
+		data := readBuffer[:sizeRead]
+		dataStart := 0
+
+		for i, b := range data {
+			if b == 0x0a {
+				// Found a newline, so we can use what we
+				// have accumulated before plus this as
+				// a message.
+				if i-1 > dataStart {
+					currentData = append(currentData, data[dataStart:i]...)
+				}
+				dataStart = i + 1
+				fh.handleMessage(currentData)
+				currentData = make([]byte, 0, readBufferSize*2)
 				continue
 			}
-			fh.handleMessage(currentData)
-			currentData = append(currentData[:0], currentData[len(currentData):]...)
+			if len(data)-1 == i {
+				// This is the end of the buffer and
+				// we got no newline, keep it for later.
+				currentData = append(currentData, data[dataStart:i]...)
+			}
 		}
 	}
 }
 
 func (fh *Firehose) handleMessage(raw []byte) {
-	fhMessage := FirehoseMessage{string(raw)}
+	fhMessage := FirehoseMessage{RawContent: string(raw)}
+
+	// Are we over-queue?
+	if fh.opts.MaxMessageCount != 0 && len(fh.Messages) >= fh.opts.MaxMessageCount {
+		fh.messageDropCount++
+		if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
+			fh.ErrorMessages <- fhMessage
+		} else {
+			log.Warn().Msg("maximum error message count reached")
+		}
+		return
+	}
+
 	if fh.opts.ParseMessage {
-		isValid := json.Valid(raw)
-		if isValid && len(fh.Messages) < fh.opts.MaxMessageCount {
-			fh.Messages <- fhMessage
+		d := map[string]interface{}{}
+		err := json.Unmarshal(raw, &d)
+		if err == nil {
+			fhMessage.Content = d
 		} else {
 			fh.messageDropCount++
 			if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
@@ -384,27 +420,34 @@ func (fh *Firehose) handleMessage(raw []byte) {
 				log.Warn().Msg("maximum error message count reached")
 			}
 		}
-	} else {
-		fh.Messages <- fhMessage
 	}
+
+	fh.Messages <- fhMessage
 }
 
 // Shutdown stops the listener and delete the output previsouly registered if any
 func (fh *Firehose) Shutdown() {
 	fh.mutex.Lock()
-	defer fh.mutex.Unlock()
 
-	if !fh.IsRunning() {
+	if !fh.isRunning {
+		fh.mutex.Unlock()
 		return
 	}
+	fh.isRunning = false
+	fh.mutex.Unlock()
 
 	listener := fh.listener
 	fh.listener = nil
-	go listener.Close()
+	listener.Close()
 
 	if fh.outputOpts != nil {
 		fh.Organization.unregisterOutput(*fh.outputOpts)
 	}
+
+	fh.wgFeeders.Wait()
+
+	close(fh.Messages)
+	close(fh.ErrorMessages)
 	log.Debug().Msg("firehose closed")
 }
 
@@ -412,7 +455,7 @@ func (fh *Firehose) Shutdown() {
 func (fh *Firehose) IsRunning() bool {
 	fh.mutex.Lock()
 	defer fh.mutex.Unlock()
-	return fh.listener != nil
+	return fh.isRunning
 }
 
 // GetMessageDropCount returns the current count of dropped messages
