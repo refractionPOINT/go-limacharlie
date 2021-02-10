@@ -358,7 +358,9 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 
 	readBuffer := [readBufferSize]byte{}
 	currentData := make([]byte, 0, readBufferSize*2)
+	log.Debug().Msg("start consuming")
 	for fh.IsRunning() {
+		log.Debug().Msg("try consuming")
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		sizeRead, err := conn.Read(readBuffer[:])
 		fmt.Sprintf("received from %s:%d => %v (%d) = %s", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err, sizeRead, string(readBuffer[:sizeRead]))
