@@ -61,7 +61,7 @@ type FirehoseOptions struct {
 	ConnectToPort uint16
 
 	// Port that LC should use to connect to this object
-	ConnectToIP net.IP
+	ConnectTo string
 
 	// Path to the SSL cert file (PEM) to use to receive from the cloud
 	// Optional
@@ -200,7 +200,7 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 	return &tlsListener, nil
 }
 
-func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
+func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest string) error {
 	if fhOpts.UniqueName == "" {
 		log.Info().Msg("output registration not required")
 		return nil
@@ -222,6 +222,7 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
 		Name:            outputName,
 		Module:          OutputTypes.Syslog,
 		Type:            fhOpts.Type,
+		DestinationHost: dest,
 		InvestigationID: fhOpts.InvestigationID,
 		Tag:             fhOpts.Tag,
 		Category:        fhOpts.Category,
@@ -316,7 +317,8 @@ func (fh *Firehose) Start() error {
 	}
 
 	if fh.outputOpts != nil {
-		err := fh.Organization.registerOutput(*fh.outputOpts)
+		dest := fmt.Sprintf("%s:%d", fh.opts.ConnectTo, fh.opts.ConnectToPort)
+		err := fh.Organization.registerOutput(*fh.outputOpts, dest)
 		if err != nil {
 			log.Info().Msg("shutting down listener")
 			listener.Close()
