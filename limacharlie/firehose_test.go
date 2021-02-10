@@ -36,9 +36,13 @@ func TestFirehose(t *testing.T) {
 		t.Errorf("Start: %v", err)
 	}
 
-	testFeed := []string{
+	testFeed1 := []string{
 		"{\"a\": 42}",
 		"{\"a\": 43}",
+	}
+	testFeed2 := []string{
+		"{\"a\": 44}",
+		"{\"a\": 45}",
 	}
 
 	wg := sync.WaitGroup{}
@@ -55,7 +59,7 @@ func TestFirehose(t *testing.T) {
 		}
 		defer conn.Close()
 
-		for _, l := range testFeed {
+		for _, l := range testFeed1 {
 			conn.SetDeadline(time.Now().Add(5 * time.Second))
 			if _, err := conn.Write([]byte(fmt.Sprintf("%s\n", l))); err != nil {
 				t.Errorf("conn.Write: %v", err)
@@ -63,7 +67,33 @@ func TestFirehose(t *testing.T) {
 			}
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
+
+		fh.Shutdown()
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		time.Sleep(3 * time.Second)
+
+		conn, err := getTestFeeder()
+		if err != nil {
+			t.Errorf("getTestFeeder: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		for _, l := range testFeed2 {
+			conn.SetDeadline(time.Now().Add(5 * time.Second))
+			if _, err := conn.Write([]byte(fmt.Sprintf("%s\n", l))); err != nil {
+				t.Errorf("conn.Write: %v", err)
+				return
+			}
+		}
+
+		time.Sleep(2 * time.Second)
 
 		fh.Shutdown()
 	}()
@@ -79,17 +109,27 @@ func TestFirehose(t *testing.T) {
 
 	wg.Wait()
 
-	if len(received) != len(testFeed) {
+	if len(received) != (len(testFeed1) + len(testFeed2)) {
 		t.Errorf("received n: %v", received)
 	} else {
-		if received[0].RawContent != testFeed[0] || received[1].RawContent != testFeed[1] {
-			t.Errorf("wrong received: %v %v", received, testFeed)
+		if received[0].RawContent != testFeed1[0] || received[1].RawContent != testFeed1[1] {
+			t.Errorf("wrong received: %v %v", received, testFeed1)
 		}
 		if _, ok := received[0].Content["a"]; !ok {
 			t.Errorf("parsed missing: %+v", received[0])
 		}
 		if _, ok := received[1].Content["a"]; !ok {
 			t.Errorf("parsed missing: %+v", received[1])
+		}
+
+		if received[2].RawContent != testFeed2[0] || received[3].RawContent != testFeed2[1] {
+			t.Errorf("wrong received: %v %v", received, testFeed2)
+		}
+		if _, ok := received[2].Content["a"]; !ok {
+			t.Errorf("parsed missing: %+v", received[2])
+		}
+		if _, ok := received[3].Content["a"]; !ok {
+			t.Errorf("parsed missing: %+v", received[3])
 		}
 	}
 }
