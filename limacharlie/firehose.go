@@ -10,11 +10,12 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"math/big"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -334,8 +335,14 @@ func (fh *Firehose) Start() error {
 
 func (fh *Firehose) handleConnections() {
 	log.Debug().Msg(fmt.Sprintf("listening for connections on %s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort))
+
+	var err error
+	var conn net.Conn
+
+	defer log.Debug().Msg(fmt.Sprintf("stopped listening for connections on %s:%d (%v)", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err))
+
 	for fh.IsRunning() {
-		conn, err := fh.listener.Accept()
+		conn, err = fh.listener.Accept()
 		if err != nil {
 			break
 		}
@@ -350,11 +357,12 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 	defer conn.Close()
 	defer fh.wgFeeders.Done()
 
-	readBuffer := make([]byte, readBufferSize)
+	readBuffer := [readBufferSize]byte{}
 	currentData := make([]byte, 0, readBufferSize*2)
 	for fh.IsRunning() {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		sizeRead, err := conn.Read(readBuffer)
+		sizeRead, err := conn.Read(readBuffer[:])
+		fmt.Sprintf("received from %s:%d => %v (%d) = %s", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err, sizeRead, string(readBuffer[:sizeRead]))
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 			continue
 		} else if err != nil {
