@@ -303,9 +303,8 @@ func NewFirehose(org *Organization, fhOpts FirehoseOptions, fhOutputOpts *Fireho
 
 // Start register the optional output to limacharlie.io and start listening for data
 func (fh *Firehose) Start() error {
-	var mutex sync.Mutex
-	mutex.Lock()
-	defer mutex.Unlock()
+	fh.mutex.Lock()
+	defer fh.mutex.Unlock()
 	if fh.isRunning {
 		return fmt.Errorf("firehose already started")
 	}
