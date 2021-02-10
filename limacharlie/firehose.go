@@ -219,7 +219,7 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
 	}
 
 	output := OutputConfig{
-		Name:            fhOpts.UniqueName,
+		Name:            outputName,
 		Module:          OutputTypes.Syslog,
 		Type:            fhOpts.Type,
 		InvestigationID: fhOpts.InvestigationID,
@@ -242,7 +242,7 @@ func (org *Organization) unregisterOutput(fhOutputOpts FirehoseOutputOptions) {
 	}
 
 	log.Debug().Msg("unregistering output")
-	_, err := org.OutputDel(fhOutputOpts.UniqueName)
+	_, err := org.OutputDel("tmp_live_" + fhOutputOpts.UniqueName)
 	if err != nil {
 		log.Err(err).Msg("could not delete output")
 	}
