@@ -352,15 +352,10 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 
 	readBuffer := make([]byte, readBufferSize)
 	currentData := make([]byte, 0, readBufferSize*2)
-	lastReceived := time.Now()
 	for fh.IsRunning() {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		sizeRead, err := conn.Read(readBuffer)
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			if time.Now().After(lastReceived.Add(5 * time.Minute)) {
-				log.Debug().Msg("incoming connection timed out")
-				break
-			}
 			continue
 		} else if err != nil {
 			log.Err(err).Msg("error reading from connection")
