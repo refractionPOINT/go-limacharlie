@@ -361,6 +361,7 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 				log.Debug().Msg("incoming connection timed out")
 				break
 			}
+			continue
 		} else if err != nil {
 			log.Err(err).Msg("error reading from connection")
 			return
