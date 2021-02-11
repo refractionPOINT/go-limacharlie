@@ -232,6 +232,7 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest strin
 		Category:        fhOpts.Category,
 		DeleteOnFailure: fhOpts.IsDeleteOnFailure,
 		StrictTLS:       !fhOpts.IsNotStrictSSL,
+		TLS:             true,
 	}
 	_, err = org.OutputAdd(output)
 	if err != nil {
