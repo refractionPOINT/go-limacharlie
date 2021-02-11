@@ -399,7 +399,7 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 			if len(data)-1 == i {
 				// This is the end of the buffer and
 				// we got no newline, keep it for later.
-				currentData = append(currentData, data[dataStart:i]...)
+				currentData = append(currentData, data[dataStart:i+1]...)
 			}
 		}
 	}
