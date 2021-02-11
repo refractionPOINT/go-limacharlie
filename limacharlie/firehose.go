@@ -373,7 +373,6 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 	currentData := make([]byte, 0, readBufferSize*2)
 	for fh.IsRunning() {
 		sizeRead, err := conn.Read(readBuffer[:])
-		log.Debug().Msg(fmt.Sprintf("received: %d (%v): %s", sizeRead, err, readBuffer[:sizeRead]))
 		if err != nil {
 			if err != io.EOF {
 				log.Err(err).Msg("error reading from connection")
