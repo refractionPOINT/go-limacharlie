@@ -341,9 +341,14 @@ func (fh *Firehose) handleConnections() {
 			break
 		}
 		fh.mutex.Lock()
+		if !fh.isRunning {
+			fh.mutex.Unlock()
+			conn.Close()
+			break
+		}
 		fh.activeFeeders[conn] = struct{}{}
-		fh.mutex.Unlock()
 		fh.wgFeeders.Add(1)
+		fh.mutex.Unlock()
 		go fh.handleConnection(conn)
 	}
 }
@@ -450,7 +455,8 @@ func (fh *Firehose) Shutdown() {
 
 	fh.mutex.Lock()
 	for conn, _ := range fh.activeFeeders {
-		defer conn.Close()
+		go conn.Close()
+		delete(fh.activeFeeders, conn)
 	}
 	fh.mutex.Unlock()
 
