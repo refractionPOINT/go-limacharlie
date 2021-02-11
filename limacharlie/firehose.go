@@ -211,16 +211,6 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest strin
 	}
 
 	outputName := "tmp_live_" + fhOpts.UniqueName
-	allOutputs, err := org.Outputs()
-	if err != nil {
-		return fmt.Errorf("could not register output with name '%s': %s", outputName, err)
-	}
-
-	_, found := allOutputs[outputName]
-	if found {
-		log.Debug().Str("name", outputName).Msg("output registration already done")
-		return nil
-	}
 
 	output := OutputConfig{
 		Name:            outputName,
@@ -234,7 +224,7 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest strin
 		StrictTLS:       !fhOpts.IsNotStrictSSL,
 		TLS:             true,
 	}
-	_, err = org.OutputAdd(output)
+	_, err := org.OutputAdd(output)
 	if err != nil {
 		return fmt.Errorf("could not add output: %s", err)
 	}
