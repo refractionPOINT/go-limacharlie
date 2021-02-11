@@ -336,11 +336,11 @@ func (fh *Firehose) handleConnections() {
 	log.Debug().Msg(fmt.Sprintf("listening for connections on %s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort))
 
 	var err error
-	var conn net.Conn
 
 	defer log.Debug().Msg(fmt.Sprintf("stopped listening for connections on %s:%d (%v)", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err))
 
 	for fh.IsRunning() {
+		var conn net.Conn
 		conn, err = fh.listener.Accept()
 		if err != nil {
 			break
