@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -107,13 +109,14 @@ type Firehose struct {
 	// It will only be used if the supplied FirehoseOptions require message to be parsed
 	ErrorMessages chan FirehoseMessage
 
-	messageDropCount int
+	messageDropCount int32
 	listenerConfig   *tls.Config
 	listener         net.Listener
 
-	mutex     sync.Mutex
-	wgFeeders sync.WaitGroup
-	isRunning bool
+	mutex         sync.Mutex
+	wgFeeders     sync.WaitGroup
+	activeFeeders map[net.Conn]struct{}
+	isRunning     bool
 }
 
 type firehoseHandler struct {
@@ -297,6 +300,7 @@ func NewFirehose(org *Organization, fhOpts FirehoseOptions, fhOutputOpts *Fireho
 		messageDropCount: 0,
 		listenerConfig:   tlsConfig,
 		listener:         nil,
+		activeFeeders:    map[net.Conn]struct{}{},
 	}
 	return fh, nil
 }
@@ -345,6 +349,9 @@ func (fh *Firehose) handleConnections() {
 		if err != nil {
 			break
 		}
+		fh.mutex.Lock()
+		fh.activeFeeders[conn] = struct{}{}
+		fh.mutex.Unlock()
 		fh.wgFeeders.Add(1)
 		go fh.handleConnection(conn)
 	}
@@ -353,25 +360,22 @@ func (fh *Firehose) handleConnections() {
 func (fh *Firehose) handleConnection(conn net.Conn) {
 	log.Debug().Msg("new incoming connection")
 	defer log.Debug().Msg("incoming connection disconnected")
-	defer conn.Close()
+	defer func() {
+		fh.mutex.Lock()
+		delete(fh.activeFeeders, conn)
+		fh.mutex.Unlock()
+		conn.Close()
+	}()
 	defer fh.wgFeeders.Done()
 
 	readBuffer := [readBufferSize]byte{}
 	currentData := make([]byte, 0, readBufferSize*2)
-	log.Debug().Msg("start consuming")
 	for fh.IsRunning() {
-		log.Debug().Msg("try consuming")
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		sizeRead, err := conn.Read(readBuffer[:])
-		log.Debug().Msg(fmt.Sprintf("received from %s:%d => %v (%d) = %s", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err, sizeRead, string(readBuffer[:sizeRead])))
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			continue
-		} else if err != nil {
-			log.Err(err).Msg("error reading from connection")
-			return
-		}
-		if sizeRead == 0 {
-			log.Debug().Msg("empty body read")
+		if err != nil {
+			if err != io.EOF {
+				log.Err(err).Msg("error reading from connection")
+			}
 			return
 		}
 
@@ -403,37 +407,39 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 func (fh *Firehose) handleMessage(raw []byte) {
 	fhMessage := FirehoseMessage{RawContent: string(raw)}
 
-	// Are we over-queue?
-	if fh.opts.MaxMessageCount != 0 && len(fh.Messages) >= fh.opts.MaxMessageCount {
-		fh.messageDropCount++
-		if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
-			fh.ErrorMessages <- fhMessage
-		} else {
-			log.Warn().Msg("maximum error message count reached")
-		}
-		return
-	}
-
 	if fh.opts.ParseMessage {
-		d := map[string]interface{}{}
-		err := json.Unmarshal(raw, &d)
-		if err == nil {
-			fhMessage.Content = d
-		} else {
-			fh.messageDropCount++
-			if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
-				fh.ErrorMessages <- fhMessage
-			} else {
+		if err := json.Unmarshal([]byte(fhMessage.RawContent), &fhMessage.Content); err != nil {
+			log.Warn().Msg(fmt.Sprintf("error parsing: %v", fhMessage.RawContent))
+			select {
+			case fh.ErrorMessages <- fhMessage:
+			default:
+				// Error channel is full.
 				log.Warn().Msg("maximum error message count reached")
 			}
+			return
 		}
 	}
 
-	fh.Messages <- fhMessage
+	// Are we over-queue?
+	select {
+	case fh.Messages <- fhMessage:
+		// Success
+	default:
+		// Channel is full.
+		atomic.AddInt32(&fh.messageDropCount, 1)
+		// Try to generate an error message.
+		select {
+		case fh.ErrorMessages <- fhMessage:
+		default:
+			// Error channel is full.
+			log.Warn().Msg("maximum error message count reached")
+		}
+	}
 }
 
 // Shutdown stops the listener and delete the output previsouly registered if any
 func (fh *Firehose) Shutdown() {
+	log.Debug().Msg("closing firehose")
 	fh.mutex.Lock()
 
 	if !fh.isRunning {
@@ -451,6 +457,12 @@ func (fh *Firehose) Shutdown() {
 		fh.Organization.unregisterOutput(*fh.outputOpts)
 	}
 
+	fh.mutex.Lock()
+	for conn, _ := range fh.activeFeeders {
+		defer conn.Close()
+	}
+	fh.mutex.Unlock()
+
 	fh.wgFeeders.Wait()
 
 	close(fh.Messages)
@@ -467,7 +479,7 @@ func (fh *Firehose) IsRunning() bool {
 
 // GetMessageDropCount returns the current count of dropped messages
 func (fh *Firehose) GetMessageDropCount() int {
-	return fh.messageDropCount
+	return int(fh.messageDropCount)
 }
 
 // ResetMessageDropCount reset the count of dropped messages

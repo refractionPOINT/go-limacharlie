@@ -22,9 +22,10 @@ func TestFirehose(t *testing.T) {
 		t.Errorf("NewOrganization: %v", err)
 	}
 	fh, err := NewFirehose(o, FirehoseOptions{
-		ListenOnPort: 3000,
-		ListenOnIP:   net.ParseIP("127.0.0.1"),
-		ParseMessage: true,
+		ListenOnPort:    3000,
+		ListenOnIP:      net.ParseIP("127.0.0.1"),
+		ParseMessage:    true,
+		MaxMessageCount: 10,
 	}, &FirehoseOutputOptions{
 		Type:              "event",
 		IsDeleteOnFailure: true,
@@ -66,10 +67,6 @@ func TestFirehose(t *testing.T) {
 				return
 			}
 		}
-
-		time.Sleep(2 * time.Second)
-
-		fh.Shutdown()
 	}()
 
 	wg.Add(1)
@@ -92,11 +89,11 @@ func TestFirehose(t *testing.T) {
 				return
 			}
 		}
-
-		time.Sleep(2 * time.Second)
-
-		fh.Shutdown()
 	}()
+
+	wg.Wait()
+	time.Sleep(1 * time.Second)
+	fh.Shutdown()
 
 	received := []FirehoseMessage{}
 	wg.Add(1)
