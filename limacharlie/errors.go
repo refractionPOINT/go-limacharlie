@@ -5,6 +5,26 @@ import (
 	"fmt"
 )
 
+type lcErrorCode = string
+
+const (
+	lcErrClientNoOptionsLoader = "CLIENT_NO_OPTION_LOADER"
+)
+
+type lcError struct {
+	code lcErrorCode
+}
+
+func newLCError(code lcErrorCode) *lcError {
+	return &lcError{
+		code: code,
+	}
+}
+
+func (e *lcError) Error() string {
+	return fmt.Sprintf("limacharlie: %s", e.code)
+}
+
 // InvalidClientOptionsError is the error type returned by Client
 type InvalidClientOptionsError struct {
 	s string

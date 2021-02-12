@@ -77,11 +77,62 @@ func (r restRequest) withFormData(formData interface{}) restRequest {
 	return r
 }
 
+func isEmpty(s string) bool {
+	return len(strings.TrimSpace(s)) == 0
+}
+
+func newClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader) (*Client, error) {
+	loaderCount := len(optsLoaders)
+	if loaderCount == 0 {
+		return nil, newLCError(lcErrClientNoOptionsLoader)
+	}
+
+	var opt ClientOptions
+	var err error
+
+	loaderIdx := 0
+	keepLoading := false
+	for !keepLoading {
+		loader := optsLoaders[loaderIdx]
+		if opt, err = loader.Load(inOpt); err != nil {
+			return nil, err
+		}
+		if err = opt.validateMinimumRequirements(); err == nil {
+			break
+		}
+		loaderIdx++
+		keepLoading = loaderIdx < loaderCount
+	}
+
+	if err = opt.validateMinimumRequirements(); err != nil {
+		return nil, err
+	}
+	if err = opt.validate(); err != nil {
+		return nil, err
+	}
+
+	c := &Client{
+		options: opt,
+	}
+	return c, nil
+}
+
+// NewClientDefault loads client options from
+// first, environment varibles;
+// then from a file specified by the environment variable LC_CREDS_FILE;
+// then from .limacharlie in home directory
+func NewClientDefault(opt ClientOptions) (*Client, error) {
+	return newClientFromLoader(opt,
+		&EnvironmentClientOptionLoader{},
+		NewFileClientOptionLoader(os.Getenv("LC_CREDS_FILE")),
+		NewFileClientOptionLoader("~/.limacharlie"),
+	)
+}
+
 // NewClient creates a new client
 // If options are not provided, will use those from environment
 func NewClient(opts ...ClientOptions) (*Client, error) {
 	c := &Client{}
-
 	if len(opts) > 1 {
 		return nil, NewInvalidClientOptionsError("too many options specified")
 	} else if len(opts) == 1 {
@@ -90,48 +141,23 @@ func NewClient(opts ...ClientOptions) (*Client, error) {
 
 	// If any value is missing from the options
 	// look for it in the environment.
-	if c.options.OID == "" {
-		c.options.OID = os.Getenv(oidEnvVar)
-	}
-	if c.options.UID == "" {
-		c.options.UID = os.Getenv(uidEnvVar)
-	}
-	if c.options.APIKey == "" {
-		c.options.APIKey = os.Getenv(keyEnvVar)
-	}
-	if c.options.Environment == "" {
-		c.options.Environment = os.Getenv(environmentNameEnvVar)
-	}
+	envLoader := EnvironmentClientOptionLoader{}
+	c.options, _ = envLoader.Load(c.options)
 
 	// If neither OrgID or UserID is specified
 	// we need to parse the config to auto-detect.
-	if c.options.OID == "" && c.options.UID == "" {
-		configFile := defaultConfigFileLocation
-		if globalEnv := os.Getenv(credsEnvVar); globalEnv != "" {
-			configFile = globalEnv
-		}
-		if err := c.options.FromConfigFile(configFile, c.options.Environment); err != nil {
+	if err := c.options.validateMinimumRequirements(); err != nil {
+		fileLoader := NewFileClientOptionLoader(os.Getenv(credsEnvVar))
+		if c.options, err = fileLoader.Load(c.options); err != nil {
 			return nil, err
 		}
 	}
 
 	// Validate the minimum requirements.
-	if c.options.OID == "" && c.options.UID == "" {
-		return nil, NewInvalidClientOptionsError("OID or UID is required")
+	if err := c.options.validateMinimumRequirements(); err != nil {
+		return nil, err
 	}
-
-	// Validate all the options we ended up with.
-	if err := validateUUID(c.options.OID); err != nil {
-		return nil, NewInvalidClientOptionsError(fmt.Sprintf("invalid OID: %v", err))
-	}
-	if err := validateUUID(c.options.UID); err != nil {
-		return nil, NewInvalidClientOptionsError(fmt.Sprintf("invalid UID: %v", err))
-	}
-	if err := validateUUID(c.options.APIKey); err != nil {
-		return nil, NewInvalidClientOptionsError(fmt.Sprintf("invalid APIKey: %v", err))
-	}
-
-	return c, nil
+	return c, c.options.validate()
 }
 
 func validateUUID(s string) error {
