@@ -2,19 +2,20 @@ package limacharlie
 
 import (
 	"os"
-	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func getTestOptionsFromEnv(t *testing.T) ClientOptions {
+func getClientOptionsFromEnv(a *assert.Assertions) ClientOptions {
 	oid := os.Getenv("_OID")
 	key := os.Getenv("_KEY")
-	return getTestOptions(t, oid, key)
+	return getClientOptions(a, oid, key)
 }
 
-func getTestOptions(t *testing.T, oid string, key string) ClientOptions {
+func getClientOptions(a *assert.Assertions, oid string, key string) ClientOptions {
 	// Looks like test credentials are not configured.
-	assert(t, key != "", "key not provided")
-	assert(t, oid != "", "oid not provided")
+	a.NotEmpty(key)
+	a.NotEmpty(oid)
 
 	return ClientOptions{
 		OID:    oid,
@@ -22,14 +23,14 @@ func getTestOptions(t *testing.T, oid string, key string) ClientOptions {
 	}
 }
 
-func getTestClientFromEnv(t *testing.T) Client {
-	c, err := NewClient(getTestOptionsFromEnv(t))
-	assertIsNotError(t, err, "failed to create client")
+func getTestClientFromEnv(a *assert.Assertions) Client {
+	c, err := NewClient(getClientOptionsFromEnv(a))
+	a.NoError(err)
 	return *c
 }
 
-func getTestOrgFromEnv(t *testing.T) *Organization {
-	org, err := NewOrganization(getTestOptionsFromEnv(t))
-	assertIsNotError(t, err, "failed to make organization")
+func getTestOrgFromEnv(a *assert.Assertions) *Organization {
+	org, err := NewOrganization(getClientOptionsFromEnv(a))
+	a.NoError(err)
 	return org
 }

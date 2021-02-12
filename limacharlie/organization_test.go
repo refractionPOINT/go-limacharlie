@@ -2,16 +2,20 @@ package limacharlie
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthorize(t *testing.T) {
-	org := getTestOrgFromEnv(t)
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 	_, _, err := org.Authorize([]string{"org.get"})
-	assertIsNotError(t, err, "Org should have 'org.get' permission")
+	a.EqualError(err, "Org should have 'org.get' permission")
 }
 
 func TestAuthorizeMissingPermission(t *testing.T) {
-	org := getTestOrgFromEnv(t)
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 	_, _, err := org.Authorize([]string{"org.get", "foo.bar"})
-	assertIsErrorMessage(t, err, "Unauthorized, missing permissions: 'foo.bar'")
+	a.EqualError(err, "Unauthorized, missing permissions: 'foo.bar'")
 }

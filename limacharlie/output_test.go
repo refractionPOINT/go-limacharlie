@@ -2,21 +2,25 @@ package limacharlie
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOutputList(t *testing.T) {
-	org := getTestOrgFromEnv(t)
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 	outputs, err := org.Outputs()
-	assertIsNotError(t, err, "failed to get outputs")
+	a.NoError(err)
 	if len(outputs) != 0 {
 		t.Errorf("unexpected preexisting outputs in list: %+v", outputs)
 	}
 }
 
 func TestOutputAddDelete(t *testing.T) {
-	org := getTestOrgFromEnv(t)
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 	outputs, err := org.Outputs()
-	assertIsNotError(t, err, "failed to get outputs")
+	a.NoError(err)
 	if len(outputs) != 0 {
 		t.Errorf("unexpected preexisting outputs in add/delete: %+v", outputs)
 	}
@@ -35,10 +39,10 @@ func TestOutputAddDelete(t *testing.T) {
 	}
 
 	_, err = org.OutputAdd(testOutput)
-	assertIsNotError(t, err, "error adding output")
+	a.NoError(err)
 
 	outputs, err = org.Outputs()
-	assertIsNotError(t, err, "failed to get outputs")
+	a.NoError(err)
 	if len(outputs) == 0 {
 		t.Errorf("outputs is empty")
 	} else if _, ok := outputs[testOutputName]; !ok {
@@ -47,11 +51,11 @@ func TestOutputAddDelete(t *testing.T) {
 
 	var rawJSON GenericJSON
 	err = org.OutputsGeneric(&rawJSON)
-	assertIsNotError(t, err, "failed to get generic ouputs")
+	a.NoError(err)
 	if len(rawJSON) == 0 {
 		t.Errorf("generic outputs is empty")
 	}
 
 	_, err = org.OutputDel(testOutputName)
-	assertIsNotError(t, err, "error deleting output")
+	a.NoError(err)
 }

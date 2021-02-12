@@ -88,7 +88,7 @@ func NewClient(opts ...ClientOptions) (*Client, error) {
 		c.options = opts[0]
 	}
 
-	// If any value is missing from the config file
+	// If any value is missing from the options
 	// look for it in the environment.
 	if c.options.OID == "" {
 		c.options.OID = os.Getenv(oidEnvVar)

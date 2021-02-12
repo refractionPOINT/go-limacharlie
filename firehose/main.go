@@ -2,12 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/akamensky/argparse"
-	"github.com/google/uuid"
-	lc "github.com/refractionPOINT/go-limacharlie/limacharlie"
-	zerolog "github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/ssh/terminal"
 	"net"
 	"os"
 	"os/signal"
@@ -15,6 +9,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/akamensky/argparse"
+	"github.com/google/uuid"
+	lc "github.com/refractionPOINT/go-limacharlie/limacharlie"
+	zerolog "github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func addParserOptionString(p *argparse.Parser, short string, long string, required bool, help string) *string {
@@ -144,7 +145,7 @@ func consumeMessages(fh *lc.Firehose) {
 			time.Sleep(1 * time.Second)
 		} else {
 			message := <-fh.Messages
-			log.Info().Msg(message.Content)
+			log.Info().Msg(message.RawContent)
 		}
 	}
 }

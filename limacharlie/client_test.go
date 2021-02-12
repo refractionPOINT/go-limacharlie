@@ -3,17 +3,21 @@ package limacharlie
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestClientAndJWT(t *testing.T) {
-	c := getTestClientFromEnv(t)
+	a := assert.New(t)
+	c := getTestClientFromEnv(a)
 	err := c.refreshJWT(60 * 30 * time.Second)
-	assertIsNotError(t, err, "failed to get jwt")
+	a.NoError(err)
 }
 
 func TestWho(t *testing.T) {
-	c := getTestClientFromEnv(t)
+	a := assert.New(t)
+	c := getTestClientFromEnv(a)
 	who, err := c.whoAmI()
-	assertIsNotError(t, err, "failed to get WhoAmI response")
-	assert(t, *who.Identity != "", "error getting basic JWT info")
+	a.NoError(err)
+	a.NotEmpty(*who.Identity)
 }
