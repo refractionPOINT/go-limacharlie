@@ -8,7 +8,8 @@ import (
 type lcErrorCode = string
 
 const (
-	lcErrClientNoOptionsLoader = "CLIENT_NO_OPTION_LOADER"
+	lcErrClientNoOptionsLoader     = "CLIENT_NO_OPTION_LOADER"
+	lcErrClientMissingRequirements = "CLIENT_MISSING_REQUIREMENTS"
 )
 
 type lcError struct {
@@ -22,7 +23,7 @@ func newLCError(code lcErrorCode) *lcError {
 }
 
 func (e *lcError) Error() string {
-	return fmt.Sprintf("limacharlie: %s", e.code)
+	return fmt.Sprintf("limacharlie client: %s", e.code)
 }
 
 // InvalidClientOptionsError is the error type returned by Client

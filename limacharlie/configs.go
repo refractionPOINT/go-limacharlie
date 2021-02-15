@@ -79,8 +79,8 @@ func (o *ClientOptions) FromConfig(cfg ConfigFile, environmentName string) error
 }
 
 func (o *ClientOptions) validateMinimumRequirements() error {
-	if o.OID != "" && o.UID != "" {
-		return NewInvalidClientOptionsError("OID or UID is required")
+	if o.OID == "" && o.UID == "" {
+		return newLCError(lcErrClientMissingRequirements)
 	}
 	return nil
 }

@@ -81,7 +81,9 @@ func isEmpty(s string) bool {
 	return len(strings.TrimSpace(s)) == 0
 }
 
-func newClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader) (*Client, error) {
+// NewClientFromLoader initialize a client from options loaders.
+// Will return a valid client as soon as one loader returns valid requirements
+func NewClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader) (*Client, error) {
 	loaderCount := len(optsLoaders)
 	if loaderCount == 0 {
 		return nil, newLCError(lcErrClientNoOptionsLoader)
@@ -91,8 +93,7 @@ func newClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 	var err error
 
 	loaderIdx := 0
-	keepLoading := false
-	for !keepLoading {
+	for {
 		loader := optsLoaders[loaderIdx]
 		if opt, err = loader.Load(inOpt); err != nil {
 			return nil, err
@@ -101,7 +102,9 @@ func newClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 			break
 		}
 		loaderIdx++
-		keepLoading = loaderIdx < loaderCount
+		if loaderIdx >= loaderCount {
+			break
+		}
 	}
 
 	if err = opt.validateMinimumRequirements(); err != nil {
@@ -122,7 +125,7 @@ func newClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 // then from a file specified by the environment variable LC_CREDS_FILE;
 // then from .limacharlie in home directory
 func NewClientDefault(opt ClientOptions) (*Client, error) {
-	return newClientFromLoader(opt,
+	return NewClientFromLoader(opt,
 		&EnvironmentClientOptionLoader{},
 		NewFileClientOptionLoader(os.Getenv("LC_CREDS_FILE")),
 		NewFileClientOptionLoader("~/.limacharlie"),
