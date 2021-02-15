@@ -10,5 +10,5 @@ ENV LC_CREDS_FILE "tests/test.yaml"
 ADD limacharlie.test .
 ADD tests ./tests
 
-RUN ./limacharlie.test -test.v -test.run ^TestClientSuite$
+RUN ./limacharlie.test -test.v -test.run ^.*$
 
