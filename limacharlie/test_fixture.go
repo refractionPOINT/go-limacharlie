@@ -6,17 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getClientOptionsFromEnv(a *assert.Assertions) ClientOptions {
-	oid := os.Getenv("_OID")
-	key := os.Getenv("_KEY")
-	return getClientOptions(a, oid, key)
-}
-
-func getClientOptions(a *assert.Assertions, oid string, key string) ClientOptions {
-	// Looks like test credentials are not configured.
+func getTestClientOpts(a *assert.Assertions) ClientOptions {
+	oid := os.Getenv("LC_OID")
+	key := os.Getenv("LC_API_KEY")
 	a.NotEmpty(key)
 	a.NotEmpty(oid)
-
 	return ClientOptions{
 		OID:    oid,
 		APIKey: key,
@@ -24,13 +18,13 @@ func getClientOptions(a *assert.Assertions, oid string, key string) ClientOption
 }
 
 func getTestClientFromEnv(a *assert.Assertions) Client {
-	c, err := NewClient(getClientOptionsFromEnv(a))
+	c, err := NewClient(getTestClientOpts(a))
 	a.NoError(err)
 	return *c
 }
 
 func getTestOrgFromEnv(a *assert.Assertions) *Organization {
-	org, err := NewOrganization(getClientOptionsFromEnv(a))
+	org, err := NewOrganization(getTestClientOpts(a))
 	a.NoError(err)
 	return org
 }
