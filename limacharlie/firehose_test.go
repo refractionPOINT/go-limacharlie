@@ -16,9 +16,10 @@ func TestFirehose(t *testing.T) {
 	o := getTestOrgFromEnv(a)
 
 	fh, err := NewFirehose(o, FirehoseOptions{
-		ListenOnPort: 3000,
-		ListenOnIP:   net.ParseIP("127.0.0.1"),
-		ParseMessage: true,
+		ListenOnPort:    3000,
+		ListenOnIP:      net.ParseIP("127.0.0.1"),
+		ParseMessage:    true,
+		MaxMessageCount: 10,
 	}, &FirehoseOutputOptions{
 		Type:              "event",
 		IsDeleteOnFailure: true,
@@ -26,9 +27,13 @@ func TestFirehose(t *testing.T) {
 	a.NoError(err)
 	a.NoError(fh.Start())
 
-	testFeed := []string{
+	testFeed1 := []string{
 		"{\"a\": 42}",
 		"{\"a\": 43}",
+	}
+	testFeed2 := []string{
+		"{\"a\": 44}",
+		"{\"a\": 45}",
 	}
 
 	wg := sync.WaitGroup{}
@@ -41,15 +46,37 @@ func TestFirehose(t *testing.T) {
 		a.NoError(err)
 		defer conn.Close()
 
-		for _, l := range testFeed {
+		for _, l := range testFeed1 {
 			conn.SetDeadline(time.Now().Add(5 * time.Second))
 			_, err := conn.Write([]byte(fmt.Sprintf("%s\n", l)))
 			a.NoError(err)
 		}
-
-		time.Sleep(1 * time.Second)
-		fh.Shutdown()
 	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(3 * time.Second)
+
+		conn, err := getTestFeeder()
+		if err != nil {
+			t.Errorf("getTestFeeder: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		for _, l := range testFeed2 {
+			conn.SetDeadline(time.Now().Add(5 * time.Second))
+			if _, err := conn.Write([]byte(fmt.Sprintf("%s\n", l))); err != nil {
+				t.Errorf("conn.Write: %v", err)
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+	time.Sleep(1 * time.Second)
+	fh.Shutdown()
 
 	received := []FirehoseMessage{}
 	wg.Add(1)
@@ -62,12 +89,20 @@ func TestFirehose(t *testing.T) {
 
 	wg.Wait()
 
-	a.Equal(len(received), len(testFeed))
-	a.Equal(received[0].RawContent, testFeed[0])
-	a.Equal(received[1].RawContent, testFeed[1])
+	a.Equal(len(received), len(testFeed1)+len(testFeed2))
+
+	a.Equal(received[0].RawContent, testFeed1[0])
+	a.Equal(received[1].RawContent, testFeed1[1])
 	_, ok := received[0].Content["a"]
 	a.True(ok)
 	_, ok = received[1].Content["a"]
+	a.True(ok)
+
+	a.Equal(received[2].RawContent, testFeed2[0])
+	a.Equal(received[3].RawContent, testFeed2[1])
+	_, ok = received[2].Content["a"]
+	a.True(ok)
+	_, ok = received[3].Content["a"]
 	a.True(ok)
 }
 

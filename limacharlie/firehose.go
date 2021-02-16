@@ -10,11 +10,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/rs/zerolog/log"
+	"io"
 	"math/big"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -61,7 +64,7 @@ type FirehoseOptions struct {
 	ConnectToPort uint16
 
 	// Port that LC should use to connect to this object
-	ConnectToIP net.IP
+	ConnectTo string
 
 	// Path to the SSL cert file (PEM) to use to receive from the cloud
 	// Optional
@@ -106,13 +109,14 @@ type Firehose struct {
 	// It will only be used if the supplied FirehoseOptions require message to be parsed
 	ErrorMessages chan FirehoseMessage
 
-	messageDropCount int
+	messageDropCount int32
 	listenerConfig   *tls.Config
 	listener         net.Listener
 
-	mutex     sync.Mutex
-	wgFeeders sync.WaitGroup
-	isRunning bool
+	mutex         sync.Mutex
+	wgFeeders     sync.WaitGroup
+	activeFeeders map[net.Conn]struct{}
+	isRunning     bool
 }
 
 type firehoseHandler struct {
@@ -200,35 +204,27 @@ func startListener(listenOnIP net.IP, listenOnPort uint16, sslCertPath string, s
 	return &tlsListener, nil
 }
 
-func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions) error {
+func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest string) error {
 	if fhOpts.UniqueName == "" {
 		log.Info().Msg("output registration not required")
 		return nil
 	}
 
 	outputName := "tmp_live_" + fhOpts.UniqueName
-	allOutputs, err := org.Outputs()
-	if err != nil {
-		return fmt.Errorf("could not register output with name '%s': %s", outputName, err)
-	}
-
-	_, found := allOutputs[outputName]
-	if found {
-		log.Debug().Str("name", outputName).Msg("output registration already done")
-		return nil
-	}
 
 	output := OutputConfig{
-		Name:            fhOpts.UniqueName,
+		Name:            outputName,
 		Module:          OutputTypes.Syslog,
 		Type:            fhOpts.Type,
+		DestinationHost: dest,
 		InvestigationID: fhOpts.InvestigationID,
 		Tag:             fhOpts.Tag,
 		Category:        fhOpts.Category,
 		DeleteOnFailure: fhOpts.IsDeleteOnFailure,
 		StrictTLS:       !fhOpts.IsNotStrictSSL,
+		TLS:             true,
 	}
-	_, err = org.OutputAdd(output)
+	_, err := org.OutputAdd(output)
 	if err != nil {
 		return fmt.Errorf("could not add output: %s", err)
 	}
@@ -242,7 +238,7 @@ func (org *Organization) unregisterOutput(fhOutputOpts FirehoseOutputOptions) {
 	}
 
 	log.Debug().Msg("unregistering output")
-	_, err := org.OutputDel(fhOutputOpts.UniqueName)
+	_, err := org.OutputDel("tmp_live_" + fhOutputOpts.UniqueName)
 	if err != nil {
 		log.Err(err).Msg("could not delete output")
 	}
@@ -295,15 +291,15 @@ func NewFirehose(org *Organization, fhOpts FirehoseOptions, fhOutputOpts *Fireho
 		messageDropCount: 0,
 		listenerConfig:   tlsConfig,
 		listener:         nil,
+		activeFeeders:    map[net.Conn]struct{}{},
 	}
 	return fh, nil
 }
 
 // Start register the optional output to limacharlie.io and start listening for data
 func (fh *Firehose) Start() error {
-	var mutex sync.Mutex
-	mutex.Lock()
-	defer mutex.Unlock()
+	fh.mutex.Lock()
+	defer fh.mutex.Unlock()
 	if fh.isRunning {
 		return fmt.Errorf("firehose already started")
 	}
@@ -316,7 +312,8 @@ func (fh *Firehose) Start() error {
 	}
 
 	if fh.outputOpts != nil {
-		err := fh.Organization.registerOutput(*fh.outputOpts)
+		dest := fmt.Sprintf("%s:%d", fh.opts.ConnectTo, fh.opts.ConnectToPort)
+		err := fh.Organization.registerOutput(*fh.outputOpts, dest)
 		if err != nil {
 			log.Info().Msg("shutting down listener")
 			listener.Close()
@@ -332,12 +329,26 @@ func (fh *Firehose) Start() error {
 
 func (fh *Firehose) handleConnections() {
 	log.Debug().Msg(fmt.Sprintf("listening for connections on %s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort))
+
+	var err error
+
+	defer log.Debug().Msg(fmt.Sprintf("stopped listening for connections on %s:%d (%v)", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err))
+
 	for fh.IsRunning() {
-		conn, err := fh.listener.Accept()
+		var conn net.Conn
+		conn, err = fh.listener.Accept()
 		if err != nil {
 			break
 		}
+		fh.mutex.Lock()
+		if !fh.isRunning {
+			fh.mutex.Unlock()
+			conn.Close()
+			break
+		}
+		fh.activeFeeders[conn] = struct{}{}
 		fh.wgFeeders.Add(1)
+		fh.mutex.Unlock()
 		go fh.handleConnection(conn)
 	}
 }
@@ -345,26 +356,22 @@ func (fh *Firehose) handleConnections() {
 func (fh *Firehose) handleConnection(conn net.Conn) {
 	log.Debug().Msg("new incoming connection")
 	defer log.Debug().Msg("incoming connection disconnected")
-	defer conn.Close()
+	defer func() {
+		fh.mutex.Lock()
+		delete(fh.activeFeeders, conn)
+		fh.mutex.Unlock()
+		conn.Close()
+	}()
 	defer fh.wgFeeders.Done()
 
 	readBuffer := make([]byte, readBufferSize)
 	currentData := make([]byte, 0, readBufferSize*2)
-	lastReceived := time.Now()
 	for fh.IsRunning() {
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		sizeRead, err := conn.Read(readBuffer)
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			if time.Now().After(lastReceived.Add(5 * time.Minute)) {
-				log.Debug().Msg("incoming connection timed out")
-				break
+		sizeRead, err := conn.Read(readBuffer[:])
+		if err != nil {
+			if err != io.EOF {
+				log.Err(err).Msg("error reading from connection")
 			}
-		} else if err != nil {
-			log.Err(err).Msg("error reading from connection")
-			return
-		}
-		if sizeRead == 0 {
-			log.Debug().Msg("empty body read")
 			return
 		}
 
@@ -387,7 +394,7 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 			if len(data)-1 == i {
 				// This is the end of the buffer and
 				// we got no newline, keep it for later.
-				currentData = append(currentData, data[dataStart:i]...)
+				currentData = append(currentData, data[dataStart:i+1]...)
 			}
 		}
 	}
@@ -396,37 +403,39 @@ func (fh *Firehose) handleConnection(conn net.Conn) {
 func (fh *Firehose) handleMessage(raw []byte) {
 	fhMessage := FirehoseMessage{RawContent: string(raw)}
 
-	// Are we over-queue?
-	if fh.opts.MaxMessageCount != 0 && len(fh.Messages) >= fh.opts.MaxMessageCount {
-		fh.messageDropCount++
-		if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
-			fh.ErrorMessages <- fhMessage
-		} else {
-			log.Warn().Msg("maximum error message count reached")
-		}
-		return
-	}
-
 	if fh.opts.ParseMessage {
-		d := map[string]interface{}{}
-		err := json.Unmarshal(raw, &d)
-		if err == nil {
-			fhMessage.Content = d
-		} else {
-			fh.messageDropCount++
-			if len(fh.ErrorMessages) < fh.opts.MaxErrorMessageCount {
-				fh.ErrorMessages <- fhMessage
-			} else {
+		if err := json.Unmarshal([]byte(fhMessage.RawContent), &fhMessage.Content); err != nil {
+			log.Warn().Msg(fmt.Sprintf("error parsing: %v", fhMessage.RawContent))
+			select {
+			case fh.ErrorMessages <- fhMessage:
+			default:
+				// Error channel is full.
 				log.Warn().Msg("maximum error message count reached")
 			}
+			return
 		}
 	}
 
-	fh.Messages <- fhMessage
+	// Are we over-queue?
+	select {
+	case fh.Messages <- fhMessage:
+		// Success
+	default:
+		// Channel is full.
+		atomic.AddInt32(&fh.messageDropCount, 1)
+		// Try to generate an error message.
+		select {
+		case fh.ErrorMessages <- fhMessage:
+		default:
+			// Error channel is full.
+			log.Warn().Msg("maximum error message count reached")
+		}
+	}
 }
 
 // Shutdown stops the listener and delete the output previsouly registered if any
 func (fh *Firehose) Shutdown() {
+	log.Debug().Msg("closing firehose")
 	fh.mutex.Lock()
 
 	if !fh.isRunning {
@@ -444,6 +453,13 @@ func (fh *Firehose) Shutdown() {
 		fh.Organization.unregisterOutput(*fh.outputOpts)
 	}
 
+	fh.mutex.Lock()
+	for conn, _ := range fh.activeFeeders {
+		go conn.Close()
+		delete(fh.activeFeeders, conn)
+	}
+	fh.mutex.Unlock()
+
 	fh.wgFeeders.Wait()
 
 	close(fh.Messages)
@@ -460,7 +476,7 @@ func (fh *Firehose) IsRunning() bool {
 
 // GetMessageDropCount returns the current count of dropped messages
 func (fh *Firehose) GetMessageDropCount() int {
-	return fh.messageDropCount
+	return int(fh.messageDropCount)
 }
 
 // ResetMessageDropCount reset the count of dropped messages
