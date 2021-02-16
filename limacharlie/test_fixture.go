@@ -7,10 +7,14 @@ import (
 )
 
 func getTestClientOpts(a *assert.Assertions) ClientOptions {
-	oid := os.Getenv("LC_OID")
-	key := os.Getenv("LC_API_KEY")
-	a.NotEmpty(key)
-	a.NotEmpty(oid)
+	oid := os.Getenv("_OID")
+	if oid == "" {
+		a.FailNow("'_OID' environment variable is needed for tests")
+	}
+	key := os.Getenv("_KEY")
+	if key == "" {
+		a.FailNow("'_KEY' environment variable is needed for tests")
+	}
 	return ClientOptions{
 		OID:    oid,
 		APIKey: key,

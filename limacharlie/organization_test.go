@@ -3,19 +3,25 @@ package limacharlie
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestAuthorize(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	_, _, err := org.Authorize([]string{"org.get"})
-	a.EqualError(err, "Org should have 'org.get' permission")
+type OrgTestSuite struct {
+	suite.Suite
 }
 
-func TestAuthorizeMissingPermission(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
+func TestOrgSuite(t *testing.T) {
+	suite.Run(t, new(OrgTestSuite))
+}
+
+func (s *OrgTestSuite) TestAuthorize() {
+	org := getTestOrgFromEnv(s.Assertions)
+	_, _, err := org.Authorize([]string{"org.get"})
+	s.EqualError(err, "Org should have 'org.get' permission")
+}
+
+func (s *OrgTestSuite) TestAuthorizeMissingPermission() {
+	org := getTestOrgFromEnv(s.Assertions)
 	_, _, err := org.Authorize([]string{"org.get", "foo.bar"})
-	a.EqualError(err, "Unauthorized, missing permissions: 'foo.bar'")
+	s.EqualError(err, "Unauthorized, missing permissions: 'foo.bar'")
 }

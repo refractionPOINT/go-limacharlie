@@ -7,6 +7,10 @@ ENV LC_API_KEY "843e80c8-e273-4b3e-93bd-41151b4b933a"
 ENV LC_CREDS_FILE_NO_ENV "tests/test_noenv.yaml"
 ENV LC_CREDS_FILE "tests/test.yaml"
 
+# credentials used for tests
+ENV _OID ""
+ENV _KEY ""
+
 ADD limacharlie.test .
 ADD tests ./tests
 
