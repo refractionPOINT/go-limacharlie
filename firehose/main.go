@@ -2,12 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/akamensky/argparse"
-	"github.com/google/uuid"
-	lc "github.com/refractionPOINT/go-limacharlie/limacharlie"
-	zerolog "github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/ssh/terminal"
 	"net"
 	"os"
 	"os/signal"
@@ -15,6 +9,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/akamensky/argparse"
+	"github.com/google/uuid"
+	lc "github.com/refractionPOINT/go-limacharlie/limacharlie"
+	zerolog "github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func addParserOptionString(p *argparse.Parser, short string, long string, required bool, help string) *string {
@@ -91,7 +92,6 @@ func parseArgs() (FirehoseCLIOptions, error) {
 	argOutputType := argParser.String("", "data_type", &argparse.Options{Required: true, Help: fmt.Sprintf("the type of data to receive in firehose, one of: %s.", dataTypes), Validate: validateOutputType})
 
 	argOID := argParser.String("o", "oid", &argparse.Options{Required: false, Help: "the OID to authenticate as, if not specified environment credentials are used.", Validate: validateUUID})
-	argDestination := argParser.String("p", "public-destination", &argparse.Options{Required: false, Help: "", Validate: validateIPPort})
 	outputName := argParser.String("n", "name", &argparse.Options{Required: false, Help: "unique name to use for this firehose, will be used to register a limacharlie.io Output if specified, otherwise assumes Output is already taken care of."})
 	argInvestigationID := argParser.String("i", "investigation-id", &argparse.Options{Required: false, Help: "firehose should only receive events marked with this investigation id."})
 	argTag := argParser.String("t", "tag", &argparse.Options{Required: false, Help: "firehose should only receive events from sensors tagged with this tag."})
@@ -109,11 +109,7 @@ func parseArgs() (FirehoseCLIOptions, error) {
 		oid = *argOID
 	}
 	listenOnIP, listenOnPort := getIPPort(*argListenOn)
-	destinationIP := listenOnIP
 	destinationPort := listenOnPort
-	if argDestination != nil && *argDestination != "" {
-		destinationIP, destinationPort = getIPPort(*argDestination)
-	}
 
 	return FirehoseCLIOptions{
 			ClientOpts: lc.ClientOptions{
@@ -122,7 +118,6 @@ func parseArgs() (FirehoseCLIOptions, error) {
 			FirehoseOpts: lc.FirehoseOptions{
 				ListenOnIP:    listenOnIP,
 				ListenOnPort:  listenOnPort,
-				ConnectToIP:   destinationIP,
 				ConnectToPort: destinationPort,
 			},
 			FirehoseOutputOpts: lc.FirehoseOutputOptions{
@@ -144,7 +139,7 @@ func consumeMessages(fh *lc.Firehose) {
 			time.Sleep(1 * time.Second)
 		} else {
 			message := <-fh.Messages
-			log.Info().Msg(message.Content)
+			log.Info().Msg(message.RawContent)
 		}
 	}
 }
