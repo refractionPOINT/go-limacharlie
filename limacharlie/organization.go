@@ -15,7 +15,7 @@ func NewOrganization(clientOpts ClientOptions) (*Organization, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Could not initialize client: %s", err)
 	}
-	return &Organization{c}, nil
+	return &Organization{client: c}, nil
 }
 
 // Permission represents the permission granted in LC
@@ -96,6 +96,7 @@ func makeSet(arr []Permission) map[string]struct{} {
 	return m
 }
 
+// GetCurrentJWT returns the JWT of the client
 func (org *Organization) GetCurrentJWT() string {
 	return org.client.GetCurrentJWT()
 }

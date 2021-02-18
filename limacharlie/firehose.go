@@ -454,7 +454,7 @@ func (fh *Firehose) Shutdown() {
 	}
 
 	fh.mutex.Lock()
-	for conn, _ := range fh.activeFeeders {
+	for conn := range fh.activeFeeders {
 		go conn.Close()
 		delete(fh.activeFeeders, conn)
 	}
