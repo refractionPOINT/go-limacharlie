@@ -89,6 +89,10 @@ func NewClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 		return nil, newLCError(lcErrClientNoOptionsLoader)
 	}
 
+	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
+		return &Client{options: inOpt}, nil
+	}
+
 	var opt ClientOptions
 	var err error
 
@@ -140,6 +144,10 @@ func NewClient(opts ...ClientOptions) (*Client, error) {
 		return nil, NewInvalidClientOptionsError("too many options specified")
 	} else if len(opts) == 1 {
 		c.options = opts[0]
+	}
+
+	if c.options.validateMinimumRequirements() == nil && c.options.validate() == nil {
+		return c, nil
 	}
 
 	// If any value is missing from the options
@@ -227,9 +235,8 @@ func getHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
-func (c *Client) reliableRequest(verb string, path string, request restRequest) error {
+func (c *Client) reliableRequest(verb string, path string, request restRequest) (err error) {
 	request.nRetries++
-	var err error
 	for request.nRetries > 0 {
 		var statusCode int
 		statusCode, err = c.request(verb, path, request)
@@ -241,7 +248,7 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 		if statusCode == 401 {
 			// Unauthorized, the JWT may have expired, refresh
 			// it and retry.
-			if err := c.refreshJWT(c.options.JWTExpiryTime); err != nil {
+			if err = c.refreshJWT(c.options.JWTExpiryTime); err != nil {
 				// If we cannot get a new JWT there is no point in
 				// retrying with bad creds.
 				return err
@@ -357,6 +364,7 @@ func (c *Client) whoAmI() (whoAmIJsonResponse, error) {
 	return who, nil
 }
 
+// GetCurrentJWT returns the JWT from the client options
 func (c *Client) GetCurrentJWT() string {
 	return c.options.JWT
 }
