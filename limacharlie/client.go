@@ -124,51 +124,16 @@ func NewClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 	return c, nil
 }
 
-// NewClientDefault loads client options from
+// NewClient loads client options from
 // first, environment varibles;
 // then from a file specified by the environment variable LC_CREDS_FILE;
 // then from .limacharlie in home directory
-func NewClientDefault(opt ClientOptions) (*Client, error) {
+func NewClient(opt ClientOptions) (*Client, error) {
 	return NewClientFromLoader(opt,
 		&EnvironmentClientOptionLoader{},
 		NewFileClientOptionLoader(os.Getenv("LC_CREDS_FILE")),
 		NewFileClientOptionLoader("~/.limacharlie"),
 	)
-}
-
-// NewClient creates a new client
-// If options are not provided, will use those from environment
-func NewClient(opts ...ClientOptions) (*Client, error) {
-	c := &Client{}
-	if len(opts) > 1 {
-		return nil, NewInvalidClientOptionsError("too many options specified")
-	} else if len(opts) == 1 {
-		c.options = opts[0]
-	}
-
-	if c.options.validateMinimumRequirements() == nil && c.options.validate() == nil {
-		return c, nil
-	}
-
-	// If any value is missing from the options
-	// look for it in the environment.
-	envLoader := EnvironmentClientOptionLoader{}
-	c.options, _ = envLoader.Load(c.options)
-
-	// If neither OrgID or UserID is specified
-	// we need to parse the config to auto-detect.
-	if err := c.options.validateMinimumRequirements(); err != nil {
-		fileLoader := NewFileClientOptionLoader(os.Getenv(credsEnvVar))
-		if c.options, err = fileLoader.Load(c.options); err != nil {
-			return nil, err
-		}
-	}
-
-	// Validate the minimum requirements.
-	if err := c.options.validateMinimumRequirements(); err != nil {
-		return nil, err
-	}
-	return c, c.options.validate()
 }
 
 func validateUUID(s string) error {
