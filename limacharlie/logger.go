@@ -12,6 +12,27 @@ type LCLogger interface {
 	Trace(msg string)
 }
 
+// LCLoggerEmpty does not actually log anything
+type LCLoggerEmpty struct{}
+
+// Fatal empty stub for logging interface
+func (l *LCLoggerEmpty) Fatal(msg string) {}
+
+// Error empty stub for logging interface
+func (l *LCLoggerEmpty) Error(msg string) {}
+
+// Warn empty stub for logging interface
+func (l *LCLoggerEmpty) Warn(msg string) {}
+
+// Info empty stub for logging interface
+func (l *LCLoggerEmpty) Info(msg string) {}
+
+// Debug empty stub for logging interface
+func (l *LCLoggerEmpty) Debug(msg string) {}
+
+// Trace empty stub for logging interface
+func (l *LCLoggerEmpty) Trace(msg string) {}
+
 // LCLoggerZerolog implements the logging interface with zerolog
 type LCLoggerZerolog struct {
 	l zerolog.Logger
