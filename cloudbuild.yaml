@@ -3,5 +3,5 @@ steps:
   dir: limacharlie
   args: ['go', 'test', '.', '-v']
   env:
-    - 'LC_TEST_KEY=${_KEY}'
-    - 'LC_TEST_OID=${_OID}'
+    - '_KEY=${_KEY}'
+    - '_OID=${_OID}'
