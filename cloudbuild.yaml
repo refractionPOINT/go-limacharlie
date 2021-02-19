@@ -1,7 +1,6 @@
 steps:
-- name: 'run tests'
+- name: './run_tests.sh'
   dir: limacharlie
-  args: ['./run_test.sh']
   env:
     - 'LC_TEST_KEY=${_KEY}'
     - 'LC_TEST_OID=${_OID}'
