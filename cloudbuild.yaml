@@ -1,7 +1,7 @@
 steps:
-- name: 'golang'
+- name: 'run tests'
   dir: limacharlie
-  args: ['go', 'test', '.', '-v']
+  args: ['./run_test.sh']
   env:
-    - '_KEY=${_KEY}'
-    - '_OID=${_OID}'
+    - 'LC_TEST_KEY=${_KEY}'
+    - 'LC_TEST_OID=${_OID}'
