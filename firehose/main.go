@@ -180,7 +180,7 @@ func main() {
 		cliOpts.ClientOpts.APIKey = string(bytesAPIKey)
 	}
 
-	lcClient, err := lc.NewClient(cliOpts.ClientOpts, zerolog.Logger{})
+	lcClient, err := lc.NewClient(cliOpts.ClientOpts, &lc.LCLoggerZerolog{})
 	if err != nil {
 		log.Err(err).Msg("could not make client")
 		return

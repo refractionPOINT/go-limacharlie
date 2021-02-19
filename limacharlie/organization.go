@@ -2,14 +2,12 @@ package limacharlie
 
 import (
 	"fmt"
-
-	"github.com/rs/zerolog"
 )
 
 // Organization holds a connection to the LC cloud organization
 type Organization struct {
 	client *Client
-	logger zerolog.Logger
+	logger LCLogger
 }
 
 // NewOrganization initialize a link to an Organization

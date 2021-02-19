@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -36,7 +35,7 @@ const (
 // Client makes raw request to LC cloud
 type Client struct {
 	options ClientOptions
-	logger  zerolog.Logger
+	logger  LCLogger
 }
 
 // ClientOptions holds all options for Client
@@ -85,7 +84,7 @@ func isEmpty(s string) bool {
 
 // NewClientFromLoader initialize a client from options loaders.
 // Will return a valid client as soon as one loader returns valid requirements
-func NewClientFromLoader(inOpt ClientOptions, logger zerolog.Logger, optsLoaders ...ClientOptionLoader) (*Client, error) {
+func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...ClientOptionLoader) (*Client, error) {
 	loaderCount := len(optsLoaders)
 	if loaderCount == 0 {
 		return nil, newLCError(lcErrClientNoOptionsLoader)
@@ -123,7 +122,7 @@ func NewClientFromLoader(inOpt ClientOptions, logger zerolog.Logger, optsLoaders
 // first, environment varibles;
 // then from a file specified by the environment variable LC_CREDS_FILE;
 // then from .limacharlie in home directory
-func NewClient(opt ClientOptions, logger zerolog.Logger) (*Client, error) {
+func NewClient(opt ClientOptions, logger LCLogger) (*Client, error) {
 	return NewClientFromLoader(opt,
 		logger,
 		&EnvironmentClientOptionLoader{},
