@@ -2,6 +2,8 @@ package limacharlie
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
 const (
@@ -19,49 +21,32 @@ env:
     api_key: 91111111-2222-3333-4444-555555555555`
 )
 
-func TestLoadingDefaultConfig(t *testing.T) {
-	o := ClientOptions{}
-
-	if err := o.FromConfigString([]byte(testConfig), ""); err != nil {
-		t.Errorf("failed parsing yaml config: %v", err)
-	}
-	if o.OID != "11111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected oid: %+v", o)
-	}
-	if o.UID != "" {
-		t.Errorf("unexpected uid: %+v", o)
-	}
-	if o.APIKey != "31111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected apiKey: %+v", o)
-	}
-
-	if err := o.FromConfigString([]byte(testConfig), "default"); err != nil {
-		t.Errorf("failed parsing yaml config: %v", err)
-	}
-	if o.OID != "11111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected oid: %+v", o)
-	}
-	if o.UID != "" {
-		t.Errorf("unexpected uid: %+v", o)
-	}
-	if o.APIKey != "31111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected apiKey: %+v", o)
-	}
+type ConfigsTestSuite struct {
+	suite.Suite
 }
 
-func TestLoadingEnvConfig(t *testing.T) {
+func TestConfigSuite(t *testing.T) {
+	suite.Run(t, new(ConfigsTestSuite))
+}
+
+func (s *ConfigsTestSuite) TestFromConfigStringDefault() {
 	o := ClientOptions{}
 
-	if err := o.FromConfigString([]byte(testConfig), "vvv"); err != nil {
-		t.Errorf("failed parsing yaml config: %v", err)
-	}
-	if o.OID != "71111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected oid: %+v", o)
-	}
-	if o.UID != "81111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected uid: %+v", o)
-	}
-	if o.APIKey != "91111111-2222-3333-4444-555555555555" {
-		t.Errorf("unexpected apiKey: %+v", o)
-	}
+	s.NoError(o.FromConfigString([]byte(testConfig), ""))
+	s.Equal(o.OID, "11111111-2222-3333-4444-555555555555")
+	s.Equal(o.UID, "")
+	s.Equal(o.APIKey, "31111111-2222-3333-4444-555555555555")
+
+	s.NoError(o.FromConfigString([]byte(testConfig), "default"))
+	s.Equal(o.OID, "11111111-2222-3333-4444-555555555555")
+	s.Equal(o.UID, "")
+	s.Equal(o.APIKey, "31111111-2222-3333-4444-555555555555")
+}
+
+func (s *ConfigsTestSuite) TestFromConfigStringFromEnvironment() {
+	o := ClientOptions{}
+	s.NoError(o.FromConfigString([]byte(testConfig), "vvv"))
+	s.Equal(o.OID, "71111111-2222-3333-4444-555555555555")
+	s.Equal(o.UID, "81111111-2222-3333-4444-555555555555")
+	s.Equal(o.APIKey, "91111111-2222-3333-4444-555555555555")
 }

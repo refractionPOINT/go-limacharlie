@@ -7,15 +7,24 @@ import (
 // Organization holds a connection to the LC cloud organization
 type Organization struct {
 	client *Client
+	logger LCLogger
 }
 
-// NewOrganization creates an Organization
-func NewOrganization(clientOpts ClientOptions) (*Organization, error) {
-	c, err := NewClient(clientOpts)
+// NewOrganization initialize a link to an organization
+func NewOrganization(c *Client) (*Organization, error) {
+	return &Organization{
+		client: c,
+		logger: c.logger,
+	}, nil
+}
+
+// NewOrganizationFromClientOptions initialize an organization from client options
+func NewOrganizationFromClientOptions(opt ClientOptions, logger LCLogger) (*Organization, error) {
+	c, err := NewClient(opt, logger)
 	if err != nil {
-		return nil, fmt.Errorf("Could not initialize client: %s", err)
+		return nil, err
 	}
-	return &Organization{c}, nil
+	return NewOrganization(c)
 }
 
 // Permission represents the permission granted in LC
@@ -96,6 +105,7 @@ func makeSet(arr []Permission) map[string]struct{} {
 	return m
 }
 
+// GetCurrentJWT returns the JWT of the client
 func (org *Organization) GetCurrentJWT() string {
 	return org.client.GetCurrentJWT()
 }

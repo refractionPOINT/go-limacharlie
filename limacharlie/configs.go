@@ -2,10 +2,11 @@ package limacharlie
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os/user"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // ConfigFile is the actual config file format may seem a bit odd
@@ -74,5 +75,26 @@ func (o *ClientOptions) FromConfig(cfg ConfigFile, environmentName string) error
 	o.UID = env.UID
 	o.APIKey = env.APIKey
 
+	return nil
+}
+
+func (o *ClientOptions) validateMinimumRequirements() error {
+	if o.OID == "" && o.UID == "" {
+		return newLCError(lcErrClientMissingRequirements)
+	}
+	return nil
+}
+
+func (o *ClientOptions) validate() error {
+	// Validate all the options we ended up with.
+	if err := validateUUID(o.OID); err != nil {
+		return NewInvalidClientOptionsError(fmt.Sprintf("invalid OID: %v", err))
+	}
+	if err := validateUUID(o.UID); err != nil {
+		return NewInvalidClientOptionsError(fmt.Sprintf("invalid UID: %v", err))
+	}
+	if err := validateUUID(o.APIKey); err != nil {
+		return NewInvalidClientOptionsError(fmt.Sprintf("invalid APIKey: %v", err))
+	}
 	return nil
 }

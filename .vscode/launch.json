@@ -15,7 +15,7 @@
                 // "-test.run",
                 // "^$"
             ],
-            "envFile": "${workspaceFolder}/.env",
+            "envFile": "${workspaceFolder}/limacharlie/tests/.test.env",
             "showLog": true
         },
         {
