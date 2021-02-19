@@ -10,12 +10,21 @@ type Organization struct {
 	logger LCLogger
 }
 
-// NewOrganization initialize a link to an Organization
+// NewOrganization initialize a link to an organization
 func NewOrganization(c *Client) (*Organization, error) {
 	return &Organization{
 		client: c,
 		logger: c.logger,
 	}, nil
+}
+
+// NewOrganizationFromClientOptions initialize an organization from client options
+func NewOrganizationFromClientOptions(opt ClientOptions, logger LCLogger) (*Organization, error) {
+	c, err := NewClient(opt, logger)
+	if err != nil {
+		return nil, err
+	}
+	return NewOrganization(c)
 }
 
 // Permission represents the permission granted in LC

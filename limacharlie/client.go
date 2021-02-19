@@ -123,6 +123,9 @@ func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...Cl
 // then from a file specified by the environment variable LC_CREDS_FILE;
 // then from .limacharlie in home directory
 func NewClient(opt ClientOptions, logger LCLogger) (*Client, error) {
+	if logger == nil {
+		logger = &LCLoggerEmpty{}
+	}
 	return NewClientFromLoader(opt,
 		logger,
 		&EnvironmentClientOptionLoader{},
