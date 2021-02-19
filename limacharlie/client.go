@@ -95,18 +95,11 @@ func NewClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 
 	var opt ClientOptions
 	var err error
-
-	loaderIdx := 0
-	for {
-		loader := optsLoaders[loaderIdx]
+	for _, loader := range optsLoaders {
 		if opt, err = loader.Load(inOpt); err != nil {
 			return nil, err
 		}
 		if err = opt.validateMinimumRequirements(); err == nil {
-			break
-		}
-		loaderIdx++
-		if loaderIdx >= loaderCount {
 			break
 		}
 	}
@@ -118,10 +111,9 @@ func NewClientFromLoader(inOpt ClientOptions, optsLoaders ...ClientOptionLoader)
 		return nil, err
 	}
 
-	c := &Client{
+	return &Client{
 		options: opt,
-	}
-	return c, nil
+	}, nil
 }
 
 // NewClient loads client options from
