@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -16,13 +17,13 @@ func TestClientSuite(t *testing.T) {
 }
 
 func (s *ClientTestSuite) TestNoLoader() {
-	c, err := NewClientFromLoader(ClientOptions{})
+	c, err := NewClientFromLoader(ClientOptions{}, zerolog.Logger{})
 	s.EqualError(err, newLCError(lcErrClientNoOptionsLoader).Error())
 	s.Nil(c)
 }
 
 func (s *ClientTestSuite) TestEnvironmentLoader() {
-	c, err := NewClientFromLoader(ClientOptions{}, &EnvironmentClientOptionLoader{})
+	c, err := NewClientFromLoader(ClientOptions{}, zerolog.Logger{}, &EnvironmentClientOptionLoader{})
 	if s.NoError(err) {
 		s.Equal(c.options, ClientOptions{
 			Environment: "test_env",
@@ -34,7 +35,7 @@ func (s *ClientTestSuite) TestEnvironmentLoader() {
 }
 
 func (s *ClientTestSuite) TestFileLoaderNoEnvironment() {
-	c, err := NewClientFromLoader(ClientOptions{}, &FileClientOptionLoader{os.Getenv("LC_CREDS_FILE_NO_ENV")})
+	c, err := NewClientFromLoader(ClientOptions{}, zerolog.Logger{}, &FileClientOptionLoader{os.Getenv("LC_CREDS_FILE_NO_ENV")})
 	if s.NoError(err) {
 		s.Equal(c.options, ClientOptions{
 			Environment: "",
@@ -45,7 +46,7 @@ func (s *ClientTestSuite) TestFileLoaderNoEnvironment() {
 	}
 }
 func (s *ClientTestSuite) TestFileLoader() {
-	c, err := NewClientFromLoader(ClientOptions{}, &FileClientOptionLoader{os.Getenv("LC_CREDS_FILE")})
+	c, err := NewClientFromLoader(ClientOptions{}, zerolog.Logger{}, &FileClientOptionLoader{os.Getenv("LC_CREDS_FILE")})
 	if s.NoError(err) {
 		s.Equal(c.options, ClientOptions{
 			Environment: "",

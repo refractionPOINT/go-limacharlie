@@ -180,7 +180,13 @@ func main() {
 		cliOpts.ClientOpts.APIKey = string(bytesAPIKey)
 	}
 
-	org, err := lc.NewOrganization(cliOpts.ClientOpts)
+	lcClient, err := lc.NewClient(cliOpts.ClientOpts, zerolog.Logger{})
+	if err != nil {
+		log.Err(err).Msg("could not make client")
+		return
+	}
+
+	org, err := lc.NewOrganization(lcClient)
 	if err != nil {
 		log.Err(err).Msg("could not make organization")
 		return

@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"os"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,14 +22,14 @@ func getTestClientOpts(a *assert.Assertions) ClientOptions {
 	}
 }
 
-func getTestClientFromEnv(a *assert.Assertions) Client {
-	c, err := NewClient(getTestClientOpts(a))
+func getTestClientFromEnv(a *assert.Assertions) *Client {
+	c, err := NewClient(getTestClientOpts(a), zerolog.Logger{})
 	a.NoError(err)
-	return *c
+	return c
 }
 
 func getTestOrgFromEnv(a *assert.Assertions) *Organization {
-	org, err := NewOrganization(getTestClientOpts(a))
+	org, err := NewOrganization(getTestClientFromEnv(a))
 	a.NoError(err)
 	return org
 }

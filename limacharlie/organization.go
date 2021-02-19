@@ -2,20 +2,22 @@ package limacharlie
 
 import (
 	"fmt"
+
+	"github.com/rs/zerolog"
 )
 
 // Organization holds a connection to the LC cloud organization
 type Organization struct {
 	client *Client
+	logger zerolog.Logger
 }
 
-// NewOrganization creates an Organization
-func NewOrganization(clientOpts ClientOptions) (*Organization, error) {
-	c, err := NewClient(clientOpts)
-	if err != nil {
-		return nil, fmt.Errorf("Could not initialize client: %s", err)
-	}
-	return &Organization{client: c}, nil
+// NewOrganization initialize a link to an Organization
+func NewOrganization(c *Client) (*Organization, error) {
+	return &Organization{
+		client: c,
+		logger: c.logger,
+	}, nil
 }
 
 // Permission represents the permission granted in LC
