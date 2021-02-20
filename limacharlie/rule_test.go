@@ -25,8 +25,6 @@ func TestDRRuleAddDelete(t *testing.T) {
 		t.Errorf("unexpected preexisting rules in add/delete: %+v", rules)
 	}
 
-	testOutputName := "test-lc-go-sdk-out"
-
 	testRuleName := "testrule"
 	testRuleExp := int64(3600)
 	testRuleDetect := map[string]interface{}{
@@ -50,11 +48,11 @@ func TestDRRuleAddDelete(t *testing.T) {
 	a.NoError(err)
 	if len(rules) == 0 {
 		t.Errorf("rules is empty")
-	} else if _, ok := rules[testOutputName]; !ok {
+	} else if _, ok := rules[testRuleName]; !ok {
 		t.Errorf("test rule not found: %+v", rules)
 	}
 
-	_, err = org.OutputDel(testOutputName)
+	_, err = org.OutputDel(testRuleName)
 	a.NoError(err)
 
 	rules, err = org.DRRules()
