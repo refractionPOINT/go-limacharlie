@@ -227,7 +227,9 @@ func getStringKV(d interface{}) (map[string]string, error) {
 		return nil, err
 	}
 	o := map[string]interface{}{}
-	if err := json.Unmarshal(b, &o); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if err := decoder.Decode(&o); err != nil {
 		return nil, err
 	}
 	m := map[string]string{}
