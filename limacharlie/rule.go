@@ -28,6 +28,13 @@ type drAddRuleRequest struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+type CoreDRRule struct {
+	Name      string                   `json:"name"`
+	Namespace string                   `json:"namespace,omitempty"`
+	Detect    map[string]interface{}   `json:"detect"`
+	Response  []map[string]interface{} `json:"respond"`
+}
+
 // DRRuleAdd add a D&R Rule to an LC organization
 func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...DRRuleOptions) error {
 	resp := map[string]interface{}{}
@@ -97,4 +104,36 @@ func (org Organization) DRDelRules(name string, optNamespace ...string) error {
 		return err
 	}
 	return nil
+}
+
+func (d CoreDRRule) Equal(dr CoreDRRule) bool {
+	if d.Name != dr.Name {
+		return false
+	}
+	if d.Namespace == dr.Namespace || (d.Namespace == "general" && dr.Namespace == "") || (dr.Namespace == "general" && d.Namespace == "") {
+		return false
+	}
+	j1, err := json.Marshal(d.Detect)
+	if err != nil {
+		return false
+	}
+	j2, err := json.Marshal(dr.Detect)
+	if err != nil {
+		return false
+	}
+	if string(j1) != string(j2) {
+		return false
+	}
+	j1, err = json.Marshal(d.Response)
+	if err != nil {
+		return false
+	}
+	j2, err = json.Marshal(dr.Response)
+	if err != nil {
+		return false
+	}
+	if string(j1) != string(j2) {
+		return false
+	}
+	return true
 }
