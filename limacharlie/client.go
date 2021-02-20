@@ -310,13 +310,13 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	// we will perform a CleanUnmarshal to better
 	// interpret large integers to int64 whenever
 	// possible instead of the json's default float64.
-	if originalResponse, ok := request.response.(map[string]interface{}); ok {
+	if originalResponse, ok := request.response.(*map[string]interface{}); ok {
 		tmpResp, err := UnmarshalCleanJSON(respData.String())
 		if err != nil {
 			return resp.StatusCode, err
 		}
 		for k, v := range tmpResp {
-			originalResponse[k] = v
+			(*originalResponse)[k] = v
 		}
 		return resp.StatusCode, nil
 	}
