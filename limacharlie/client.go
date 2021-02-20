@@ -305,6 +305,23 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		return resp.StatusCode, err
 	}
 
+	// If the response is not a well structured
+	// datatype (and is a map[]interface{} instead)
+	// we will perform a CleanUnmarshal to better
+	// interpret large integers to int64 whenever
+	// possible instead of the json's default float64.
+	if originalResponse, ok := request.response.(map[string]interface{}); ok {
+		tmpResp, err := UnmarshalCleanJSON(respData.String())
+		if err != nil {
+			return resp.StatusCode, err
+		}
+		for k, v := range tmpResp {
+			originalResponse[k] = v
+		}
+		return resp.StatusCode, nil
+	}
+
+	// Looks like it is not a map[string]interface{}, let json do its thing.
 	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
 		return resp.StatusCode, err
 	}
