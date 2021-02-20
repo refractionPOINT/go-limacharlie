@@ -1,0 +1,100 @@
+package limacharlie
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+)
+
+type DRRuleOptions struct {
+	// Replace rule if it already exists with this name.
+	IsReplace bool
+	// Rule namespace, defaults to "general".
+	Namespace string
+	// Rule is enabled.
+	IsEnabled bool
+	// Number of seconds before rule auto-deletes.
+	TTL int64
+}
+
+type drAddRuleRequest struct {
+	Name      string `json:"name"`
+	IsReplace bool   `json:"is_replace,string"`
+	Detection string `json:"detection"`
+	Response  string `json:"response"`
+	IsEnabled bool   `json:"is_enabled,string"`
+	ExpireOn  int64  `json:"expire_on,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// DRRuleAdd add a D&R Rule to an LC organization
+func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...DRRuleOptions) error {
+	resp := map[string]interface{}{}
+	reqOpt := DRRuleOptions{
+		IsEnabled: true,
+	}
+	for _, o := range opt {
+		reqOpt = o
+		if reqOpt.TTL != 0 {
+			reqOpt.TTL = time.Now().Unix() + reqOpt.TTL
+		}
+	}
+
+	serialDet, err := json.Marshal(detection)
+	if err != nil {
+		return err
+	}
+	serialResp, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	request := makeDefaultRequest(&resp).withFormData(drAddRuleRequest{
+		Name:      name,
+		IsReplace: reqOpt.IsEnabled,
+		Detection: string(serialDet),
+		Response:  string(serialResp),
+		IsEnabled: reqOpt.IsEnabled,
+		ExpireOn:  reqOpt.TTL,
+		Namespace: reqOpt.Namespace,
+	})
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DRRules get all D&R rules for an LC organization
+func (org Organization) DRRules(optNamespace ...string) (map[string]interface{}, error) {
+	req := map[string]string{}
+	for _, n := range optNamespace {
+		req["namespace"] = n
+	}
+
+	resp := map[string]interface{}{}
+
+	request := makeDefaultRequest(&resp).withFormData(req)
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// DRDelRule delete a D&R rule from an LC organization
+func (org Organization) DRDelRules(name string, optNamespace ...string) error {
+	req := map[string]string{
+		"name": name,
+	}
+	for _, n := range optNamespace {
+		req["namespace"] = n
+	}
+
+	resp := map[string]interface{}{}
+
+	request := makeDefaultRequest(&resp).withFormData(req)
+	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
+		return err
+	}
+	return nil
+}
