@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type NewDRRuleFilter struct {
+type NewDRRuleOptions struct {
 	// Replace rule if it already exists with this name.
 	IsReplace bool
 	// Rule namespace, defaults to "general".
@@ -38,9 +38,9 @@ type CoreDRRule struct {
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization
-func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...NewDRRuleFilter) error {
+func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...NewDRRuleOptions) error {
 	resp := map[string]interface{}{}
-	reqOpt := NewDRRuleFilter{
+	reqOpt := NewDRRuleOptions{
 		IsEnabled: true,
 	}
 	for _, o := range opt {

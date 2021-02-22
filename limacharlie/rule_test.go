@@ -38,7 +38,7 @@ func TestDRRuleAddDelete(t *testing.T) {
 		"name":   "test",
 	}}
 
-	err = org.DRRuleAdd(testRuleName, testRuleDetect, testRuleResponse, DRRuleOptions{
+	err = org.DRRuleAdd(testRuleName, testRuleDetect, testRuleResponse, NewDRRuleOptions{
 		IsEnabled: true,
 		TTL:       testRuleExp,
 	})
