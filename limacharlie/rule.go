@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type DRRuleOptions struct {
+type NewDRRuleFilter struct {
 	// Replace rule if it already exists with this name.
 	IsReplace bool
 	// Rule namespace, defaults to "general".
@@ -17,6 +17,8 @@ type DRRuleOptions struct {
 	// Number of seconds before rule auto-deletes.
 	TTL int64
 }
+
+type DRRuleFilter func(map[string]string)
 
 type drAddRuleRequest struct {
 	Name      string `json:"name"`
@@ -36,9 +38,9 @@ type CoreDRRule struct {
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization
-func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...DRRuleOptions) error {
+func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...NewDRRuleFilter) error {
 	resp := map[string]interface{}{}
-	reqOpt := DRRuleOptions{
+	reqOpt := NewDRRuleFilter{
 		IsEnabled: true,
 	}
 	for _, o := range opt {
@@ -73,10 +75,11 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 }
 
 // DRRules get all D&R rules for an LC organization
-func (org Organization) DRRules(optNamespace ...string) (map[string]interface{}, error) {
+func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]interface{}, error) {
 	req := map[string]string{}
-	for _, n := range optNamespace {
-		req["namespace"] = n
+
+	for _, f := range filters {
+		f(req)
 	}
 
 	resp := map[string]interface{}{}
@@ -89,12 +92,12 @@ func (org Organization) DRRules(optNamespace ...string) (map[string]interface{},
 }
 
 // DRDelRule delete a D&R rule from an LC organization
-func (org Organization) DRDelRules(name string, optNamespace ...string) error {
+func (org Organization) DRDelRules(name string, filters ...DRRuleFilter) error {
 	req := map[string]string{
 		"name": name,
 	}
-	for _, n := range optNamespace {
-		req["namespace"] = n
+	for _, f := range filters {
+		f(req)
 	}
 
 	resp := map[string]interface{}{}
@@ -136,4 +139,10 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	return true
+}
+
+func WithNamespace(namespace string) func(map[string]string) {
+	return func(m map[string]string) {
+		m["namespace"] = namespace
+	}
 }
