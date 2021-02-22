@@ -44,7 +44,7 @@ func TestDRRuleAddDelete(t *testing.T) {
 	})
 	a.NoError(err)
 
-	rules, err = org.DRRules()
+	rules, err = org.DRRules(WithNamespace("general"))
 	a.NoError(err)
 	if len(rules) == 0 {
 		t.Errorf("rules is empty")
