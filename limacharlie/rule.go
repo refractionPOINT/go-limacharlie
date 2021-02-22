@@ -82,6 +82,8 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]interface{}
 		f(req)
 	}
 
+	fmt.Println(req)
+
 	resp := map[string]interface{}{}
 
 	request := makeDefaultRequest(&resp).withFormData(req)
