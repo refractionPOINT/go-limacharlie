@@ -113,7 +113,13 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 	if d.Name != dr.Name {
 		return false
 	}
-	if d.Namespace == dr.Namespace || (d.Namespace == "general" && dr.Namespace == "") || (dr.Namespace == "general" && d.Namespace == "") {
+	if d.Namespace == "" {
+		d.Namespace = "general"
+	}
+	if dr.Namespace == "" {
+		dr.Namespace = "general"
+	}
+	if d.Namespace != dr.Namespace {
 		return false
 	}
 	j1, err := json.Marshal(d.Detect)
