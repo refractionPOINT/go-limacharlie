@@ -78,6 +78,11 @@ func (r restRequest) withFormData(formData interface{}) restRequest {
 	return r
 }
 
+func (r restRequest) withQueryData(queryData interface{}) restRequest {
+	r.queryData = queryData
+	return r
+}
+
 func isEmpty(s string) bool {
 	return len(strings.TrimSpace(s)) == 0
 }
