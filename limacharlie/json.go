@@ -5,6 +5,29 @@ import (
 	"strings"
 )
 
+type Dict map[string]interface{}
+type List []interface{}
+
+func (d *Dict) UnmarshalJSON(data []byte) error {
+	c, err := UnmarshalCleanJSON(string(data))
+	if err != nil {
+		return err
+	}
+	*d = c
+
+	return nil
+}
+
+func (l *List) UnmarshalJSON(data []byte) error {
+	c, err := UnmarshalCleanJSONList(string(data))
+	if err != nil {
+		return err
+	}
+	*l = c
+
+	return nil
+}
+
 func UnmarshalCleanJSON(data string) (map[string]interface{}, error) {
 	d := json.NewDecoder(strings.NewReader(data))
 	d.UseNumber()
@@ -15,6 +38,22 @@ func UnmarshalCleanJSON(data string) (map[string]interface{}, error) {
 	}
 
 	if err := unmarshalCleanJSONMap(out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func UnmarshalCleanJSONList(data string) ([]interface{}, error) {
+	d := json.NewDecoder(strings.NewReader(data))
+	d.UseNumber()
+
+	out := []interface{}{}
+	if err := d.Decode(&out); err != nil {
+		return nil, err
+	}
+
+	if err := unmarshalCleanJSONList(out); err != nil {
 		return nil, err
 	}
 
@@ -90,4 +129,16 @@ func unmarshalCleanJSONElement(out interface{}) (interface{}, error) {
 		}
 	}
 	return out, nil
+}
+
+func (d Dict) UnMarshalToStruct(out interface{}) error {
+	tmp, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(tmp, out); err != nil {
+		return err
+	}
+	return nil
 }

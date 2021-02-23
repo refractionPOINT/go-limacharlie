@@ -355,3 +355,37 @@ func (c *Client) whoAmI() (whoAmIJsonResponse, error) {
 func (c *Client) GetCurrentJWT() string {
 	return c.options.JWT
 }
+
+func (w whoAmIJsonResponse) checkPermission(oid string, permName string) bool {
+	if w.UserPermissions != nil {
+		if p, ok := (*w.UserPermissions)[oid]; ok {
+			for _, v := range p {
+				if permName == v {
+					return true
+				}
+			}
+		}
+	}
+	if w.Organizations == nil || w.Permissions == nil {
+		return false
+	}
+	isOrgFound := false
+	for _, o := range *w.Organizations {
+		if o == oid {
+			isOrgFound = true
+			break
+		}
+	}
+	if !isOrgFound {
+		return false
+	}
+	if permName == "" {
+		return true
+	}
+	for _, p := range *w.Permissions {
+		if p == permName {
+			return true
+		}
+	}
+	return false
+}
