@@ -92,7 +92,7 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error
 }
 
 // DRDelRule delete a D&R rule from an LC organization
-func (org Organization) DRDelRules(name string, filters ...DRRuleFilter) error {
+func (org Organization) DRDelRule(name string, filters ...DRRuleFilter) error {
 	req := map[string]string{
 		"name": name,
 	}
@@ -113,13 +113,7 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 	if d.Name != dr.Name {
 		return false
 	}
-	if d.Namespace == "" {
-		d.Namespace = "general"
-	}
-	if dr.Namespace == "" {
-		dr.Namespace = "general"
-	}
-	if d.Namespace != dr.Namespace {
+	if !d.IsInSameNamespace(dr) {
 		return false
 	}
 	j1, err := json.Marshal(d.Detect)
@@ -142,6 +136,19 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	if string(j1) != string(j2) {
+		return false
+	}
+	return true
+}
+
+func (d CoreDRRule) IsInSameNamespace(dr CoreDRRule) bool {
+	if d.Namespace == "" {
+		d.Namespace = "general"
+	}
+	if dr.Namespace == "" {
+		dr.Namespace = "general"
+	}
+	if d.Namespace != dr.Namespace {
 		return false
 	}
 	return true
