@@ -151,6 +151,10 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 				}
 			}
 		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsAdded: true})
+			continue
+		}
 		if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
 			IsReplace: true,
 			Namespace: rule.Namespace,
