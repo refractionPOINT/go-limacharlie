@@ -31,10 +31,10 @@ type drAddRuleRequest struct {
 }
 
 type CoreDRRule struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace,omitempty"`
-	Detect    Dict   `json:"detect"`
-	Response  List   `json:"respond"`
+	Name      string `json:"name" yaml:"name"`
+	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Detect    Dict   `json:"detect" yaml:"detect"`
+	Response  List   `json:"respond" yaml:"respond"`
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization

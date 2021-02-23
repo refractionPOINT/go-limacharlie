@@ -35,7 +35,7 @@ type SyncOptions struct {
 type DRRuleName = string
 
 type OrgConfig struct {
-	DRRules map[DRRuleName]CoreDRRule `json:"rules"`
+	DRRules map[DRRuleName]CoreDRRule `json:"rules" yaml:"rules"`
 }
 
 type OrgSyncOperation struct {

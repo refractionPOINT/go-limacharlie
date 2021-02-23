@@ -1,7 +1,7 @@
 package limacharlie
 
 import (
-	"github.com/stretchr/testify/assert"
+	//"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"testing"
 )
@@ -18,24 +18,36 @@ func TestSyncPush(t *testing.T) {
 	yc := `
 rules:
   r1:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope1
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope1
+    respons:
+      - action: report
+        name: t1
   r2:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope2
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope2
+    respons:
+      - action: report
+        name: t2
   r3:
     namespace: managed
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope3
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope3
+    respons:
+      - action: report
+        name: t3
 `
 	c := OrgConfig{}
-	if err := yaml.Unmarshal([]byte(yc), c); err != nil {
+	if err := yaml.Unmarshal([]byte(yc), &c); err != nil {
 		t.Errorf("yaml.Unmarshal: %v", err)
 	}
 
