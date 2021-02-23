@@ -23,7 +23,7 @@ rules:
       event: NEW_PROCESS
       path: event/FILE_PATH
       value: nope1
-    respons:
+    respond:
       - action: report
         name: t1
   r2:
@@ -32,7 +32,7 @@ rules:
       event: NEW_PROCESS
       path: event/FILE_PATH
       value: nope2
-    respons:
+    respond:
       - action: report
         name: t2
   r3:
@@ -42,7 +42,7 @@ rules:
       event: NEW_PROCESS
       path: event/FILE_PATH
       value: nope3
-    respons:
+    respond:
       - action: report
         name: t3
 `
