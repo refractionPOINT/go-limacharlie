@@ -356,7 +356,7 @@ func (c *Client) GetCurrentJWT() string {
 	return c.options.JWT
 }
 
-func (w whoAmIJsonResponse) checkPermission(oid string, permName string) bool {
+func (w whoAmIJsonResponse) hasPermissionForOrg(oid string, permName string) bool {
 	if w.UserPermissions != nil {
 		if p, ok := (*w.UserPermissions)[oid]; ok {
 			for _, v := range p {

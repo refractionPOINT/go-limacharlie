@@ -98,13 +98,13 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName]CoreDRRule, options SyncOptions) ([]OrgSyncOperation, error) {
 	// Check which namespaces we have available.
 	availableNamespaces := map[string]struct{}{}
-	if who.checkPermission(org.client.options.OID, "dr.list") {
+	if who.hasPermissionForOrg(org.client.options.OID, "dr.list") {
 		availableNamespaces["general"] = struct{}{}
 	}
-	if who.checkPermission(org.client.options.OID, "dr.list.managed") {
+	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.managed") {
 		availableNamespaces["managed"] = struct{}{}
 	}
-	if who.checkPermission(org.client.options.OID, "dr.list.replicant") {
+	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
 		availableNamespaces["replicant"] = struct{}{}
 	}
 
