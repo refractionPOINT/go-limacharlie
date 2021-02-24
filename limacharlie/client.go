@@ -379,13 +379,32 @@ func (w whoAmIJsonResponse) hasPermissionForOrg(oid string, permName string) boo
 	if !isOrgFound {
 		return false
 	}
-	if permName == "" {
-		return true
-	}
 	for _, p := range *w.Permissions {
 		if p == permName {
 			return true
 		}
 	}
 	return false
+}
+
+func (w whoAmIJsonResponse) hasAccessToOrg(oid string) bool {
+	if w.UserPermissions != nil {
+		if _, ok := (*w.UserPermissions)[oid]; ok {
+			return true
+		}
+	}
+	if w.Organizations == nil || w.Permissions == nil {
+		return false
+	}
+	isOrgFound := false
+	for _, o := range *w.Organizations {
+		if o == oid {
+			isOrgFound = true
+			break
+		}
+	}
+	if !isOrgFound {
+		return false
+	}
+	return true
 }
