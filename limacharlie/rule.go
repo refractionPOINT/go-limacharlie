@@ -31,15 +31,15 @@ type drAddRuleRequest struct {
 }
 
 type CoreDRRule struct {
-	Name      string                   `json:"name"`
-	Namespace string                   `json:"namespace,omitempty"`
-	Detect    map[string]interface{}   `json:"detect"`
-	Response  []map[string]interface{} `json:"respond"`
+	Name      string `json:"name" yaml:"name"`
+	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Detect    Dict   `json:"detect" yaml:"detect"`
+	Response  List   `json:"respond" yaml:"respond"`
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization
 func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...NewDRRuleOptions) error {
-	resp := map[string]interface{}{}
+	resp := Dict{}
 	reqOpt := NewDRRuleOptions{
 		IsEnabled: true,
 	}
@@ -75,14 +75,14 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 }
 
 // DRRules get all D&R rules for an LC organization
-func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]interface{}, error) {
+func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error) {
 	req := map[string]string{}
 
 	for _, f := range filters {
 		f(req)
 	}
 
-	resp := map[string]interface{}{}
+	resp := map[string]Dict{}
 
 	request := makeDefaultRequest(&resp).withQueryData(req)
 	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
@@ -92,7 +92,7 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]interface{}
 }
 
 // DRDelRule delete a D&R rule from an LC organization
-func (org Organization) DRDelRules(name string, filters ...DRRuleFilter) error {
+func (org Organization) DRDelRule(name string, filters ...DRRuleFilter) error {
 	req := map[string]string{
 		"name": name,
 	}
@@ -100,7 +100,7 @@ func (org Organization) DRDelRules(name string, filters ...DRRuleFilter) error {
 		f(req)
 	}
 
-	resp := map[string]interface{}{}
+	resp := Dict{}
 
 	request := makeDefaultRequest(&resp).withFormData(req)
 	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
@@ -110,16 +110,7 @@ func (org Organization) DRDelRules(name string, filters ...DRRuleFilter) error {
 }
 
 func (d CoreDRRule) Equal(dr CoreDRRule) bool {
-	if d.Name != dr.Name {
-		return false
-	}
-	if d.Namespace == "" {
-		d.Namespace = "general"
-	}
-	if dr.Namespace == "" {
-		dr.Namespace = "general"
-	}
-	if d.Namespace != dr.Namespace {
+	if !d.IsInSameNamespace(dr) {
 		return false
 	}
 	j1, err := json.Marshal(d.Detect)
@@ -145,6 +136,16 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	return true
+}
+
+func (d CoreDRRule) IsInSameNamespace(dr CoreDRRule) bool {
+	if d.Namespace == "" {
+		d.Namespace = "general"
+	}
+	if dr.Namespace == "" {
+		dr.Namespace = "general"
+	}
+	return d.Namespace == dr.Namespace
 }
 
 func WithNamespace(namespace string) func(map[string]string) {

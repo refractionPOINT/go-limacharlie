@@ -59,3 +59,6 @@ func (e RESTError) Error() string {
 
 // ErrorResourceNotFound is returned when querying for a resource that does not exist or that the client does not have the permission to see
 var ErrorResourceNotFound = errors.New("resource not found")
+
+// Returned for a feature that is not yet implemented to parity with the Python SDK.
+var ErrorNotImplemented = errors.New("not implemented")
