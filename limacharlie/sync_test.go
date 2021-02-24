@@ -174,10 +174,18 @@ rules:
 		t.Errorf("managed rules has: %+v", rules)
 	}
 
-	err = org.DRDelRule("r1", WithNamespace("general"))
+	ops, err = org.SyncPush(OrgConfig{}, SyncOptions{
+		SyncDRRules: true,
+		IsForce: true,
+	})
 	a.NoError(err)
-	err = org.DRDelRule("r2", WithNamespace("general"))
-	a.NoError(err)
-	err = org.DRDelRule("r3", WithNamespace("general"))
-	a.NoError(err)
+
+	if len(ops) != 3 {
+		t.Errorf("unexpected ops: %+v", err)
+	}
+	for _, o := range ops {
+		if !o.IsRemoved {
+			t.Errorf("non-remove op: %+v", o)
+		}
+	}
 }
