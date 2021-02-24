@@ -90,9 +90,6 @@ func (o *ClientOptions) validate() error {
 	if err := validateUUID(o.OID); err != nil {
 		return NewInvalidClientOptionsError(fmt.Sprintf("invalid OID: %v", err))
 	}
-	if err := validateUUID(o.UID); err != nil {
-		return NewInvalidClientOptionsError(fmt.Sprintf("invalid UID: %v", err))
-	}
 	if err := validateUUID(o.APIKey); err != nil {
 		return NewInvalidClientOptionsError(fmt.Sprintf("invalid APIKey: %v", err))
 	}
