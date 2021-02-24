@@ -176,7 +176,7 @@ rules:
 
 	ops, err = org.SyncPush(OrgConfig{}, SyncOptions{
 		SyncDRRules: true,
-		IsForce: true,
+		IsForce:     true,
 	})
 	a.NoError(err)
 

@@ -49,8 +49,7 @@ type OrgSyncOperation struct {
 }
 
 func (org Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
-	// TODO
-	return OrgConfig{}, nil
+	return OrgConfig{}, ErrorNotImplemented
 }
 
 func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
@@ -64,7 +63,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 	// Order matters to minimize issues
 	// of dependance between components.
 	if options.SyncResources {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 	if options.SyncDRRules {
 		newOps, err := org.syncDRRules(who, conf.DRRules, options)
@@ -74,22 +73,22 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncFPRules {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 	if options.SyncOutputs {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 	if options.SyncIntegrity {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 	if options.SyncArtifacts {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 	if options.SyncExfil {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 	if options.SyncNetPolicies {
-		// TODO
+		return ops, ErrorNotImplemented
 	}
 
 	return ops, nil
