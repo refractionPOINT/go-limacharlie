@@ -145,10 +145,7 @@ func (d CoreDRRule) IsInSameNamespace(dr CoreDRRule) bool {
 	if dr.Namespace == "" {
 		dr.Namespace = "general"
 	}
-	if d.Namespace != dr.Namespace {
-		return false
-	}
-	return true
+	return d.Namespace == dr.Namespace
 }
 
 func WithNamespace(namespace string) func(map[string]string) {
