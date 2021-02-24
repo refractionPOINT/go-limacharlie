@@ -1,6 +1,9 @@
 package limacharlie
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	OrgConfigLatestVersion = 3
@@ -67,7 +70,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		newOps, err := org.syncDRRules(who, conf.DRRules, options)
 		ops = append(ops, newOps...)
 		if err != nil {
-			return ops, err
+			return ops, fmt.Errorf("dr-rules: %v", err)
 		}
 	}
 	if options.SyncFPRules {
@@ -112,12 +115,12 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 	for ns := range availableNamespaces {
 		tmpRules, err := org.DRRules(WithNamespace(ns))
 		if err != nil {
-			return ops, err
+			return ops, fmt.Errorf("DRRules %s: %v", ns, err)
 		}
 		for ruleName, rule := range tmpRules {
 			parsedRule := CoreDRRule{}
 			if err := rule.UnMarshalToStruct(&parsedRule); err != nil {
-				return ops, err
+				return ops, fmt.Errorf("UnMarshalToStruct %s: %v", ruleName, err)
 			}
 			existingRules[ruleName] = parsedRule
 		}
@@ -147,7 +150,7 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 					existingNs = "general"
 				}
 				if err := org.DRDelRule(ruleName, WithNamespace(existingNs)); err != nil {
-					return ops, err
+					return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 				}
 			}
 		}
@@ -160,7 +163,7 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 			Namespace: rule.Namespace,
 			IsEnabled: true,
 		}); err != nil {
-			return ops, err
+			return ops, fmt.Errorf("DRRuleAdd %s: %v", ruleName, err)
 		}
 		ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsAdded: true})
 	}
@@ -186,7 +189,7 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 			continue
 		}
 		if err := org.DRDelRule(ruleName, WithNamespace(rule.Namespace)); err != nil {
-			return ops, err
+			return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 		}
 		ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsRemoved: true})
 	}

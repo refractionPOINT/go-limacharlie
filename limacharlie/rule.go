@@ -110,9 +110,6 @@ func (org Organization) DRDelRule(name string, filters ...DRRuleFilter) error {
 }
 
 func (d CoreDRRule) Equal(dr CoreDRRule) bool {
-	if d.Name != dr.Name {
-		return false
-	}
 	if !d.IsInSameNamespace(dr) {
 		return false
 	}
