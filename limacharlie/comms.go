@@ -51,6 +51,16 @@ type MessageText struct {
 	Text string `json:"text"`
 }
 
+var CommsCoreStatuses = struct {
+	Open     string
+	Closed   string
+	Archived string
+}{
+	Open:     "open",
+	Closed:   "closed",
+	Archived: "archived",
+}
+
 func (c *Comms) Room(roomID string) *Room {
 	return &Room{
 		c:  c,

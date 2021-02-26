@@ -41,6 +41,18 @@ func TestComms(t *testing.T) {
 	})
 	a.NoError(err)
 
+	// Close room
+	err = room.ChangeStatus(CommsCoreStatuses.Closed)
+	a.NoError(err)
+
+	// Check it is now closed
+	room.Status = ""
+	err = room.Update()
+	a.NoError(err)
+	if room.Status != CommsCoreStatuses.Closed {
+		t.Errorf("wrong room status: %v", room.Status)
+	}
+
 	// Delete the room
 	err = room.Delete()
 	a.NoError(err)
