@@ -109,3 +109,7 @@ func makeSet(arr []Permission) map[string]struct{} {
 func (org *Organization) GetCurrentJWT() string {
 	return org.client.GetCurrentJWT()
 }
+
+func (o *Organization) Comms() *Comms {
+	return &Comms{o: o}
+}
