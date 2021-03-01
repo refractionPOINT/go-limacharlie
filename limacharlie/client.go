@@ -58,6 +58,7 @@ type restRequest struct {
 	queryData interface{}
 	formData  interface{}
 	response  interface{}
+	urlRoot   string
 }
 
 func makeDefaultRequest(response interface{}) restRequest {
@@ -65,6 +66,7 @@ func makeDefaultRequest(response interface{}) restRequest {
 		nRetries: restRetries,
 		timeout:  restTimeout,
 		response: response,
+		urlRoot:  fmt.Sprintf("/%s/", currentAPIVersion),
 	}
 }
 
@@ -80,6 +82,11 @@ func (r restRequest) withFormData(formData interface{}) restRequest {
 
 func (r restRequest) withQueryData(queryData interface{}) restRequest {
 	r.queryData = queryData
+	return r
+}
+
+func (r restRequest) withURLRoot(root string) restRequest {
+	r.urlRoot = root
 	return r
 }
 
@@ -208,12 +215,12 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 	for request.nRetries > 0 {
 		var statusCode int
 		statusCode, err = c.request(verb, path, request)
-		if err == nil && statusCode == 200 {
+		if err == nil && statusCode == http.StatusOK {
 			break
 		}
 		request.nRetries--
 
-		if statusCode == 401 {
+		if statusCode == http.StatusUnauthorized {
 			// Unauthorized, the JWT may have expired, refresh
 			// it and retry.
 			if err = c.refreshJWT(c.options.JWTExpiryTime); err != nil {
@@ -221,6 +228,16 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 				// retrying with bad creds.
 				return err
 			}
+		} else if statusCode == http.StatusTooManyRequests {
+			// Out of quota, wait a bit and retry.
+			time.Sleep(10 * time.Second)
+		} else if statusCode == http.StatusGatewayTimeout {
+			// Looks like the API might be under load.
+			time.Sleep(5 * time.Second)
+		} else if err == nil {
+			// If no errors, any other status code other than those
+			// above will not be retried.
+			break
 		}
 	}
 	return err
@@ -239,7 +256,26 @@ func getStringKV(d interface{}) (map[string]string, error) {
 	}
 	m := map[string]string{}
 	for k, v := range o {
-		m[k] = fmt.Sprintf("%v", v)
+		if _, ok := v.(Dict); ok {
+			// If the value is a dict, assume
+			// we want to ship its JSON string value.
+			s, err := json.Marshal(v)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = string(s)
+		} else if _, ok := v.(map[string]interface{}); ok {
+			// If the value is a dict, assume
+			// we want to ship its JSON string value.
+			s, err := json.Marshal(v)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = string(s)
+		} else {
+			// Just the normal value itself.
+			m[k] = fmt.Sprintf("%v", v)
+		}
 	}
 	return m, nil
 }
@@ -275,7 +311,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		rawQuery = vals.Encode()
 	}
 
-	r, err := http.NewRequest(verb, fmt.Sprintf("%s/%s/%s", rootURL, currentAPIVersion, path), body)
+	r, err := http.NewRequest(verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
 	if err != nil {
 		return 0, err
 	}
