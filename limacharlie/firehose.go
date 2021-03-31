@@ -32,6 +32,9 @@ type FirehoseOutputOptions struct {
 	// Type of data received from the cloud as specified in Output
 	Type OutputDataType
 
+	// Only receive events from this SensorID.
+	SensorID string
+
 	// Only receive events marked with this investigation ID
 	// Optional
 	InvestigationID string
@@ -217,12 +220,14 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest strin
 		Module:          OutputTypes.Syslog,
 		Type:            fhOpts.Type,
 		DestinationHost: dest,
+		SensorID:        fhOpts.SensorID,
 		InvestigationID: fhOpts.InvestigationID,
 		Tag:             fhOpts.Tag,
 		Category:        fhOpts.Category,
 		DeleteOnFailure: fhOpts.IsDeleteOnFailure,
 		StrictTLS:       !fhOpts.IsNotStrictSSL,
 		TLS:             true,
+		NoHeader:        true,
 	}
 	_, err := org.OutputAdd(output)
 	if err != nil {
