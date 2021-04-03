@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -73,5 +74,88 @@ func TestSensorInfo(t *testing.T) {
 	}
 	if s.LastError != nil {
 		t.Errorf("missing sensor info: %+v", s)
+	}
+}
+
+func TestSensorIsolation(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	sensors, err := org.ListSensors()
+	if err != nil {
+		t.Errorf("ListSensors: %v", err)
+	}
+	if len(sensors) == 0 {
+		t.Error("no sensors listed")
+		return
+	}
+	var sensor *Sensor
+	for _, s := range sensors {
+		sensor = s
+		break
+	}
+
+	if err := sensor.IsolateFromNetwork(); err != nil {
+		t.Errorf("failed isolating: %v", err)
+	}
+	if err := sensor.RejoinNetwork(); err != nil {
+		t.Errorf("failed rejoining: %v", err)
+	}
+}
+
+func TestSensorTags(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	sensors, err := org.ListSensors()
+	if err != nil {
+		t.Errorf("ListSensors: %v", err)
+	}
+	if len(sensors) == 0 {
+		t.Error("no sensors listed")
+		return
+	}
+	var sensor *Sensor
+	for _, s := range sensors {
+		sensor = s
+		break
+	}
+
+	tags, err := sensor.GetTags()
+	if err != nil {
+		t.Errorf("GetTags: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Errorf("test expects no default tags: %v", tags)
+		return
+	}
+
+	if err := sensor.AddTag("ttt", 30*time.Second); err != nil {
+		t.Errorf("AddTag: %v", err)
+	}
+
+	tags, err = sensor.GetTags()
+	if err != nil {
+		t.Errorf("GetTags: %v", err)
+	}
+	if len(tags) != 1 {
+		t.Errorf("unexpected tags: %v", tags)
+		return
+	}
+	if tags[0].Tag != "ttt" || tags[0].By == "" || tags[0].AddedTS == "" {
+		t.Errorf("unexpected tags: %v", tags)
+	}
+
+	if err := sensor.RemoveTag("ttt"); err != nil {
+		t.Errorf("RemoveTag: %v", err)
+	}
+
+	tags, err = sensor.GetTags()
+	if err != nil {
+		t.Errorf("GetTags: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Errorf("unexpected tags: %v", tags)
+		return
 	}
 }

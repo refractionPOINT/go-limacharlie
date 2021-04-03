@@ -1,8 +1,10 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type Sensor struct {
@@ -35,12 +37,102 @@ type sensorListPage struct {
 	Sensors           []*Sensor `json:"sensors"`
 }
 
+type sensorTagsList struct {
+	Tags map[string]map[string]TagInfo `json:"tags"`
+}
+
+type TagInfo struct {
+	Tag     string
+	By      string
+	AddedTS string
+}
+
+func (t *TagInfo) UnmarshalJSON(b []byte) error {
+	l := []interface{}{}
+	if err := json.Unmarshal(b, &l); err != nil {
+		return err
+	}
+	if len(l) < 4 {
+		return fmt.Errorf("tag info missing elements: %v", l)
+	}
+	ok := false
+	t.Tag, ok = l[1].(string)
+	if !ok {
+		return fmt.Errorf("tag wrong datatype: %v (%T)", l[1], l[1])
+	}
+	t.By, ok = l[2].(string)
+	if !ok {
+		return fmt.Errorf("by wrong datatype: %v (%T)", l[1], l[1])
+	}
+	t.AddedTS, ok = l[3].(string)
+	if !ok {
+		return fmt.Errorf("added wrong datatype: %v (%T)", l[1], l[1])
+	}
+	return nil
+}
+
 func (s *Sensor) Update() *Sensor {
 	if err := s.Organization.client.reliableRequest(http.MethodGet, s.SID, makeDefaultRequest(s)); err != nil {
 		s.LastError = err
 		return s
 	}
 	return s
+}
+
+func (s *Sensor) IsolateFromNetwork() error {
+	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(s)); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
+func (s *Sensor) RejoinNetwork() error {
+	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(s)); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
+func (s *Sensor) GetTags() ([]TagInfo, error) {
+	ti := sensorTagsList{}
+	if err := s.Organization.client.reliableRequest(http.MethodGet, fmt.Sprintf("%s/tags", s.SID), makeDefaultRequest(&ti)); err != nil {
+		s.LastError = err
+		return nil, err
+	}
+	sTags, ok := ti.Tags[s.SID]
+	if !ok {
+		return nil, fmt.Errorf("missing sid tags: %+v", ti)
+	}
+	tags := []TagInfo{}
+	for _, t := range sTags {
+		tags = append(tags, t)
+	}
+	return tags, nil
+}
+
+func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
+	req := makeDefaultRequest(s).withFormData(Dict{
+		"tags": tag,
+		"ttl":  ttl / time.Second,
+	})
+	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
+func (s *Sensor) RemoveTag(tag string) error {
+	req := makeDefaultRequest(s).withFormData(Dict{
+		"tags": tag,
+	})
+	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
 }
 
 func (org *Organization) GetSensor(SID string) *Sensor {
