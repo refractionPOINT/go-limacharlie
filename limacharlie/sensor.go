@@ -82,6 +82,7 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 		if page.ContinuationToken == "" {
 			break
 		}
+		lastToken = page.ContinuationToken
 	}
 
 	return m, nil
