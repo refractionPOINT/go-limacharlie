@@ -13,8 +13,8 @@ type Sensor struct {
 	Platform     uint32 `json:"plat"`
 	Architecture uint32 `json:"arch"`
 
-	EnrollTS int64 `json:"enroll"`
-	AliveTS  int64 `json:"alive"`
+	EnrollTS string `json:"enroll"`
+	AliveTS  string `json:"alive"`
 
 	InternalIP string `json:"int_ip"`
 	ExternalIP string `json:"ext_ip"`
