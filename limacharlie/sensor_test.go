@@ -29,9 +29,6 @@ func TestSensorInfo(t *testing.T) {
 		if s.OID == "" {
 			t.Errorf("missing sensor info: %+v", s)
 		}
-		if s.IID == "" {
-			t.Errorf("missing sensor info: %+v", s)
-		}
 		if s.SID == "" {
 			t.Errorf("missing sensor info: %+v", s)
 		}
