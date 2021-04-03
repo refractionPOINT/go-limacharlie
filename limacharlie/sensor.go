@@ -54,6 +54,11 @@ type TagInfo struct {
 	AddedTS string
 }
 
+type TaskingOptions struct {
+	InvestigationID      string
+	InvestigationContext string
+}
+
 func (t *TagInfo) UnmarshalJSON(b []byte) error {
 	l := []interface{}{}
 	if err := json.Unmarshal(b, &l); err != nil {
@@ -145,11 +150,21 @@ func (s *Sensor) RemoveTag(tag string) error {
 	return nil
 }
 
-func (s *Sensor) Task(task string) error {
+func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 	data := Dict{
 		"tasks": task,
 	}
-	if s.InvestigationID != "" {
+	effectiveInvestigationID := s.InvestigationID
+	if len(options) != 0 {
+		opt := options[0]
+		if opt.InvestigationID != "" {
+			effectiveInvestigationID = opt.InvestigationID
+		}
+		if effectiveInvestigationID != "" && opt.InvestigationContext != "" {
+			effectiveInvestigationID = fmt.Sprintf("%s/%s", effectiveInvestigationID, opt.InvestigationContext)
+		}
+	}
+	if effectiveInvestigationID != "" {
 		data["investigation_id"] = s.InvestigationID
 	}
 	req := makeDefaultRequest(s).withFormData(data)
