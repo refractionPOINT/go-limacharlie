@@ -65,7 +65,7 @@ func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permis
 
 	if result.UserPermissions != nil && len(*result.UserPermissions) > 1 {
 		// permissions for multiple orgs
-		effectiveNames, _ := (*result.UserPermissions)[org.client.options.OID]
+		effectiveNames := (*result.UserPermissions)[org.client.options.OID]
 		effective = MakePermissions(effectiveNames)
 	} else if result.Organizations != nil {
 		// machine token
@@ -87,7 +87,7 @@ func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permis
 	}
 
 	if len(missing) > 0 {
-		return "", NoPermission(), fmt.Errorf("Unauthorized, missing permissions: '%q'", missing)
+		return "", NoPermission(), fmt.Errorf("unauthorized, missing permissions: '%q'", missing)
 	}
 
 	ident := ""

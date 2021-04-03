@@ -439,8 +439,5 @@ func (w whoAmIJsonResponse) hasAccessToOrg(oid string) bool {
 			break
 		}
 	}
-	if !isOrgFound {
-		return false
-	}
-	return true
+	return isOrgFound
 }
