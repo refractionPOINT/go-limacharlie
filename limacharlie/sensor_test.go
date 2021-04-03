@@ -160,3 +160,32 @@ func TestSensorTags(t *testing.T) {
 		return
 	}
 }
+
+func TestSensorTask(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	org = org.WithInvestigationID("testinv")
+
+	sensors, err := org.ListSensors()
+	if err != nil {
+		t.Errorf("ListSensors: %v", err)
+	}
+	if len(sensors) == 0 {
+		t.Error("no sensors listed")
+		return
+	}
+	var sensor *Sensor
+	for _, s := range sensors {
+		sensor = s
+		break
+	}
+
+	if sensor.InvestigationID != "testinv" {
+		t.Errorf("InvID not propagated: %s", sensor.InvestigationID)
+	}
+
+	if err := sensor.Task("os_version"); err != nil {
+		t.Errorf("Task: %v", err)
+	}
+}

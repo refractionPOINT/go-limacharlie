@@ -8,6 +8,7 @@ import (
 type Organization struct {
 	client *Client
 	logger LCLogger
+	invID  string
 }
 
 // NewOrganization initialize a link to an organization
@@ -108,6 +109,11 @@ func makeSet(arr []Permission) map[string]struct{} {
 // GetCurrentJWT returns the JWT of the client
 func (org *Organization) GetCurrentJWT() string {
 	return org.client.GetCurrentJWT()
+}
+
+func (org *Organization) WithInvestigationID(invID string) *Organization {
+	org.invID = invID
+	return org
 }
 
 func (o *Organization) Comms() *Comms {

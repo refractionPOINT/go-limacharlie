@@ -30,6 +30,8 @@ type Sensor struct {
 	Organization *Organization `json:"-"`
 
 	LastError error `json:"-"`
+
+	InvestigationID string `json:"-"`
 }
 
 type sensorInfo struct {
@@ -143,11 +145,27 @@ func (s *Sensor) RemoveTag(tag string) error {
 	return nil
 }
 
+func (s *Sensor) Task(task string) error {
+	data := Dict{
+		"tasks": []string{task},
+	}
+	if s.InvestigationID != "" {
+		data["investigation_id"] = s.InvestigationID
+	}
+	req := makeDefaultRequest(s).withFormData(data)
+	if err := s.Organization.client.reliableRequest(http.MethodPost, s.SID, req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
 func (org *Organization) GetSensor(SID string) *Sensor {
 	s := &Sensor{
-		OID:          org.client.options.OID,
-		SID:          SID,
-		Organization: org,
+		OID:             org.client.options.OID,
+		SID:             SID,
+		Organization:    org,
+		InvestigationID: org.invID,
 	}
 	return s.Update()
 }
@@ -177,6 +195,7 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 		}
 		for _, s := range page.Sensors {
 			s.Organization = org
+			s.InvestigationID = org.invID
 			m[s.SID] = s
 		}
 		if page.ContinuationToken == "" {
