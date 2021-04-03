@@ -32,6 +32,11 @@ type Sensor struct {
 	LastError error `json:"-"`
 }
 
+type sensorInfo struct {
+	Info     *Sensor `json:"info"`
+	IsOnline bool    `json:"is_online"`
+}
+
 type sensorListPage struct {
 	ContinuationToken string    `json:"continuation_token"`
 	Sensors           []*Sensor `json:"sensors"`
@@ -72,7 +77,10 @@ func (t *TagInfo) UnmarshalJSON(b []byte) error {
 }
 
 func (s *Sensor) Update() *Sensor {
-	if err := s.Organization.client.reliableRequest(http.MethodGet, s.SID, makeDefaultRequest(s)); err != nil {
+	si := sensorInfo{
+		Info: s,
+	}
+	if err := s.Organization.client.reliableRequest(http.MethodGet, s.SID, makeDefaultRequest(&si)); err != nil {
 		s.LastError = err
 		return s
 	}
