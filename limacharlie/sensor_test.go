@@ -131,6 +131,8 @@ func TestSensorTags(t *testing.T) {
 		t.Errorf("AddTag: %v", err)
 	}
 
+	time.Sleep(2 * time.Second)
+
 	tags, err = sensor.GetTags()
 	if err != nil {
 		t.Errorf("GetTags: %v", err)
