@@ -147,7 +147,7 @@ func (s *Sensor) RemoveTag(tag string) error {
 
 func (s *Sensor) Task(task string) error {
 	data := Dict{
-		"tasks": []string{task},
+		"tasks": task,
 	}
 	if s.InvestigationID != "" {
 		data["investigation_id"] = s.InvestigationID
