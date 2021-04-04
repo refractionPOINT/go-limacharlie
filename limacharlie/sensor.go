@@ -29,6 +29,8 @@ type Sensor struct {
 
 	Organization *Organization `json:"-"`
 
+	Device *Device `json:"-"`
+
 	LastError error `json:"-"`
 
 	InvestigationID string `json:"-"`
@@ -90,6 +92,12 @@ func (s *Sensor) Update() *Sensor {
 	if err := s.Organization.client.reliableRequest(http.MethodGet, s.SID, makeDefaultRequest(&si)); err != nil {
 		s.LastError = err
 		return s
+	}
+	if s.DID != "" {
+		s.Device = &Device{
+			DID:          s.DID,
+			Organization: s.Organization,
+		}
 	}
 	return s
 }
@@ -211,6 +219,12 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 		for _, s := range page.Sensors {
 			s.Organization = org
 			s.InvestigationID = org.invID
+			if s.DID != "" {
+				s.Device = &Device{
+					DID:          s.DID,
+					Organization: org,
+				}
+			}
 			m[s.SID] = s
 		}
 		if page.ContinuationToken == "" {
