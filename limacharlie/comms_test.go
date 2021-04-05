@@ -35,11 +35,14 @@ func TestComms(t *testing.T) {
 	}
 
 	// Post a message
-	err = room.Post(NewMessage{
+	mid, err := room.Post(NewMessage{
 		Type:    "chat",
 		Content: MessageText{"test-message"},
 	})
 	a.NoError(err)
+	if mid == "" {
+		t.Error("message id empty")
+	}
 
 	// Close room
 	err = room.ChangeStatus(CommsCoreStatuses.Closed)

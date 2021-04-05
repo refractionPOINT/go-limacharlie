@@ -47,8 +47,33 @@ type NewMessage struct {
 	Content interface{} `json:"content"`
 }
 
+type newPostResp struct {
+	Message struct {
+		ID string `json:"mid"`
+	} `json:"message"`
+}
+
 type MessageText struct {
 	Text string `json:"text"`
+}
+
+type MessageTasking struct {
+	Task    string   `json:"task"`
+	Sensors []string `json:"sensors"`
+}
+
+type MessageTaskingResponse struct {
+	Response map[string]interface{} `json:"response"`
+}
+
+var CommsMessageTypes = struct {
+	Chat         string
+	Task         string
+	TaskResponse string
+}{
+	Chat:         "chat",
+	Task:         "task",
+	TaskResponse: "task-response",
 }
 
 var CommsCoreStatuses = struct {
@@ -99,13 +124,13 @@ func (r *Room) Delete() error {
 	return nil
 }
 
-func (r *Room) Post(message NewMessage) error {
-	resp := GenericJSON{}
+func (r *Room) Post(message NewMessage) (string, error) {
+	resp := newPostResp{}
 	request := makeDefaultRequest(&resp).withFormData(message).withURLRoot("/")
 	if err := r.c.o.client.reliableRequest(http.MethodPost, fmt.Sprintf("comms/messages/%s", r.ID), request); err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return resp.Message.ID, nil
 }
 
 func (r *Room) ChangeStatus(status RoomStatus) error {
