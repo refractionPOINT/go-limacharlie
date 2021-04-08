@@ -134,9 +134,14 @@ func (r *Room) Post(message NewMessage) (string, error) {
 }
 
 func (r *Room) ChangeStatus(status RoomStatus) error {
+	return r.ChangeStatusWithReason(status, "")
+}
+
+func (r *Room) ChangeStatusWithReason(status RoomStatus, reason string) error {
 	resp := GenericJSON{}
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"status": status,
+		"reason": reason,
 	}).withURLRoot("/")
 	if err := r.c.o.client.reliableRequest(http.MethodPost, fmt.Sprintf("comms/room/%s", r.ID), request); err != nil {
 		return err
