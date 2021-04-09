@@ -66,14 +66,35 @@ type MessageTaskingResponse struct {
 	Response map[string]interface{} `json:"response"`
 }
 
+type MessageError struct {
+	Code    string `json:"code"`
+	Message string `json:"msg"`
+
+	// IsMaterial indicates the error relates
+	// to an action/process/change that had a
+	// real impact on a Room or other LimaCharlie
+	// resource. It is up to the UI to determine
+	// if/how non-material errors should be displayed.
+	IsMaterial string `json:"is_material"`
+}
+
+type MessageCommandAck struct {
+	CommandName string `json:"name"`
+	CommandID   string `json:"cid"`
+}
+
 var CommsMessageTypes = struct {
 	Chat         string
 	Task         string
 	TaskResponse string
+	Error        string
+	CommandAck   string
 }{
 	Chat:         "chat",
 	Task:         "task",
 	TaskResponse: "task-response",
+	Error:        "error",
+	CommandAck:   "cmdack",
 }
 
 var CommsCoreStatuses = struct {
@@ -101,7 +122,7 @@ func (c *Comms) CreateRoom(nickname string) (*Room, error) {
 		"oid":      c.o.client.options.OID,
 		"nickname": nickname,
 	}).withTimeout(10 * time.Second).withURLRoot("/")
-	if err := c.o.client.reliableRequest(http.MethodPost, fmt.Sprintf("comms/room"), request); err != nil {
+	if err := c.o.client.reliableRequest(http.MethodPost, "comms/room", request); err != nil {
 		return nil, err
 	}
 	return r, nil
