@@ -71,16 +71,23 @@ type MessageError struct {
 	Message string `json:"msg"`
 }
 
+type MessageCommandAck struct {
+	CommandName string `json:"name"`
+	CommandID   string `json:"cid"`
+}
+
 var CommsMessageTypes = struct {
 	Chat         string
 	Task         string
 	TaskResponse string
 	Error        string
+	CommandAck   string
 }{
 	Chat:         "chat",
 	Task:         "task",
 	TaskResponse: "task-response",
 	Error:        "error",
+	CommandAck:   "cmdack",
 }
 
 var CommsCoreStatuses = struct {
