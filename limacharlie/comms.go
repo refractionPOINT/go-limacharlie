@@ -66,14 +66,21 @@ type MessageTaskingResponse struct {
 	Response map[string]interface{} `json:"response"`
 }
 
+type MessageError struct {
+	Code    string `json:"code"`
+	Message string `json:"msg"`
+}
+
 var CommsMessageTypes = struct {
 	Chat         string
 	Task         string
 	TaskResponse string
+	Error        string
 }{
 	Chat:         "chat",
 	Task:         "task",
 	TaskResponse: "task-response",
+	Error:        "error",
 }
 
 var CommsCoreStatuses = struct {
@@ -101,7 +108,7 @@ func (c *Comms) CreateRoom(nickname string) (*Room, error) {
 		"oid":      c.o.client.options.OID,
 		"nickname": nickname,
 	}).withTimeout(10 * time.Second).withURLRoot("/")
-	if err := c.o.client.reliableRequest(http.MethodPost, fmt.Sprintf("comms/room"), request); err != nil {
+	if err := c.o.client.reliableRequest(http.MethodPost, "comms/room", request); err != nil {
 		return nil, err
 	}
 	return r, nil
