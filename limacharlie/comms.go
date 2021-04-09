@@ -69,6 +69,13 @@ type MessageTaskingResponse struct {
 type MessageError struct {
 	Code    string `json:"code"`
 	Message string `json:"msg"`
+
+	// IsMaterial indicates the error relates
+	// to an action/process/change that had a
+	// real impact on a Room or other LimaCharlie
+	// resource. It is up to the UI to determine
+	// if/how non-material errors should be displayed.
+	IsMaterial string `json:"is_material"`
 }
 
 type MessageCommandAck struct {
