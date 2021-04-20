@@ -173,7 +173,7 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 		}
 	}
 	if effectiveInvestigationID != "" {
-		data["investigation_id"] = s.InvestigationID
+		data["investigation_id"] = effectiveInvestigationID
 	}
 	req := makeDefaultRequest(s).withFormData(data)
 	if err := s.Organization.client.reliableRequest(http.MethodPost, s.SID, req); err != nil {
