@@ -97,13 +97,13 @@ func isEmpty(s string) bool {
 // NewClientFromLoader initialize a client from options loaders.
 // Will return a valid client as soon as one loader returns valid requirements
 func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...ClientOptionLoader) (*Client, error) {
+	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
+		return &Client{options: inOpt, logger: logger}, nil
+	}
+	
 	loaderCount := len(optsLoaders)
 	if loaderCount == 0 {
 		return nil, newLCError(lcErrClientNoOptionsLoader)
-	}
-
-	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
-		return &Client{options: inOpt, logger: logger}, nil
 	}
 
 	var opt ClientOptions
