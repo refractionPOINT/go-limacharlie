@@ -100,7 +100,7 @@ func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...Cl
 	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
 		return &Client{options: inOpt, logger: logger}, nil
 	}
-	
+
 	loaderCount := len(optsLoaders)
 	if loaderCount == 0 {
 		return nil, newLCError(lcErrClientNoOptionsLoader)
@@ -156,7 +156,7 @@ func validateUUID(s string) error {
 	return nil
 }
 
-func (c *Client) refreshJWT(expiry time.Duration) error {
+func (c *Client) RefreshJWT(expiry time.Duration) error {
 	if c.options.APIKey == "" {
 		return ErrorNoAPIKeyConfigured
 	}
