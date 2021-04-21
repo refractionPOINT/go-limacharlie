@@ -9,6 +9,14 @@ type ClientOptionLoader interface {
 	Load(inOpt ClientOptions) (ClientOptions, error)
 }
 
+// NoopClientOptionLoader does not load any options
+type NoopClientOptionLoader struct{}
+
+// Load returns arguments passed
+func (l *NoopClientOptionLoader) Load(inOpt ClientOptions) (ClientOptions, error) {
+	return inOpt, nil
+}
+
 // EnvironmentClientOptionLoader loads options from environement variables
 type EnvironmentClientOptionLoader struct{}
 
