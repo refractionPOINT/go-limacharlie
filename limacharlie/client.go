@@ -156,9 +156,9 @@ func validateUUID(s string) error {
 	return nil
 }
 
-func (c *Client) RefreshJWT(expiry time.Duration) error {
+func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	if c.options.APIKey == "" {
-		return ErrorNoAPIKeyConfigured
+		return "", ErrorNoAPIKeyConfigured
 	}
 	authData := url.Values{}
 	authData.Set("secret", c.options.APIKey)
@@ -174,28 +174,27 @@ func (c *Client) RefreshJWT(expiry time.Duration) error {
 
 	resp, err := http.PostForm(getJWTURL, authData)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return NewRESTError(resp.Status)
+		return "", NewRESTError(resp.Status)
 	}
 
 	respData := bytes.Buffer{}
 	if _, err := io.Copy(&respData, resp.Body); err != nil {
-		return err
+		return "", err
 	}
 
 	// We should have a valid JWT.
 	jwtData := jwtResponse{}
 	if err := json.Unmarshal(respData.Bytes(), &jwtData); err != nil {
-		return err
+		return "", err
 	}
 
 	c.options.JWT = jwtData.JWT
-
-	return nil
+	return c.options.JWT, nil
 }
 
 func getHTTPClient(timeout time.Duration) *http.Client {
@@ -223,7 +222,7 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 		if statusCode == http.StatusUnauthorized {
 			// Unauthorized, the JWT may have expired, refresh
 			// it and retry.
-			if err = c.refreshJWT(c.options.JWTExpiryTime); err != nil {
+			if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
 				// If we cannot get a new JWT there is no point in
 				// retrying with bad creds.
 				return err
