@@ -32,11 +32,18 @@ const (
 	restTimeout = 5 * time.Second
 )
 
+type LCClient interface {
+	RefreshJWT(expiry time.Duration) (string, error)
+	GetCurrentJWT() string
+}
+
 // Client makes raw request to LC cloud
 type Client struct {
 	options ClientOptions
 	logger  LCLogger
 }
+
+var _ LCClient = &Client{}
 
 // ClientOptions holds all options for Client
 type ClientOptions struct {
