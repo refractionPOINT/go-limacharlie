@@ -11,7 +11,7 @@ type ClientBuilder struct {
 
 var _ LCClientBuilder = &ClientBuilder{}
 
-func NewClientBuilder(logger LCLogger, clientLoaders []ClientOptionLoader) *ClientBuilder {
+func NewClientBuilder(logger LCLogger, clientLoaders ...ClientOptionLoader) *ClientBuilder {
 	return &ClientBuilder{
 		logger:        logger,
 		clientLoaders: clientLoaders,
