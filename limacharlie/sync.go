@@ -15,24 +15,24 @@ type SyncOptions struct {
 	// Force makes the remove Org an exact mirror of the
 	// configuration provided, adding and removing.
 	// Otherwise elements will only be added, not removed.
-	IsForce bool
+	IsForce bool `json:"is_force"`
 
 	// IgnoreInaccessible ignores elements that are
 	// locked and cannot be modified by the credentials
 	// currently in use.
-	IsIgnoreInaccessible bool
+	IsIgnoreInaccessible bool `json:"ignore_inaccessible"`
 
 	// Only simulate changes to the Org.
-	IsDryRun bool
+	IsDryRun bool `json:"is_dry_run"`
 
-	SyncDRRules     bool
-	SyncOutputs     bool
-	SyncResources   bool
-	SyncIntegrity   bool
-	SyncFPRules     bool
-	SyncExfil       bool
-	SyncArtifacts   bool
-	SyncNetPolicies bool
+	SyncDRRules     bool `json:"sync_dr"`
+	SyncOutputs     bool `json:"sync_outputs"`
+	SyncResources   bool `json:"sync_resources"`
+	SyncIntegrity   bool `json:"sync_integrity"`
+	SyncFPRules     bool `json:"sync_fp"`
+	SyncExfil       bool `json:"sync_exfil"`
+	SyncArtifacts   bool `json:"sync_artifacts"`
+	SyncNetPolicies bool `json:"sync_net_policies"`
 }
 
 type DRRuleName = string
