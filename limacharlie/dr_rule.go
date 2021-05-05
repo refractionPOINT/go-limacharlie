@@ -91,8 +91,8 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error
 	return resp, nil
 }
 
-// DRDelRule delete a D&R rule from an LC organization
-func (org Organization) DRDelRule(name string, filters ...DRRuleFilter) error {
+// DRRuleDelete delete a D&R rule from an LC organization
+func (org Organization) DRRuleDelete(name string, filters ...DRRuleFilter) error {
 	req := map[string]string{
 		"name": name,
 	}
