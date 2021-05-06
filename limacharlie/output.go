@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -111,8 +112,21 @@ type OutputConfig struct {
 	HumioToken        string `json:"humio_api_token,omitempty"`
 }
 
+func (o OutputConfig) Equals(other OutputConfig) bool {
+	otherBytes, err := json.Marshal(other)
+	if err != nil {
+		return false
+	}
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return false
+	}
+	return string(otherBytes) == string(bytes)
+}
+
 // OutputsByName represents OutputConfig where the key is the name of the OutputConfig
-type OutputsByName = map[string]OutputConfig
+type OutputName = string
+type OutputsByName = map[OutputName]OutputConfig
 type outputsByOrgID = map[string]OutputsByName
 type genericOutputsByOrgID = map[string]GenericJSON
 
@@ -125,9 +139,17 @@ func (org Organization) OutputsGeneric(outputs interface{}) error {
 	return nil
 }
 
+// backward compat where type is returned in the sfor field
+type outputResponse struct {
+	OutputConfig
+
+	Type OutputDataType `json:"for"`
+}
+
+
 // Outputs returns all outputs by name
 func (org Organization) Outputs() (OutputsByName, error) {
-	outputsByOrg := outputsByOrgID{}
+	outputsByOrg := map[string]map[OutputName]outputResponse{}
 	if err := org.OutputsGeneric(&outputsByOrg); err != nil {
 		return OutputsByName{}, err
 	}
@@ -139,7 +161,10 @@ func (org Organization) Outputs() (OutputsByName, error) {
 
 	cleanOutByName := OutputsByName{}
 	for k, v := range outByName {
-		cleanOutByName[k] = OutputConfig(v)
+		outputConfig := v.OutputConfig
+		outputConfig.Type = v.Type
+
+		cleanOutByName[k] = outputConfig
 	}
 
 	return cleanOutByName, nil
@@ -147,12 +172,15 @@ func (org Organization) Outputs() (OutputsByName, error) {
 
 // OutputAdd add an output to the LC organization
 func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
-	resp := OutputConfig{}
+	resp := outputResponse{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
 	if err := org.outputs(http.MethodPost, request); err != nil {
 		return OutputConfig{}, err
 	}
-	return resp, nil
+
+	ret := resp.OutputConfig
+	ret.Type = resp.Type
+	return ret, nil
 }
 
 // OutputDel deletes an output from the LC organization
