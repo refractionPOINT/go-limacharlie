@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -37,8 +38,33 @@ type SyncOptions struct {
 
 type DRRuleName = string
 
+type OrgSyncFPRule struct {
+	Detection Dict `json:"detect" yaml:"detect"`
+}
+
+func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
+	orgRuleDetectionBytes, err := json.Marshal(r.Detection)
+	if err != nil {
+		return false
+	}
+	fpRuleDetectionBytes, err := json.Marshal(fpRule.Detection)
+	if err != nil {
+		return false
+	}
+	return string(orgRuleDetectionBytes) == string(fpRuleDetectionBytes)
+}
+
 type OrgConfig struct {
-	DRRules map[DRRuleName]CoreDRRule `json:"rules" yaml:"rules"`
+	DRRules map[DRRuleName]CoreDRRule    `json:"rules" yaml:"rules"`
+	FPRules map[FPRuleName]OrgSyncFPRule `json:"fps" yaml:"fps"`
+}
+
+var OrgSyncOperationElementType = struct {
+	DRRule string
+	FPRule string
+}{
+	DRRule: "dr-rule",
+	FPRule: "fp-rule",
 }
 
 type OrgSyncOperation struct {
@@ -73,7 +99,11 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncFPRules {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncFPRules(conf.FPRules, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("fp-rules: %v", err)
+		}
 	}
 	if options.SyncOutputs {
 		return ops, ErrorNotImplemented
@@ -91,6 +121,65 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		return ops, ErrorNotImplemented
 	}
 
+	return ops, nil
+}
+
+func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgRules, err := org.FPRules()
+	if err != nil {
+		return ops, err
+	}
+
+	// Add rules that should be replaced first
+	for ruleName, rule := range rules {
+		orgRule, found := orgRules[ruleName]
+		if found {
+			if rule.DetectionEquals(orgRule) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.FPRule,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.FPRule,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+		if options.IsDryRun {
+			continue
+		}
+
+		if err := org.FPRuleAdd(ruleName, rule.Detection, FPRuleOptions{IsReplace: true}); err != nil {
+			return ops, nil
+		}
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// Go through existing rules and removes the ones not in our list
+	for ruleName := range orgRules {
+		_, found := rules[ruleName]
+		if found {
+			continue
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.FPRule,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+		if options.IsDryRun {
+			continue
+		}
+		if err := org.FPRuleDelete(ruleName); err != nil {
+			return ops, err
+		}
+	}
 	return ops, nil
 }
 
@@ -131,13 +220,13 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 			// A rule with that name is already there.
 			// Is it the exact same rule?
 			if existingRule.Equal(rule) {
-				ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName})
+				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName})
 				// Nothing to do, move on.
 				continue
 			}
 			// If this is a DryRun, just report the op and move on.
 			if options.IsDryRun {
-				ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsAdded: true})
+				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 				continue
 			}
 			// It must be replaced.
@@ -148,13 +237,13 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 				if existingNs == "" {
 					existingNs = "general"
 				}
-				if err := org.DRDelRule(ruleName, WithNamespace(existingNs)); err != nil {
+				if err := org.DRRuleDelete(ruleName, WithNamespace(existingNs)); err != nil {
 					return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 				}
 			}
 		}
 		if options.IsDryRun {
-			ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsAdded: true})
+			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 			continue
 		}
 		if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
@@ -164,7 +253,7 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 		}); err != nil {
 			return ops, fmt.Errorf("DRRuleAdd %s: %v", ruleName, err)
 		}
-		ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsAdded: true})
+		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 	}
 
 	// If we're not Forcing, then we're done.
@@ -184,13 +273,13 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 		}
 		// If this is a DryRun, report the op and move on.
 		if options.IsDryRun {
-			ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsRemoved: true})
+			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 			continue
 		}
-		if err := org.DRDelRule(ruleName, WithNamespace(rule.Namespace)); err != nil {
+		if err := org.DRRuleDelete(ruleName, WithNamespace(rule.Namespace)); err != nil {
 			return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 		}
-		ops = append(ops, OrgSyncOperation{ElementType: "dr-rule", ElementName: ruleName, IsRemoved: true})
+		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 	}
 
 	return ops, nil
