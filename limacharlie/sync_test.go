@@ -255,6 +255,7 @@ fps:
 	a.Equal(expectedOps, sortSyncOps(ops))
 	fpRules, err = org.FPRules()
 	a.NoError(err)
+	a.Equal(len(orgConfig.FPRules), len(fpRules))
 	for fpRuleName, fpRule := range fpRules {
 		configFPRule, found := orgConfig.FPRules[fpRuleName]
 		a.True(found)
@@ -307,9 +308,147 @@ fps:
 	a.Equal(expectedOps, sortSyncOps(ops))
 	fpRulesForce, err = org.FPRules()
 	a.NoError(err)
+	a.Equal(len(orgConfigForce.FPRules), len(fpRulesForce))
 	for fpRuleName, fpRule := range fpRulesForce {
 		configFPRule, found := orgConfigForce.FPRules[fpRuleName]
 		a.True(found)
 		a.True(configFPRule.DetectionEquals(fpRule))
 	}
+}
+
+func deleteAllOutputs(org *Organization) {
+	outputs, _ := org.Outputs()
+	for outputName := range outputs {
+		org.OutputDel(outputName)
+	}
+}
+
+func TestSyncPushOutputs(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteAllOutputs(org)
+
+	outputs, err := org.Outputs()
+	a.NoError(err)
+	a.Empty(outputs)
+
+	yamlOutputs := `
+outputs:
+  output0:
+    module: s3
+    type: detect
+    bucket: aws-bucket-name
+    key_id: 105c750e-8d6f-4ee5-9815-5975fda15e5b
+    secret_key: 403aabff-d7a8-4602-ab9c-815a638a8a30
+    is_indexing: "true"
+    is_compression: "true"
+  output1:
+    module: scp
+    type: artifact
+    dest_host: storage.corp.com
+    dir: /uploads/
+    username: root
+    password: 9a7448cb-df59-423d-b879-d3a83d6ced50
+  output2:
+    module: slack
+    type: detect
+    slack_api_token: e8ef2263-baeb-4459-87d3-c7d0cff8aba1
+    slack_channe: #detections
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlOutputs), &orgConfig))
+
+	// sync in dry run
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncOutputs: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output0", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output2", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	outputs, err = org.Outputs()
+	a.NoError(err)
+	a.Empty(outputs)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncOutputs: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	outputs, err = org.Outputs()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Outputs), len(outputs))
+	for outputName, output := range outputs {
+		configOutput, found := orgConfig.Outputs[outputName]
+		a.True(found)
+		configOutput.Name = outputName
+		a.True(output.Equals(configOutput), "outputs are not equal %v != %v", output, configOutput)
+	}
+
+	// force sync in dry run
+	yamlOutputs = `
+outputs:
+  output0:
+    module: s3
+    type: detect
+    bucket: aws-bucket-name
+    key_id: 105c750e-8d6f-4ee5-9815-5975fda15e5b
+    secret_key: 403aabff-d7a8-4602-ab9c-815a638a8a30
+    is_indexing: "true"
+    is_compression: "true"
+  output11:
+    module: scp
+    type: artifact
+    dest_host: storage.corp.com
+    dir: /uploads/
+    username: root
+    password: 9a7448cb-df59-423d-b879-d3a83d6ced50
+  output12:
+    module: slack
+    type: detect
+    slack_api_token: e8ef2263-baeb-4459-87d3-c7d0cff8aba1
+    slack_channe: #detections
+`
+	orgConfigForce := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlOutputs), &orgConfigForce))
+
+	ops, err = org.SyncPush(orgConfigForce, SyncOptions{IsDryRun: true, SyncOutputs: true, IsForce: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output0"},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output1", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output2", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output11", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output12", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	outputsForce, err := org.Outputs()
+	a.NoError(err)
+	for outputName, output := range outputsForce {
+		configOutput, found := orgConfig.Outputs[outputName]
+		a.True(found)
+		configOutput.Name = outputName
+		a.True(output.Equals(configOutput), "outputs are not equal %v != %v", output, configOutput)
+	}
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfigForce, SyncOptions{SyncOutputs: true, IsForce: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output0"},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output1", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output2", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output11", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Output, ElementName: "output12", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	outputsForce, err = org.Outputs()
+	a.NoError(err)
+	for outputName, output := range outputsForce {
+		configOutput, found := orgConfigForce.Outputs[outputName]
+		a.True(found)
+		configOutput.Name = outputName
+		a.True(output.Equals(configOutput), "outputs are not equal %v != %v", output, configOutput)
+	}
+
 }

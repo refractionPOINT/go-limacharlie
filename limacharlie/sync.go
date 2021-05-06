@@ -57,14 +57,17 @@ func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
 type OrgConfig struct {
 	DRRules map[DRRuleName]CoreDRRule    `json:"rules" yaml:"rules"`
 	FPRules map[FPRuleName]OrgSyncFPRule `json:"fps" yaml:"fps"`
+	Outputs map[OutputName]OutputConfig  `json:"outputs" yaml:"outputs"`
 }
 
 var OrgSyncOperationElementType = struct {
 	DRRule string
 	FPRule string
+	Output string
 }{
 	DRRule: "dr-rule",
 	FPRule: "fp-rule",
+	Output: "output",
 }
 
 type OrgSyncOperation struct {
@@ -106,7 +109,11 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncOutputs {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncOutputs(conf.Outputs, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("outputs: %v", err)
+		}
 	}
 	if options.SyncIntegrity {
 		return ops, ErrorNotImplemented
@@ -121,6 +128,70 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		return ops, ErrorNotImplemented
 	}
 
+	return ops, nil
+}
+
+func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgOutputs, err := org.Outputs()
+	if err != nil {
+		return ops, err
+	}
+
+	for outputName, output := range outputs {
+		output.Name = outputName
+		orgOutput, found := orgOutputs[outputName]
+		if found {
+			if output.Equals(orgOutput) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Output,
+					ElementName: outputName,
+				})
+				continue
+			}
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Output,
+			ElementName: outputName,
+			IsAdded:     true,
+		})
+		if options.IsDryRun {
+			continue
+		}
+		output.Name = outputName
+		if _, err := org.OutputAdd(output); err != nil {
+			return ops, err
+		}
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// refetch
+	orgOutputs, err = org.Outputs()
+	if err != nil {
+		return ops, err
+	}
+
+	// Go through existing outputs and removes the ones not in our list
+	for outputName := range orgOutputs {
+		_, found := outputs[outputName]
+		if found {
+			continue
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Output,
+			ElementName: outputName,
+			IsRemoved:   true,
+		})
+		if options.IsDryRun {
+			continue
+		}
+		if _, err := org.OutputDel(outputName); err != nil {
+			return ops, err
+		}
+	}
 	return ops, nil
 }
 
@@ -154,12 +225,18 @@ func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options 
 		}
 
 		if err := org.FPRuleAdd(ruleName, rule.Detection, FPRuleOptions{IsReplace: true}); err != nil {
-			return ops, nil
+			return ops, err
 		}
 	}
 
 	if !options.IsForce {
 		return ops, nil
+	}
+
+	// refetch
+	orgRules, err = org.FPRules()
+	if err != nil {
+		return ops, err
 	}
 
 	// Go through existing rules and removes the ones not in our list
