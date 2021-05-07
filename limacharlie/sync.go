@@ -167,18 +167,23 @@ func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options
 				continue
 			}
 		}
-		ops = append(ops, OrgSyncOperation{
-			ElementType: OrgSyncOperationElementType.Output,
-			ElementName: outputName,
-			IsAdded:     true,
-		})
 		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Output,
+				ElementName: outputName,
+				IsAdded:     true,
+			})
 			continue
 		}
 		output.Name = outputName
 		if _, err := org.OutputAdd(output); err != nil {
 			return ops, err
 		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Output,
+			ElementName: outputName,
+			IsAdded:     true,
+		})
 	}
 
 	if !options.IsForce {
@@ -197,17 +202,22 @@ func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options
 		if found {
 			continue
 		}
-		ops = append(ops, OrgSyncOperation{
-			ElementType: OrgSyncOperationElementType.Output,
-			ElementName: outputName,
-			IsRemoved:   true,
-		})
 		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Output,
+				ElementName: outputName,
+				IsRemoved:   true,
+			})
 			continue
 		}
 		if _, err := org.OutputDel(outputName); err != nil {
 			return ops, err
 		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Output,
+			ElementName: outputName,
+			IsRemoved:   true,
+		})
 	}
 	return ops, nil
 }
@@ -232,18 +242,23 @@ func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options 
 			}
 		}
 
-		ops = append(ops, OrgSyncOperation{
-			ElementType: OrgSyncOperationElementType.FPRule,
-			ElementName: ruleName,
-			IsAdded:     true,
-		})
 		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.FPRule,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
 			continue
 		}
 
 		if err := org.FPRuleAdd(ruleName, rule.Detection, FPRuleOptions{IsReplace: true}); err != nil {
 			return ops, err
 		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.FPRule,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
 	}
 
 	if !options.IsForce {
@@ -262,17 +277,22 @@ func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options 
 		if found {
 			continue
 		}
-		ops = append(ops, OrgSyncOperation{
-			ElementType: OrgSyncOperationElementType.FPRule,
-			ElementName: ruleName,
-			IsRemoved:   true,
-		})
 		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.FPRule,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
 			continue
 		}
 		if err := org.FPRuleDelete(ruleName); err != nil {
 			return ops, err
 		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.FPRule,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
 	}
 	return ops, nil
 }
@@ -392,17 +412,22 @@ func (org Organization) syncResources(resources map[ResourceName][]string, optio
 			// cat does not exist in org, subscribe to all
 			for _, resName := range resNames {
 				fullResName := fmt.Sprintf("%s/%s", resCat, resName)
-				ops = append(ops, OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Resource,
-					ElementName: fullResName,
-					IsAdded:     true,
-				})
 				if options.IsDryRun {
+					ops = append(ops, OrgSyncOperation{
+						ElementType: OrgSyncOperationElementType.Resource,
+						ElementName: fullResName,
+						IsAdded:     true,
+					})
 					continue
 				}
 				if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
 					return ops, nil
 				}
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Resource,
+					ElementName: fullResName,
+					IsAdded:     true,
+				})
 			}
 			continue
 		}
@@ -417,17 +442,22 @@ func (org Organization) syncResources(resources map[ResourceName][]string, optio
 				})
 				continue
 			}
-			ops = append(ops, OrgSyncOperation{
-				ElementType: OrgSyncOperationElementType.Resource,
-				ElementName: fullResName,
-				IsAdded:     true,
-			})
 			if options.IsDryRun {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Resource,
+					ElementName: fullResName,
+					IsAdded:     true,
+				})
 				continue
 			}
 			if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
 				return ops, nil
 			}
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Resource,
+				ElementName: fullResName,
+				IsAdded:     true,
+			})
 		}
 	}
 
@@ -460,17 +490,22 @@ func (org Organization) syncResources(resources map[ResourceName][]string, optio
 			}
 
 			fullResName := fmt.Sprintf("%s/%s", orgResCat, orgResName)
-			ops = append(ops, OrgSyncOperation{
-				ElementType: OrgSyncOperationElementType.Resource,
-				ElementName: fullResName,
-				IsRemoved:   true,
-			})
 			if options.IsDryRun {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Resource,
+					ElementName: fullResName,
+					IsRemoved:   true,
+				})
 				continue
 			}
 			if err := org.ResourceUnsubscribe(orgResName, orgResCat); err != nil {
 				return ops, err
 			}
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Resource,
+				ElementName: fullResName,
+				IsRemoved:   true,
+			})
 		}
 	}
 
