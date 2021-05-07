@@ -18,7 +18,7 @@ func TestResourceAddDelete(t *testing.T) {
 	resourceCategory := ResourceCategories.API
 	err = org.ResourceSubscribe(resourceName, resourceCategory)
 	a.NoError(err)
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	resources, err := org.Resources()
 	a.NoError(err)
@@ -30,7 +30,7 @@ func TestResourceAddDelete(t *testing.T) {
 	err = org.ResourceUnsubscribe(resourceName, resourceCategory)
 	a.NoError(err)
 	delete(apiResources, "ip-geo")
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	resources, err = org.Resources()
 	a.NoError(err)

@@ -8,7 +8,7 @@ import (
 
 type ResourceCategory = string
 type ResourceName = string
-type ResourcesByCategory = map[ResourceCategory]map[ResourceName]struct{}
+type ResourcesByCategory map[ResourceCategory]map[ResourceName]struct{}
 
 var ResourceCategories = struct {
 	API       string
@@ -23,6 +23,30 @@ func (org Organization) resources(verb string, request restRequest) error {
 }
 
 type resourceGetResponse = map[string]map[string][]string
+
+func (r ResourcesByCategory) duplicate() ResourcesByCategory {
+	dup := ResourcesByCategory{}
+	for resCat, resNames := range r {
+		names, found := dup[resCat]
+		if !found {
+			names = map[string]struct{}{}
+		}
+		for name := range resNames {
+			names[name] = struct{}{}
+		}
+		dup[resCat] = names
+	}
+	return dup
+}
+
+func (r *ResourcesByCategory) AddToCategory(category ResourceCategory, name ResourceName) {
+	cat, found := (*r)[category]
+	if !found {
+		cat = map[string]struct{}{}
+	}
+	cat[name] = struct{}{}
+	(*r)[category] = cat
+}
 
 // Resources list available resources
 func (org Organization) Resources() (ResourcesByCategory, error) {
