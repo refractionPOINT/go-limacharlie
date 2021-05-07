@@ -24,12 +24,12 @@ func TestResourceAddDelete(t *testing.T) {
 	a.NoError(err)
 	expectedResources := resourcesBase
 	apiResources := expectedResources[ResourceCategories.API]
-	apiResources = append(apiResources, "ip-geo")
-	expectedResources[ResourceCategories.API] = apiResources
+	apiResources["ip-geo"] = struct{}{}
 	a.Equal(expectedResources, resources)
 
 	err = org.ResourceUnsubscribe(resourceName, resourceCategory)
 	a.NoError(err)
+	delete(apiResources, "ip-geo")
 	time.Sleep(2 * time.Second)
 
 	resources, err = org.Resources()

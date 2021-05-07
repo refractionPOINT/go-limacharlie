@@ -8,7 +8,7 @@ import (
 
 type ResourceCategory = string
 type ResourceName = string
-type Resources = map[ResourceCategory][]ResourceName
+type ResourcesByCategory = map[ResourceCategory]map[ResourceName]struct{}
 
 var ResourceCategories = struct {
 	API       string
@@ -22,20 +22,32 @@ func (org Organization) resources(verb string, request restRequest) error {
 	return org.client.reliableRequest(verb, fmt.Sprintf("orgs/%s/resources", org.client.options.OID), request)
 }
 
-type resourceGetResponse = map[string]Resources
+type resourceGetResponse = map[string]map[string][]string
 
 // Resources list available resources
-func (org Organization) Resources() (Resources, error) {
+func (org Organization) Resources() (ResourcesByCategory, error) {
 	resp := resourceGetResponse{}
 	req := makeDefaultRequest(&resp).withTimeout(10 * time.Second)
 	if err := org.resources(http.MethodGet, req); err != nil {
-		return Resources{}, err
+		return ResourcesByCategory{}, err
 	}
 
-	if resources, found := resp["resources"]; found {
-		return resources, nil
+	resources := ResourcesByCategory{}
+	resourcesContent, found := resp["resources"]
+	if !found {
+		return resources, fmt.Errorf("resources: expected key 'resources' is missing from response")
 	}
-	return Resources{}, fmt.Errorf("resources: expected key 'resources' is missing from response")
+	for resCat, resNames := range resourcesContent {
+		resourcesForCat, ok := resources[resCat]
+		if !ok {
+			resourcesForCat = map[string]struct{}{}
+		}
+		for _, resName := range resNames {
+			resourcesForCat[resName] = struct{}{}
+		}
+		resources[resCat] = resourcesForCat
+	}
+	return resources, nil
 }
 
 // ResourceSubscribe subscribe to a resource.
