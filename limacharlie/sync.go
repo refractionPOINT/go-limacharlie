@@ -55,19 +55,22 @@ func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
 }
 
 type OrgConfig struct {
-	DRRules map[DRRuleName]CoreDRRule    `json:"rules" yaml:"rules"`
-	FPRules map[FPRuleName]OrgSyncFPRule `json:"fps" yaml:"fps"`
-	Outputs map[OutputName]OutputConfig  `json:"outputs" yaml:"outputs"`
+	Resources map[ResourceName][]string    `json:"resources" yaml:"resources"`
+	DRRules   map[DRRuleName]CoreDRRule    `json:"rules" yaml:"rules"`
+	FPRules   map[FPRuleName]OrgSyncFPRule `json:"fps" yaml:"fps"`
+	Outputs   map[OutputName]OutputConfig  `json:"outputs" yaml:"outputs"`
 }
 
 var OrgSyncOperationElementType = struct {
-	DRRule string
-	FPRule string
-	Output string
+	DRRule   string
+	FPRule   string
+	Output   string
+	Resource string
 }{
-	DRRule: "dr-rule",
-	FPRule: "fp-rule",
-	Output: "output",
+	DRRule:   "dr-rule",
+	FPRule:   "fp-rule",
+	Output:   "output",
+	Resource: "resource",
 }
 
 type OrgSyncOperation struct {
@@ -75,6 +78,16 @@ type OrgSyncOperation struct {
 	ElementName string `json:"name"`
 	IsAdded     bool   `json:"is_added"`
 	IsRemoved   bool   `json:"is_removed"`
+}
+
+func (o OrgSyncOperation) String() string {
+	op := "="
+	if o.IsAdded {
+		op = "+"
+	} else if o.IsRemoved {
+		op = "-"
+	}
+	return fmt.Sprintf("%s %s %s", op, o.ElementType, o.ElementName)
 }
 
 func (org Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
@@ -92,7 +105,11 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 	// Order matters to minimize issues
 	// of dependance between components.
 	if options.SyncResources {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncResources(conf.Resources, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("resources: %v", err)
+		}
 	}
 	if options.SyncDRRules {
 		newOps, err := org.syncDRRules(who, conf.DRRules, options)
@@ -357,6 +374,104 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 			return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 		}
 		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
+	}
+
+	return ops, nil
+}
+
+func (org Organization) syncResources(resources map[ResourceName][]string, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgResources, err := org.Resources()
+	if err != nil {
+		return ops, err
+	}
+
+	for resCat, resNames := range resources {
+		orgResCat, found := orgResources[resCat]
+		if !found {
+			// cat does not exist in org, subscribe to all
+			for _, resName := range resNames {
+				fullResName := fmt.Sprintf("%s/%s", resCat, resName)
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Resource,
+					ElementName: fullResName,
+					IsAdded:     true,
+				})
+				if options.IsDryRun {
+					continue
+				}
+				if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
+					return ops, nil
+				}
+			}
+			continue
+		}
+
+		for _, resName := range resNames {
+			_, found := orgResCat[resName]
+			fullResName := fmt.Sprintf("%s/%s", resCat, resName)
+			if found {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Resource,
+					ElementName: fullResName,
+				})
+				continue
+			}
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Resource,
+				ElementName: fullResName,
+				IsAdded:     true,
+			})
+			if options.IsDryRun {
+				continue
+			}
+			if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
+				return ops, nil
+			}
+		}
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	if len(resources) == 0 {
+		return ops, nil
+	}
+
+	// Only remove resources if it is present in the config.
+	// This avoids unexpected disabling of all configs.
+	for orgResCat, orgResNames := range orgResources {
+		resNames, found := resources[orgResCat]
+		if !found {
+			continue
+		}
+		for orgResName := range orgResNames {
+
+			found := false
+			for _, resNameToFind := range resNames {
+				found = resNameToFind == orgResName
+				if found {
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+
+			fullResName := fmt.Sprintf("%s/%s", orgResCat, orgResName)
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Resource,
+				ElementName: fullResName,
+				IsRemoved:   true,
+			})
+			if options.IsDryRun {
+				continue
+			}
+			if err := org.ResourceUnsubscribe(orgResName, orgResCat); err != nil {
+				return ops, err
+			}
+		}
 	}
 
 	return ops, nil

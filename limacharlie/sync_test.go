@@ -3,10 +3,99 @@ package limacharlie
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 )
+
+func resetResource(org *Organization, resources ResourcesByCategory) {
+	orgResources, _ := org.Resources()
+	for orgResCat, orgResNames := range orgResources {
+		resCat, found := resources[orgResCat]
+		if !found {
+			for orgResName := range orgResNames {
+				org.ResourceUnsubscribe(orgResName, orgResCat)
+			}
+			continue
+		}
+		for orgResName := range orgResNames {
+			_, found := resCat[orgResName]
+			if !found {
+				org.ResourceUnsubscribe(orgResName, orgResCat)
+			}
+		}
+	}
+}
+
+func TestSyncPushResources(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	resourcesBase, err := org.Resources()
+	a.NoError(err)
+	defer resetResource(org, resourcesBase.duplicate())
+
+	resourcesConfig := `
+resources:
+  api:
+    - ip-geo
+    - vt
+  replicant:
+    - exfil
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(resourcesConfig), &orgConfig))
+
+	// sync resources in dry run
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncResources: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	resources, err := org.Resources()
+	a.NoError(err)
+	a.Equal(resourcesBase, resources)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncResources: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	time.Sleep(5 * time.Second)
+	resources, err = org.Resources()
+	a.NoError(err)
+	expectedResources := resourcesBase.duplicate()
+	expectedResources.AddToCategory(ResourceCategories.API, "ip-geo")
+	expectedResources.AddToCategory(ResourceCategories.API, "vt")
+	expectedResources.AddToCategory(ResourceCategories.Replicant, "exfil")
+	a.Equal(expectedResources, resources)
+
+	// force dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncResources: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo"},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt"},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil"},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	a.Equal(expectedResources, resources)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, SyncResources: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	time.Sleep(5 * time.Second)
+	resources, err = org.Resources()
+	a.NoError(err)
+	a.Equal(resourcesBase, resources)
+
+}
 
 func TestSyncPushDRRules(t *testing.T) {
 	a := assert.New(t)
