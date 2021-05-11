@@ -10,6 +10,9 @@ import (
 type unsubscribeReplicantCB = func()
 
 func findUnsubscribeReplicantCallback(org *Organization, replicantName string) (unsubscribeReplicantCB, error) {
+	cb := func() {
+		org.ResourceUnsubscribe(replicantName, ResourceCategories.Replicant)
+	}
 	resources, err := org.Resources()
 	if err != nil {
 		return nil, nil
@@ -19,17 +22,13 @@ func findUnsubscribeReplicantCallback(org *Organization, replicantName string) (
 	if !found {
 		org.ResourceSubscribe(replicantName, ResourceCategories.Replicant)
 		time.Sleep(5 * time.Second)
-		return func() {
-			org.ResourceUnsubscribe(replicantName, ResourceCategories.Replicant)
-		}, nil
+		return cb, nil
 	}
 
 	if _, found = resourceCatReplicant[replicantName]; found {
 		return nil, nil
 	}
-	return func() {
-		org.ResourceUnsubscribe(replicantName, ResourceCategories.Replicant)
-	}, nil
+	return cb, nil
 
 }
 
