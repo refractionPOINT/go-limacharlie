@@ -1,15 +1,16 @@
 package limacharlie
 
 type IntegrityRule struct {
-	CreatedBy   string              `json:"by"`
-	Patterns    []string            `json:"patterns"`
-	Filters     IntegrityRuleFilter `json:"filters"`
-	LastUpdated uint64              `json:"updated"`
+	Patterns []string            `json:"patterns"`
+	Filters  IntegrityRuleFilter `json:"filters"`
+
+	CreatedBy   string `json:"by"`
+	LastUpdated uint64 `json:"updated"`
 }
 
 type IntegrityRuleFilter struct {
-	Tags      []string `json:"tags"`
-	Platforms []string `json:"platforms"`
+	Tags      []string `json:"tags" yaml:"tags"`
+	Platforms []string `json:"platforms" yaml:"platforms"`
 }
 
 func (ir IntegrityRule) WithPatterns(patterns []string) IntegrityRule {

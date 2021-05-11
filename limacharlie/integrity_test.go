@@ -7,17 +7,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type unsubscribeReplicantCB = func()
+
+func findUnsubscribeReplicantCallback(org *Organization, replicantName string) (unsubscribeReplicantCB, error) {
+	resources, err := org.Resources()
+	if err != nil {
+		return nil, nil
+	}
+
+	resourceCatReplicant, found := resources[ResourceCategories.Replicant]
+	if !found {
+		org.ResourceSubscribe(replicantName, ResourceCategories.Replicant)
+		time.Sleep(5 * time.Second)
+		return func() {
+			org.ResourceUnsubscribe(replicantName, ResourceCategories.Replicant)
+		}, nil
+	}
+
+	if _, found = resourceCatReplicant[replicantName]; found {
+		return nil, nil
+	}
+	return func() {
+		org.ResourceUnsubscribe(replicantName, ResourceCategories.Replicant)
+	}, nil
+
+}
+
 func TestIntegrityRuleAddDelete(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	resources, err := org.Resources()
+	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "integrity")
 	a.NoError(err)
-	_, found := resources[ResourceCategories.Replicant]
-	if !found {
-		org.ResourceSubscribe("integrity", ResourceCategories.Replicant)
-		time.Sleep(5 * time.Second)
-		defer org.ResourceUnsubscribe("integrity", ResourceCategories.Replicant)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
 	}
 
 	rules, err := org.IntegrityRules()

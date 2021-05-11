@@ -541,3 +541,123 @@ outputs:
 	}
 
 }
+
+func deleteIntegrityRules(org *Organization) {
+	rules, _ := org.IntegrityRules()
+	for ruleName := range rules {
+		org.IntegrityRuleDelete(ruleName)
+	}
+}
+
+func TestSyncPushIntegrity(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteIntegrityRules(org)
+
+	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "integrity")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
+
+	rules, err := org.IntegrityRules()
+	a.NoError(err)
+	a.Empty(rules)
+
+	yamlIntegrityRules := `
+integrity:
+  testrule0:
+    patterns:
+    - /root/.ssh/authorized_keys
+    platforms:
+    - linux
+  testrule1:
+    patterns:
+    - /home/user/.ssh/*
+    platforms:
+    - linux
+  testrule2:
+    patterns:
+    - c:\\test.txt
+    platforms:
+    - windows
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlIntegrityRules), &orgConfig))
+
+	// dry run
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncIntegrity: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule0", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule2", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.IntegrityRules()
+	a.NoError(err)
+	a.Empty(rules)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncIntegrity: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.IntegrityRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Integrity), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Integrity[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+	}
+
+	// force and dry run
+	yamlIntegrityRules = `
+integrity:
+  testrule1:
+    patterns:
+    - /home/user/.ssh/*
+    platforms:
+    - linux
+  testrule3:
+    patterns:
+    - /home/user/.gitconfig
+    platforms:
+    - linux
+    - windows
+`
+	forceOrgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlIntegrityRules), &forceOrgConfig))
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncIntegrity: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule1"},
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule3", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule0", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule2", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.IntegrityRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Integrity), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Integrity[ruleName]
+		a.True(found, "rule '%s' not found", ruleName)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+	}
+
+	// force and no dry run
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncIntegrity: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.IntegrityRules()
+	a.NoError(err)
+	a.Equal(len(forceOrgConfig.Integrity), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := forceOrgConfig.Integrity[ruleName]
+		a.True(found, "rule '%s' not found", ruleName)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+	}
+}

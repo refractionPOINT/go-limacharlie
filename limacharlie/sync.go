@@ -54,23 +54,79 @@ func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
 	return string(orgRuleDetectionBytes) == string(fpRuleDetectionBytes)
 }
 
+type OrgSyncIntegrityRule struct {
+	LastUpdated uint64   `json:"updated" yaml:"updated"`
+	CreatedBy   string   `json:"by" yaml:"by"`
+	Patterns    []string `json:"patterns" yaml:"patterns"`
+	Tags        []string `json:"tags" yaml:"tags"`
+	Platforms   []string `json:"platforms" yaml:"platforms"`
+}
+
+func (oir OrgSyncIntegrityRule) EqualsContent(ir IntegrityRule) bool {
+	orgRulePatterns := oir.Patterns
+	if orgRulePatterns == nil {
+		orgRulePatterns = []string{}
+	}
+	orgRuleTags := oir.Tags
+	if orgRuleTags == nil {
+		orgRuleTags = []string{}
+	}
+	orgRulePlatforms := oir.Platforms
+	if orgRulePlatforms == nil {
+		orgRulePlatforms = []string{}
+	}
+	bytes, err := json.Marshal(Dict{
+		"patterns":  orgRulePatterns,
+		"tags":      orgRuleTags,
+		"platforms": orgRulePlatforms,
+	})
+	if err != nil {
+		return false
+	}
+
+	rulePattern := ir.Patterns
+	if rulePattern == nil {
+		rulePattern = []string{}
+	}
+	ruleTags := ir.Filters.Tags
+	if ruleTags == nil {
+		ruleTags = []string{}
+	}
+	rulePlatforms := ir.Filters.Platforms
+	if rulePlatforms == nil {
+		rulePlatforms = []string{}
+	}
+	otherBytes, err := json.Marshal(Dict{
+		"patterns":  rulePattern,
+		"tags":      ruleTags,
+		"platforms": rulePlatforms,
+	})
+	if err != nil {
+		return false
+	}
+	return string(bytes) == string(otherBytes)
+}
+
 type OrgConfig struct {
-	Resources map[ResourceName][]string    `json:"resources" yaml:"resources"`
-	DRRules   map[DRRuleName]CoreDRRule    `json:"rules" yaml:"rules"`
-	FPRules   map[FPRuleName]OrgSyncFPRule `json:"fps" yaml:"fps"`
-	Outputs   map[OutputName]OutputConfig  `json:"outputs" yaml:"outputs"`
+	Resources map[ResourceName][]string                  `json:"resources" yaml:"resources"`
+	DRRules   map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
+	FPRules   map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
+	Outputs   map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
+	Integrity map[IntegrityRuleName]OrgSyncIntegrityRule `json:"integrity" yaml:"integrity"`
 }
 
 var OrgSyncOperationElementType = struct {
-	DRRule   string
-	FPRule   string
-	Output   string
-	Resource string
+	DRRule    string
+	FPRule    string
+	Output    string
+	Resource  string
+	Integrity string
 }{
-	DRRule:   "dr-rule",
-	FPRule:   "fp-rule",
-	Output:   "output",
-	Resource: "resource",
+	DRRule:    "dr-rule",
+	FPRule:    "fp-rule",
+	Output:    "output",
+	Resource:  "resource",
+	Integrity: "integrity",
 }
 
 type OrgSyncOperation struct {
@@ -133,7 +189,11 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncIntegrity {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncIntegrity(conf.Integrity, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("integrity: %v", err)
+		}
 	}
 	if options.SyncArtifacts {
 		return ops, ErrorNotImplemented
@@ -148,6 +208,85 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 	return ops, nil
 }
 
+func (org Organization) syncIntegrity(integrity map[IntegrityRuleName]OrgSyncIntegrityRule, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgIntRules, err := org.IntegrityRules()
+	if err != nil {
+		return ops, err
+	}
+
+	for ruleName, rule := range integrity {
+		orgIntRules, found := orgIntRules[ruleName]
+		if found {
+			if rule.EqualsContent(orgIntRules) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Integrity,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Integrity,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.IntegrityRuleAdd(ruleName, IntegrityRule{
+			Patterns: rule.Patterns,
+			Filters: IntegrityRuleFilter{
+				Tags:      rule.Tags,
+				Platforms: rule.Platforms,
+			},
+		}); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Integrity,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// refetch
+	orgIntRules, err = org.IntegrityRules()
+	if err != nil {
+		return ops, err
+	}
+	// list the existing rules and remove the ones not in our list
+	for ruleName := range orgIntRules {
+		_, found := integrity[ruleName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Integrity,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.IntegrityRuleDelete(ruleName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Integrity,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
+	return ops, nil
+}
+
 func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgOutputs, err := org.Outputs()
@@ -156,6 +295,7 @@ func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options
 	}
 
 	for outputName, output := range outputs {
+		// take the key for the name as the conf name might be empty
 		output.Name = outputName
 		orgOutput, found := orgOutputs[outputName]
 		if found {
