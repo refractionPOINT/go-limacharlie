@@ -661,3 +661,178 @@ integrity:
 		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
 	}
 }
+
+func deleteExfil(org *Organization) {
+	rules, _ := org.ExfilRules()
+	for ruleName := range rules.Watches {
+		org.ExfilRuleWatchDelete(ruleName)
+	}
+	for ruleName := range rules.Events {
+		org.ExfilRuleEventDelete(ruleName)
+	}
+}
+
+func TestSyncPushExfil(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteExfil(org)
+
+	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "exfil")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
+
+	rules, err := org.ExfilRules()
+	a.NoError(err)
+	rulesWatchesLenStart := len(rules.Watches)
+	rulesEventsLenStart := len(rules.Events)
+
+	yamlExfil := `
+exfil:
+  watch:
+    watch_evil:
+      event: NEW_PROCESS
+      path:
+        - COMMAND_LINE
+      operator: contains
+      value: evil
+    watch_ps1:
+      event: NEW_DOCUMENT
+      path:
+        - FILE_PATH
+      operator: ends with
+      value: .ps1
+  list:
+    event_base:
+      events:
+        - NEW_PROCESS
+        - EXEC_OOB
+      filters:
+        platforms:
+          - windows
+          - linux
+    event_chrome:
+      events:
+        - DNS_REQUEST
+      filters:
+        platforms:
+          - chrome
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlExfil), &orgConfig))
+
+	// dry run
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncExfil: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_evil", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ExfilRules()
+	a.NoError(err)
+	a.Equal(rulesWatchesLenStart, len(rules.Watches))
+	a.Equal(rulesEventsLenStart, len(rules.Events))
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncExfil: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_evil", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ExfilRules()
+	a.NoError(err)
+
+	a.Equal(rulesWatchesLenStart+2, len(rules.Watches))
+	for ruleName, watch := range orgConfig.Exfil.Watches {
+		configWatch, found := rules.Watches[ruleName]
+		a.True(found, "watch '%s' not found", ruleName)
+		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
+	}
+	rulesWatchesLenStart += 2
+
+	a.Equal(rulesEventsLenStart+2, len(rules.Events))
+	for ruleName, event := range orgConfig.Exfil.Events {
+		configEvent, found := rules.Events[ruleName]
+		a.True(found, "event '%s' not found", ruleName)
+		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
+	}
+	rulesEventsLenStart += 2
+
+	// force sync and dry run
+	yamlExfil = `
+exfil:
+  watch:
+    watch_evil:
+      event: NEW_PROCESS
+      path:
+        - COMMAND_LINE
+      operator: contains
+      value: evil
+  list:
+    event_base:
+      events:
+        - NEW_PROCESS
+        - EXEC_OOB
+      filters:
+        platforms:
+          - windows
+          - linux
+`
+	forceOrgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlExfil), &forceOrgConfig))
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncExfil: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_evil"},
+		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base"},
+		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ExfilRules()
+	a.NoError(err)
+
+	a.Equal(rulesWatchesLenStart, len(rules.Watches))
+	for ruleName, watch := range orgConfig.Exfil.Watches {
+		configWatch, found := rules.Watches[ruleName]
+		a.True(found, "watch '%s' not found", ruleName)
+		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
+	}
+
+	a.Equal(rulesEventsLenStart, len(rules.Events))
+	for ruleName, event := range orgConfig.Exfil.Events {
+		configEvent, found := rules.Events[ruleName]
+		a.True(found, "event '%s' not found", ruleName)
+		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
+	}
+
+	// no dry run
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncExfil: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ExfilRules()
+	a.NoError(err)
+
+	a.Equal(rulesWatchesLenStart-1, len(rules.Watches))
+	for ruleName, watch := range forceOrgConfig.Exfil.Watches {
+		configWatch, found := rules.Watches[ruleName]
+		a.True(found, "watch '%s' not found", ruleName)
+		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
+	}
+
+	a.Equal(rulesEventsLenStart-1, len(rules.Events))
+	for ruleName, event := range forceOrgConfig.Exfil.Events {
+		configEvent, found := rules.Events[ruleName]
+		a.True(found, "event '%s' not found", ruleName)
+		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
+	}
+}

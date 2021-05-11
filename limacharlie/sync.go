@@ -113,20 +113,25 @@ type OrgConfig struct {
 	FPRules   map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
 	Outputs   map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
 	Integrity map[IntegrityRuleName]OrgSyncIntegrityRule `json:"integrity" yaml:"integrity"`
+	Exfil     ExfilRulesType                             `json:"exfil" yaml:"exfil"`
 }
 
 var OrgSyncOperationElementType = struct {
-	DRRule    string
-	FPRule    string
-	Output    string
-	Resource  string
-	Integrity string
+	DRRule     string
+	FPRule     string
+	Output     string
+	Resource   string
+	Integrity  string
+	ExfilEvent string
+	ExfilWatch string
 }{
-	DRRule:    "dr-rule",
-	FPRule:    "fp-rule",
-	Output:    "output",
-	Resource:  "resource",
-	Integrity: "integrity",
+	DRRule:     "dr-rule",
+	FPRule:     "fp-rule",
+	Output:     "output",
+	Resource:   "resource",
+	Integrity:  "integrity",
+	ExfilEvent: "exfil-list",
+	ExfilWatch: "exfil-watch",
 }
 
 type OrgSyncOperation struct {
@@ -199,12 +204,146 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		return ops, ErrorNotImplemented
 	}
 	if options.SyncExfil {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncExfil(conf.Exfil, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("exfil: %v", err)
+		}
 	}
 	if options.SyncNetPolicies {
 		return ops, ErrorNotImplemented
 	}
 
+	return ops, nil
+}
+
+func (org Organization) syncExfil(exfil ExfilRulesType, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgRules, err := org.ExfilRules()
+	if err != nil {
+		return ops, err
+	}
+
+	// watch
+	for ruleName, watch := range exfil.Watches {
+		orgWatch, found := orgRules.Watches[ruleName]
+		if found {
+			if watch.EqualsContent(orgWatch) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.ExfilWatch,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.ExfilWatch,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.ExfilRuleWatchAdd(ruleName, watch); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.ExfilWatch,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+	}
+
+	for ruleName, event := range exfil.Events {
+		orgEvent, found := orgRules.Events[ruleName]
+		if found {
+			if event.EqualsContent(orgEvent) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.ExfilEvent,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.ExfilEvent,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.ExfilRuleEventAdd(ruleName, event); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.ExfilEvent,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// remove rules not in config
+	orgRules, err = org.ExfilRules()
+	if err != nil {
+		return ops, err
+	}
+
+	for ruleName := range orgRules.Watches {
+		_, found := exfil.Watches[ruleName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.ExfilWatch,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+
+		if err := org.ExfilRuleWatchDelete(ruleName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.ExfilWatch,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
+
+	for ruleName := range orgRules.Events {
+		_, found := exfil.Events[ruleName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.ExfilEvent,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+
+		if err := org.ExfilRuleEventDelete(ruleName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.ExfilEvent,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
 	return ops, nil
 }
 

@@ -66,7 +66,7 @@ func (s *ExfilTestSuite) TestEventAddDelete() {
 func (s *ExfilTestSuite) TestWatchAddDelete() {
 	rules, err := s.org.ExfilRules()
 	s.NoError(err)
-	s.Empty(rules.Watch)
+	s.Empty(rules.Watches)
 
 	ruleName := "watchRule0"
 	ruleWatch := ExfilRuleWatch{
@@ -83,8 +83,8 @@ func (s *ExfilTestSuite) TestWatchAddDelete() {
 
 	rules, err = s.org.ExfilRules()
 	s.NoError(err)
-	s.NotEmpty(rules.Watch)
-	rule, found := rules.Watch[ruleName]
+	s.NotEmpty(rules.Watches)
+	rule, found := rules.Watches[ruleName]
 	s.True(found)
 	s.NotEmpty(rule.CreatedBy)
 	s.NotZero(rule.LastUpdated)
@@ -98,5 +98,5 @@ func (s *ExfilTestSuite) TestWatchAddDelete() {
 
 	rules, err = s.org.ExfilRules()
 	s.NoError(err)
-	s.Empty(rules.Watch)
+	s.Empty(rules.Watches)
 }
