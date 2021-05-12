@@ -107,6 +107,63 @@ func (oir OrgSyncIntegrityRule) EqualsContent(ir IntegrityRule) bool {
 	return string(bytes) == string(otherBytes)
 }
 
+type OrgSyncArtifactRule struct {
+	IsIgnoreCert   bool     `json:"is_ignore_cert" yaml:"is_ignore_cert"`
+	IsDeleteAfter  bool     `json:"is_delete_after" yaml:"is_delete_after"`
+	DaysRetentions uint     `json:"days_retention" yaml:"days_retention"`
+	Patterns       []string `json:"patterns" yaml:"patterns"`
+	Tags           []string `json:"tags" yaml:"tags"`
+	Platforms      []string `json:"platforms" yaml:"platforms"`
+}
+
+func (oar OrgSyncArtifactRule) ToArtifactRule() ArtifactRule {
+	return ArtifactRule{
+		IsIgnoreCert:   oar.IsIgnoreCert,
+		IsDeleteAfter:  oar.IsDeleteAfter,
+		DaysRetentions: oar.DaysRetentions,
+		Patterns:       oar.Patterns,
+		Filters: ArtifactRuleFilter{
+			Tags:      oar.Tags,
+			Platforms: oar.Platforms,
+		},
+	}
+}
+
+func (oar OrgSyncArtifactRule) FromArtifactRule(artifact ArtifactRule) OrgSyncArtifactRule {
+	oar.IsIgnoreCert = artifact.IsIgnoreCert
+	oar.IsDeleteAfter = artifact.IsDeleteAfter
+	oar.DaysRetentions = artifact.DaysRetentions
+	oar.Patterns = artifact.Patterns
+	oar.Tags = artifact.Filters.Tags
+	oar.Platforms = artifact.Filters.Platforms
+	return oar
+}
+
+func (oar OrgSyncArtifactRule) ToJson() ([]byte, error) {
+	if oar.Patterns == nil {
+		oar.Patterns = []string{}
+	}
+	if oar.Tags == nil {
+		oar.Tags = []string{}
+	}
+	if oar.Platforms == nil {
+		oar.Platforms = []string{}
+	}
+	return json.Marshal(oar)
+}
+
+func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
+	bytes, err := oar.ToJson()
+	if err != nil {
+		return false
+	}
+	otherBytes, err := OrgSyncArtifactRule{}.FromArtifactRule(artifact).ToJson()
+	if err != nil {
+		return false
+	}
+	return string(bytes) == string(otherBytes)
+}
+
 type OrgConfig struct {
 	Resources map[ResourceName][]string                  `json:"resources" yaml:"resources"`
 	DRRules   map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
@@ -114,6 +171,7 @@ type OrgConfig struct {
 	Outputs   map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
 	Integrity map[IntegrityRuleName]OrgSyncIntegrityRule `json:"integrity" yaml:"integrity"`
 	Exfil     ExfilRulesType                             `json:"exfil" yaml:"exfil"`
+	Artifacts map[ArtifactRuleName]OrgSyncArtifactRule   `json:"artifact" yaml:"artifact"`
 }
 
 var OrgSyncOperationElementType = struct {
@@ -124,6 +182,7 @@ var OrgSyncOperationElementType = struct {
 	Integrity  string
 	ExfilEvent string
 	ExfilWatch string
+	Artifact   string
 }{
 	DRRule:     "dr-rule",
 	FPRule:     "fp-rule",
@@ -132,6 +191,7 @@ var OrgSyncOperationElementType = struct {
 	Integrity:  "integrity",
 	ExfilEvent: "exfil-list",
 	ExfilWatch: "exfil-watch",
+	Artifact:   "artifact",
 }
 
 type OrgSyncOperation struct {
@@ -201,7 +261,11 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncArtifacts {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncArtifacts(conf.Artifacts, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("artifact: %v", err)
+		}
 	}
 	if options.SyncExfil {
 		newOps, err := org.syncExfil(conf.Exfil, options)
@@ -214,6 +278,80 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		return ops, ErrorNotImplemented
 	}
 
+	return ops, nil
+}
+
+func (org Organization) syncArtifacts(artifacts map[ArtifactRuleName]OrgSyncArtifactRule, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgArtifacts, err := org.ArtifactsRules()
+	if err != nil {
+		return ops, err
+	}
+
+	for ruleName, artifact := range artifacts {
+		orgArtifact, found := orgArtifacts[ruleName]
+		if found {
+			if artifact.EqualsContent(orgArtifact) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.Artifact,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Artifact,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.ArtifactRuleAdd(ruleName, artifact.ToArtifactRule()); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Artifact,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// remove non existing in config
+	orgArtifacts, err = org.ArtifactsRules()
+	if err != nil {
+		return ops, err
+	}
+
+	for ruleName := range orgArtifacts {
+		_, found := artifacts[ruleName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Artifact,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+
+		if err := org.ArtifactRuleDelete(ruleName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Artifact,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
 	return ops, nil
 }
 

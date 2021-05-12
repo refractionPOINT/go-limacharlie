@@ -836,3 +836,136 @@ exfil:
 		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
 	}
 }
+
+func deleteArtifacts(org *Organization) {
+	rules, _ := org.ArtifactsRules()
+	for ruleName := range rules {
+		org.ArtifactRuleDelete(ruleName)
+	}
+}
+
+func TestSyncPushArtifact(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteArtifacts(org)
+
+	unsubCB, err := findUnsubscribeReplicantCallback(org, "logging")
+	a.NoError(err)
+	if unsubCB != nil {
+		defer unsubCB()
+	}
+
+	rules, err := org.ArtifactsRules()
+	a.NoError(err)
+	rulesCountStart := len(rules)
+
+	yamlArtifact := `
+artifact:
+  linux-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - /var/log/syslog.1
+    - /var/log/auth.log.1
+    platforms:
+    - linux
+    days_retention: 30
+    tags: []
+  windows-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - c:\\windows\\system32\\winevt\\logs\\Security.evtx
+    - c:\\windows\\system32\\winevt\\logs\\System.evtx
+    platforms:
+    - windows
+    days_retention: 30
+    tags: []
+  browser-chrome-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - "%homepath%\\AppData\\Local\\Google\\Chrome\\User Data\\Crashpad\\reports"
+    - "~/Library/Application Support/Google/Chrome/Crashpad/completed/"
+    platforms:
+    - windows
+    - macos
+    tags: []
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlArtifact), &orgConfig))
+
+	// dry run - no force
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncArtifacts: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "linux-logs", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "windows-logs", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "browser-chrome-logs", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ArtifactsRules()
+	a.NoError(err)
+	a.Equal(rulesCountStart, len(rules))
+
+	// no force
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncArtifacts: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+
+	rules, err = org.ArtifactsRules()
+	a.NoError(err)
+	a.Equal(rulesCountStart+3, len(rules))
+	for ruleName, rule := range orgConfig.Artifacts {
+		orgRule, found := rules[ruleName]
+		a.True(found, "artifact rule not found for %s", ruleName)
+		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
+	}
+
+	// dry run - force
+	yamlArtifact = `
+artifact:
+  windows-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - c:\\windows\\system32\\winevt\\logs\\Security.evtx
+    - c:\\windows\\system32\\winevt\\logs\\System.evtx
+    platforms:
+    - windows
+    days_retention: 30
+    tags: []
+`
+	forceOrgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlArtifact), &forceOrgConfig))
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncArtifacts: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "linux-logs", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "windows-logs"},
+		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "browser-chrome-logs", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ArtifactsRules()
+	a.NoError(err)
+	a.Equal(rulesCountStart+3, len(rules))
+	for ruleName, rule := range orgConfig.Artifacts {
+		orgRule, found := rules[ruleName]
+		a.True(found, "artifact rule not found for %s", ruleName)
+		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
+	}
+
+	// force
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncArtifacts: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.ArtifactsRules()
+	a.NoError(err)
+	a.Equal(rulesCountStart+1, len(rules))
+	for ruleName, rule := range forceOrgConfig.Artifacts {
+		orgRule, found := rules[ruleName]
+		a.True(found, "artifact rule not found for %s", ruleName)
+		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
+	}
+}

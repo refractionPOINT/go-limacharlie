@@ -243,7 +243,7 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 	return err
 }
 
-func (c *Client) serviceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) (err error) {
+func (c *Client) serviceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) error {
 	bytes, err := json.Marshal(serviceData)
 	if err != nil {
 		return err
