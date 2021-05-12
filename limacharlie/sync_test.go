@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -967,5 +968,130 @@ artifact:
 		orgRule, found := rules[ruleName]
 		a.True(found, "artifact rule not found for %s", ruleName)
 		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
+	}
+}
+
+func deleteNetPolicies(org *Organization) {
+	policies, _ := org.NetPolicies()
+	for name := range policies {
+		org.NetPolicyDelete(name)
+	}
+}
+
+func TestSyncNetPolicies(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteNetPolicies(org)
+
+	unsubCB, err := findUnsubscribeApiCallback(org, "net")
+	a.NoError(err)
+	if unsubCB != nil {
+		defer unsubCB()
+	}
+
+	netPolicies, err := org.NetPolicies()
+	a.NoError(err)
+	netPoliciesCountStart := len(netPolicies)
+
+	yamlNetPolicies := fmt.Sprintf(`
+net-policy:
+  default-allow-outbound:
+    oid: %s  
+    type: firewall
+    policy:
+      is_allow: true
+      bpf_filter: ""
+  sinkhole:
+    oid: %s
+    type: dns
+    policy:
+      domain: evil.com
+      to_a:
+        - 127.0.0.1
+      with_subdomains: true
+  custom_google:
+    oid: %s
+    type: dns
+    policy:
+      domain: google.local.com
+      to_cname: www.google.com
+`, org.client.options.OID, org.client.options.OID, org.client.options.OID)
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlNetPolicies), &orgConfig))
+
+	// dry run - no force
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncNetPolicies: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	netPolicies, err = org.NetPolicies()
+	a.NoError(err)
+	a.Equal(netPoliciesCountStart, len(netPolicies))
+
+	// no force
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncNetPolicies: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	netPolicies, err = org.NetPolicies()
+	a.NoError(err)
+	a.Equal(netPoliciesCountStart+3, len(netPolicies))
+	for name, orgPolicy := range orgConfig.NetPolicies {
+		policy, found := netPolicies[name]
+		a.True(found, "net policy not found %s", name)
+		orgPolicy = orgPolicy.WithName(name)
+		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
+	}
+
+	// dry run - force
+	yamlNetPolicies = fmt.Sprintf(`
+net-policy:
+  sinkhole:
+    oid: %s
+    type: dns
+    policy:
+      domain: evil.com
+      to_a:
+        - 127.0.0.1
+      with_subdomains: true
+  no_ssh:
+    oid: %s
+    type: dns
+    policy:
+      domain: google.local.com
+      to_cname: www.google.com
+`, org.client.options.OID, org.client.options.OID)
+	forceOrgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlNetPolicies), &forceOrgConfig))
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncNetPolicies: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole"},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "no_ssh", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	netPolicies, err = org.NetPolicies()
+	a.NoError(err)
+	a.Equal(netPoliciesCountStart+3, len(netPolicies))
+
+	// force
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncNetPolicies: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	netPolicies, err = org.NetPolicies()
+	a.NoError(err)
+	a.Equal(netPoliciesCountStart+2, len(netPolicies))
+
+	for name, orgPolicy := range forceOrgConfig.NetPolicies {
+		policy, found := netPolicies[name]
+		a.True(found, "net policy not found %s", name)
+		orgPolicy = orgPolicy.WithName(name)
+		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
 	}
 }

@@ -165,13 +165,14 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 }
 
 type OrgConfig struct {
-	Resources map[ResourceName][]string                  `json:"resources" yaml:"resources"`
-	DRRules   map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
-	FPRules   map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
-	Outputs   map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
-	Integrity map[IntegrityRuleName]OrgSyncIntegrityRule `json:"integrity" yaml:"integrity"`
-	Exfil     ExfilRulesType                             `json:"exfil" yaml:"exfil"`
-	Artifacts map[ArtifactRuleName]OrgSyncArtifactRule   `json:"artifact" yaml:"artifact"`
+	Resources   map[ResourceName][]string                  `json:"resources" yaml:"resources"`
+	DRRules     map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
+	FPRules     map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
+	Outputs     map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
+	Integrity   map[IntegrityRuleName]OrgSyncIntegrityRule `json:"integrity" yaml:"integrity"`
+	Exfil       ExfilRulesType                             `json:"exfil" yaml:"exfil"`
+	Artifacts   map[ArtifactRuleName]OrgSyncArtifactRule   `json:"artifact" yaml:"artifact"`
+	NetPolicies NetPoliciesByName                          `json:"net-policy" yaml:"net-policy"`
 }
 
 var OrgSyncOperationElementType = struct {
@@ -183,6 +184,7 @@ var OrgSyncOperationElementType = struct {
 	ExfilEvent string
 	ExfilWatch string
 	Artifact   string
+	NetPolicy  string
 }{
 	DRRule:     "dr-rule",
 	FPRule:     "fp-rule",
@@ -192,6 +194,7 @@ var OrgSyncOperationElementType = struct {
 	ExfilEvent: "exfil-list",
 	ExfilWatch: "exfil-watch",
 	Artifact:   "artifact",
+	NetPolicy:  "net-policy",
 }
 
 type OrgSyncOperation struct {
@@ -275,9 +278,88 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncNetPolicies {
-		return ops, ErrorNotImplemented
+		newOps, err := org.syncNetPolicies(conf.NetPolicies, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("net-policy: %v", err)
+		}
+	}
+	return ops, nil
+}
+
+func (org Organization) syncNetPolicies(netPolicies NetPoliciesByName, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	orgNetPolicies, err := org.NetPolicies()
+	if err != nil {
+		return ops, err
 	}
 
+	for name, policy := range netPolicies {
+		policy = policy.WithName(name)
+		orgPolicy, found := orgNetPolicies[name]
+		if found {
+			if policy.EqualsContent(orgPolicy) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.NetPolicy,
+					ElementName: name,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.NetPolicy,
+				ElementName: name,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.NetPolicyAdd(policy); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.NetPolicy,
+			ElementName: name,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// remove non existing in config
+	orgNetPolicies, err = org.NetPolicies()
+	if err != nil {
+		return ops, err
+	}
+
+	for name := range orgNetPolicies {
+		_, found := netPolicies[name]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.NetPolicy,
+				ElementName: name,
+				IsRemoved:   true,
+			})
+			continue
+		}
+
+		if err := org.NetPolicyDelete(name); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.NetPolicy,
+			ElementName: name,
+			IsRemoved:   true,
+		})
+
+	}
 	return ops, nil
 }
 

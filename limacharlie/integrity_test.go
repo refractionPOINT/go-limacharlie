@@ -28,11 +28,17 @@ func findUnsubscribeCallback(org *Organization, category string, name string) (u
 	if _, found = resourceCatReplicant[name]; found {
 		return nil, nil
 	}
+	org.ResourceSubscribe(name, category)
+	time.Sleep(5 * time.Second)
 	return cb, nil
 }
 
 func findUnsubscribeReplicantCallback(org *Organization, replicantName string) (unsubscribeReplicantCB, error) {
 	return findUnsubscribeCallback(org, ResourceCategories.Replicant, replicantName)
+}
+
+func findUnsubscribeApiCallback(org *Organization, apiName string) (unsubscribeReplicantCB, error) {
+	return findUnsubscribeCallback(org, ResourceCategories.API, apiName)
 }
 
 func TestIntegrityRuleAddDelete(t *testing.T) {

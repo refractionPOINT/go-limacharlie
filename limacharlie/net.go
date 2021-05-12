@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -26,7 +27,29 @@ type NetPolicy struct {
 	Name      string        `json:"name"`
 	OID       string        `json:"oid"`
 	Type      NetPolicyType `json:"type"`
-	Filter    Dict          `json:"policy"`
+	Policy    Dict          `json:"policy"`
+}
+
+func (n NetPolicy) jsonMarhsalContent() ([]byte, error) {
+	n.CreatedBy = ""
+	return json.Marshal(n)
+}
+
+func (n NetPolicy) EqualsContent(other NetPolicy) bool {
+	bytes, err := n.jsonMarhsalContent()
+	if err != nil {
+		return false
+	}
+	otherBytes, err := other.jsonMarhsalContent()
+	if err != nil {
+		return false
+	}
+	return string(bytes) == string(otherBytes)
+}
+
+func (n NetPolicy) WithName(name string) NetPolicy {
+	n.Name = name
+	return n
 }
 
 type NetPolicyFirewallApplicable struct {
@@ -39,7 +62,7 @@ type NetPolicyFirewallApplicable struct {
 
 func (n NetPolicy) WithFirewallPolicy(bpfFilter string, isAllow bool, tag string, applicableTimes []NetPolicyFirewallApplicable, sources []string) NetPolicy {
 	n.Type = NetPolicyTypes.Firewall
-	n.Filter = Dict{
+	n.Policy = Dict{
 		"tag":        tag,
 		"bpf_filter": bpfFilter,
 		"is_allow":   isAllow,
@@ -61,7 +84,7 @@ var NetPolicyServiceProtocolTypes = struct {
 
 func (n NetPolicy) WithServicePolicy(serverPort uint16, serverSid string, clientTag string, protocolType NetPolicyServiceProtocolType) NetPolicy {
 	n.Type = NetPolicyTypes.Service
-	n.Filter = Dict{
+	n.Policy = Dict{
 		"server_port": serverPort,
 		"server_sid":  serverSid,
 		"tag_clients": clientTag,
@@ -77,7 +100,7 @@ type netPoliciesResponse struct {
 
 func (n NetPolicy) WithCapturePolicy(retentionDays uint64, tag string, bpfFilter string, ingestionKey string) NetPolicy {
 	n.Type = NetPolicyTypes.Capture
-	n.Filter = Dict{
+	n.Policy = Dict{
 		"days_retention": retentionDays,
 		"tag":            tag,
 		"bpf_filter":     bpfFilter,
@@ -88,7 +111,7 @@ func (n NetPolicy) WithCapturePolicy(retentionDays uint64, tag string, bpfFilter
 
 func (n NetPolicy) WithDnsPolicyARecords(domain string, tag string, aRecords []string, includeSubdomains bool) NetPolicy {
 	n.Type = NetPolicyTypes.DNS
-	n.Filter = Dict{
+	n.Policy = Dict{
 		"domain":          domain,
 		"tag":             tag,
 		"to_a":            aRecords,
@@ -99,7 +122,7 @@ func (n NetPolicy) WithDnsPolicyARecords(domain string, tag string, aRecords []s
 
 func (n NetPolicy) WithDnsPolicyCNameRecord(domain string, tag string, cName string, includeSubdomains bool) NetPolicy {
 	n.Type = NetPolicyTypes.DNS
-	n.Filter = Dict{
+	n.Policy = Dict{
 		"domain":          domain,
 		"tag":             tag,
 		"to_cname":        cName,
