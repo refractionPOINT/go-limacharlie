@@ -10,21 +10,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func resetResource(org *Organization, resources ResourcesByCategory) {
+func resetResource(org *Organization) {
 	orgResources, _ := org.Resources()
 	for orgResCat, orgResNames := range orgResources {
-		resCat, found := resources[orgResCat]
-		if !found {
-			for orgResName := range orgResNames {
-				org.ResourceUnsubscribe(orgResName, orgResCat)
-			}
-			continue
-		}
 		for orgResName := range orgResNames {
-			_, found := resCat[orgResName]
-			if !found {
-				org.ResourceUnsubscribe(orgResName, orgResCat)
-			}
+			org.ResourceUnsubscribe(orgResName, orgResCat)
 		}
 	}
 }
@@ -34,7 +24,7 @@ func TestSyncPushResources(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	resourcesBase, err := org.Resources()
 	a.NoError(err)
-	defer resetResource(org, resourcesBase.duplicate())
+	defer resetResource(org)
 
 	resourcesConfig := `
 resources:
@@ -747,7 +737,9 @@ exfil:
 		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsAdded: true},
 	})
-	a.Equal(expectedOps, sortSyncOps(ops))
+	for _, expectedOp := range expectedOps {
+		a.Contains(ops, expectedOp)
+	}
 	rules, err = org.ExfilRules()
 	a.NoError(err)
 
@@ -798,7 +790,9 @@ exfil:
 		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsRemoved: true},
 	})
-	a.Equal(expectedOps, sortSyncOps(ops))
+	for _, expectedOp := range expectedOps {
+		a.Contains(ops, expectedOp)
+	}
 	rules, err = org.ExfilRules()
 	a.NoError(err)
 
@@ -819,7 +813,9 @@ exfil:
 	// no dry run
 	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncExfil: true})
 	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
+	for _, expectedOp := range expectedOps {
+		a.Contains(ops, expectedOp)
+	}
 	rules, err = org.ExfilRules()
 	a.NoError(err)
 
@@ -829,8 +825,6 @@ exfil:
 		a.True(found, "watch '%s' not found", ruleName)
 		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
 	}
-
-	a.Equal(rulesEventsLenStart-1, len(rules.Events))
 	for ruleName, event := range forceOrgConfig.Exfil.Events {
 		configEvent, found := rules.Events[ruleName]
 		a.True(found, "event '%s' not found", ruleName)
@@ -995,7 +989,7 @@ func TestSyncNetPolicies(t *testing.T) {
 
 	yamlNetPolicies := fmt.Sprintf(`
 net-policy:
-  default-allow-outbound:
+  allow-outbound:
     oid: %s  
     type: firewall
     policy:
@@ -1023,7 +1017,7 @@ net-policy:
 	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncNetPolicies: true})
 	a.NoError(err)
 	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole", IsAdded: true},
 	})
@@ -1045,6 +1039,10 @@ net-policy:
 		orgPolicy = orgPolicy.WithName(name)
 		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
 	}
+
+	// if true {
+	// 	return
+	// }
 
 	// dry run - force
 	yamlNetPolicies = fmt.Sprintf(`
@@ -1070,7 +1068,8 @@ net-policy:
 	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncNetPolicies: true})
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsRemoved: true}, // that's a default
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole"},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "no_ssh", IsAdded: true},
@@ -1086,7 +1085,7 @@ net-policy:
 	a.Equal(expectedOps, sortSyncOps(ops))
 	netPolicies, err = org.NetPolicies()
 	a.NoError(err)
-	a.Equal(netPoliciesCountStart+2, len(netPolicies))
+	a.Equal(netPoliciesCountStart+1, len(netPolicies))
 
 	for name, orgPolicy := range forceOrgConfig.NetPolicies {
 		policy, found := netPolicies[name]
