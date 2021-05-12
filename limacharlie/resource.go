@@ -13,9 +13,11 @@ type ResourcesByCategory map[ResourceCategory]map[ResourceName]struct{}
 var ResourceCategories = struct {
 	API       string
 	Replicant string
+	Service   string
 }{
 	API:       "api",
 	Replicant: "replicant",
+	Service:   "service",
 }
 
 func (org Organization) resources(verb string, request restRequest) error {

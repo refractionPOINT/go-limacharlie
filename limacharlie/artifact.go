@@ -21,7 +21,7 @@ type ArtifactRulesByName = map[ArtifactRuleName]ArtifactRule
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
-	return org.client.replicantRequest(responseData, "logging", reqData, false)
+	return org.client.serviceRequest(responseData, "logging", reqData, false)
 }
 
 func (org Organization) ArtifactsRules() (ArtifactRulesByName, error) {
@@ -39,6 +39,7 @@ func (org Organization) ArtifactRuleAdd(ruleName ArtifactRuleName, rule Artifact
 		"patterns":        rule.Patterns,
 		"is_delete_after": rule.IsDeleteAfter,
 		"is_ignore_cert":  rule.IsIgnoreCert,
+		"days_retention":  rule.DaysRetentions,
 		"tags":            rule.Filters.Tags,
 		"platforms":       rule.Filters.Platforms,
 	}); err != nil {

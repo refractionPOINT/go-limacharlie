@@ -9,27 +9,30 @@ import (
 
 type unsubscribeReplicantCB = func()
 
-func findUnsubscribeReplicantCallback(org *Organization, replicantName string) (unsubscribeReplicantCB, error) {
+func findUnsubscribeCallback(org *Organization, category string, name string) (unsubscribeReplicantCB, error) {
 	cb := func() {
-		org.ResourceUnsubscribe(replicantName, ResourceCategories.Replicant)
+		org.ResourceUnsubscribe(name, category)
 	}
 	resources, err := org.Resources()
 	if err != nil {
 		return nil, nil
 	}
 
-	resourceCatReplicant, found := resources[ResourceCategories.Replicant]
+	resourceCatReplicant, found := resources[category]
 	if !found {
-		org.ResourceSubscribe(replicantName, ResourceCategories.Replicant)
+		org.ResourceSubscribe(name, category)
 		time.Sleep(5 * time.Second)
 		return cb, nil
 	}
 
-	if _, found = resourceCatReplicant[replicantName]; found {
+	if _, found = resourceCatReplicant[name]; found {
 		return nil, nil
 	}
 	return cb, nil
+}
 
+func findUnsubscribeReplicantCallback(org *Organization, replicantName string) (unsubscribeReplicantCB, error) {
+	return findUnsubscribeCallback(org, ResourceCategories.Replicant, replicantName)
 }
 
 func TestIntegrityRuleAddDelete(t *testing.T) {
