@@ -39,8 +39,10 @@ func (org Organization) integrity(responseData interface{}, action string, req D
 
 func (org Organization) IntegrityRules() (IntegrityRulesByName, error) {
 	resp := IntegrityRulesByName{}
-	err := org.integrity(&resp, "list_rules", Dict{})
-	return resp, err
+	if err := org.integrity(&resp, "list_rules", Dict{}); err != nil {
+		return IntegrityRulesByName{}, err
+	}
+	return resp, nil
 }
 
 func (org Organization) IntegrityRuleAdd(ruleName IntegrityRuleName, rule IntegrityRule) error {
