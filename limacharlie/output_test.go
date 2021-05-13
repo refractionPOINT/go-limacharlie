@@ -41,12 +41,17 @@ func TestOutputAddDelete(t *testing.T) {
 	_, err = org.OutputAdd(testOutput)
 	a.NoError(err)
 
+	var output OutputConfig
+	var ok bool
+
 	outputs, err = org.Outputs()
 	a.NoError(err)
 	if len(outputs) == 0 {
 		t.Errorf("outputs is empty")
-	} else if _, ok := outputs[testOutputName]; !ok {
+	} else if output, ok = outputs[testOutputName]; !ok {
 		t.Errorf("test output not found: %+v", outputs)
+	} else if output.Type != OutputType.Event {
+		t.Errorf("output type is wrong: %s", output.Type)
 	}
 
 	var rawJSON GenericJSON

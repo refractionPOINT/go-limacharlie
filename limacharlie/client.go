@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -240,6 +241,20 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 		}
 	}
 	return err
+}
+
+func (c *Client) serviceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) error {
+	bytes, err := json.Marshal(serviceData)
+	if err != nil {
+		return err
+	}
+	encodedData := base64.StdEncoding.EncodeToString(bytes)
+
+	req := makeDefaultRequest(responseData).withFormData(Dict{
+		"request_data": encodedData,
+		"is_async":     isAsync,
+	})
+	return c.reliableRequest(http.MethodPost, fmt.Sprintf("service/%s/%s", c.options.OID, serviceName), req)
 }
 
 func getStringKV(d interface{}) (map[string]string, error) {
