@@ -79,7 +79,7 @@ var NetPolicyServiceProtocolTypes = struct {
 	UDP NetPolicyServiceProtocolType
 }{
 	TCP: "6",
-	UDP: "17",
+	UDP: 17,
 }
 
 func (n NetPolicy) WithServicePolicy(serverPort uint16, serverSid string, clientTag string, protocolType NetPolicyServiceProtocolType) NetPolicy {
