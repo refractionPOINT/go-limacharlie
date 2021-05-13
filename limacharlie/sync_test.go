@@ -1078,6 +1078,12 @@ net-policy:
 	netPolicies, err = org.NetPolicies()
 	a.NoError(err)
 	a.Equal(netPoliciesCountStart+3, len(netPolicies))
+	for name, orgPolicy := range orgConfig.NetPolicies {
+		policy, found := netPolicies[name]
+		a.True(found, "net policy not found %s", name)
+		orgPolicy = orgPolicy.WithName(name)
+		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
+	}
 
 	// force
 	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncNetPolicies: true})
