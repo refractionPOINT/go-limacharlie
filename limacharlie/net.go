@@ -72,7 +72,7 @@ func (n NetPolicy) WithFirewallPolicy(bpfFilter string, isAllow bool, tag string
 	return n
 }
 
-type NetPolicyServiceProtocolType string
+type NetPolicyServiceProtocolType uint8
 
 var NetPolicyServiceProtocolTypes = struct {
 	TCP NetPolicyServiceProtocolType
