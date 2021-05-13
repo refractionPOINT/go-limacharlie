@@ -10,8 +10,13 @@ func TestComms(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	testRoomName := "automated-test-room"
+	unsubCB, err := findUnsubscribeApiCallback(org, "comms")
+	a.NoError(err)
+	if unsubCB != nil {
+		defer unsubCB()
+	}
 
+	testRoomName := "automated-test-room"
 	comms := org.Comms()
 
 	// Create a new room
