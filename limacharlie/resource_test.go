@@ -23,7 +23,7 @@ func TestResourceAddDelete(t *testing.T) {
 	resources, err := org.Resources()
 	a.NoError(err)
 	expectedResources := resourcesBase
-	apiResources := expectedResources[ResourceCategories.API]
+	apiResources := expectedResources.GetForCategory(ResourceCategories.API)
 	apiResources["ip-geo"] = struct{}{}
 	a.Equal(expectedResources, resources)
 

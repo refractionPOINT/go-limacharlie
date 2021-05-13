@@ -50,6 +50,14 @@ func (r *ResourcesByCategory) AddToCategory(category ResourceCategory, name Reso
 	(*r)[category] = cat
 }
 
+func (r *ResourcesByCategory) GetForCategory(category ResourceCategory) map[ResourceName]struct{} {
+	resourcesForCat, found := (*r)[category]
+	if !found {
+		resourcesForCat = map[ResourceName]struct{}{}
+	}
+	return resourcesForCat
+}
+
 // Resources list available resources
 func (org Organization) Resources() (ResourcesByCategory, error) {
 	resp := resourceGetResponse{}
