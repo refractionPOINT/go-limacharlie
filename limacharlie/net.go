@@ -78,7 +78,7 @@ var NetPolicyServiceProtocolTypes = struct {
 	TCP NetPolicyServiceProtocolType
 	UDP NetPolicyServiceProtocolType
 }{
-	TCP: "6",
+	TCP: 6,
 	UDP: 17,
 }
 
