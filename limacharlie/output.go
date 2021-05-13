@@ -139,7 +139,7 @@ func (org Organization) OutputsGeneric(outputs interface{}) error {
 	return nil
 }
 
-// backward compat where type is returned in the sfor field
+// backward compat where type is returned in the for field
 type outputResponse struct {
 	OutputConfig
 
