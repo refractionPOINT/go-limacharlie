@@ -23,6 +23,12 @@ func TestNetPolicyAddDelete(t *testing.T) {
 	policies, err = org.NetPolicies()
 	a.NoError(err)
 	a.Equal(policiesCountStart+1, len(policies))
+	policyFound, found := policies[policy.Name]
+	a.True(found, "policy %s not found", policy.Name)
+	delete(policy.Policy, "sources")
+	delete(policy.Policy, "tag")
+	delete(policy.Policy, "times")
+	a.True(policy.EqualsContent(policyFound), "policies content are not equal %v != %v", policy, policyFound)
 
 	a.NoError(org.NetPolicyDelete(policy.Name))
 
