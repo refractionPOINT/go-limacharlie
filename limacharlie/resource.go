@@ -54,6 +54,7 @@ func (r *ResourcesByCategory) GetForCategory(category ResourceCategory) map[Reso
 	resourcesForCat, found := (*r)[category]
 	if !found {
 		resourcesForCat = map[ResourceName]struct{}{}
+		(*r)[category] = resourcesForCat
 	}
 	return resourcesForCat
 }
