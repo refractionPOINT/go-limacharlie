@@ -253,7 +253,10 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncIntegrity {
-		return orgConfig, ErrorNotImplemented
+		orgConfig.Integrity, err = org.syncFetchIntegrity()
+		if err != nil {
+			return orgConfig, fmt.Errorf("integrity: %v", err)
+		}
 	}
 	if options.SyncArtifacts {
 		return orgConfig, ErrorNotImplemented
@@ -265,6 +268,24 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		return orgConfig, ErrorNotImplemented
 	}
 	return orgConfig, nil
+}
+
+func (org Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
+	orgRules, err := org.IntegrityRules()
+	if err != nil {
+		return nil, err
+	}
+	rules := orgSyncIntegrityRules{}
+	for ruleName, rule := range orgRules {
+		rules[ruleName] = OrgSyncIntegrityRule{
+			LastUpdated: rule.LastUpdated,
+			CreatedBy:   rule.CreatedBy,
+			Patterns:    rule.Patterns,
+			Tags:        rule.Filters.Tags,
+			Platforms:   rule.Filters.Platforms,
+		}
+	}
+	return rules, nil
 }
 
 func (org Organization) syncFetchOutputs() (orgSyncOutputs, error) {
