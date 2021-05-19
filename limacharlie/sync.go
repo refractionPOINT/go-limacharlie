@@ -164,8 +164,10 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 	return string(bytes) == string(otherBytes)
 }
 
+type OrgConfigResources = map[ResourceName][]string
+
 type OrgConfig struct {
-	Resources   map[ResourceName][]string                  `json:"resources" yaml:"resources"`
+	Resources   OrgConfigResources                         `json:"resources" yaml:"resources"`
 	DRRules     map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
 	FPRules     map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
 	Outputs     map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
@@ -214,33 +216,52 @@ func (o OrgSyncOperation) String() string {
 	return fmt.Sprintf("%s %s %s", op, o.ElementType, o.ElementName)
 }
 
-func (org Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
+func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err error) {
 	if options.SyncResources {
-		return OrgConfig{}, ErrorNotImplemented
+		orgConfig.Resources, err = org.syncFetchResources()
+		if err != nil {
+			return orgConfig, err
+		}
 	}
 	if options.SyncDRRules {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
 	}
 	if options.SyncFPRules {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
 	}
 	if options.SyncOutputs {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
 	}
 	if options.SyncIntegrity {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
 	}
 	if options.SyncArtifacts {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
 	}
 	if options.SyncExfil {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
 	}
 	if options.SyncNetPolicies {
-		return OrgConfig{}, ErrorNotImplemented
+		return orgConfig, ErrorNotImplemented
+	}
+	return orgConfig, nil
+}
+
+func (org Organization) syncFetchResources() (OrgConfigResources, error) {
+	orgResources, err := org.Resources()
+	if err != nil {
+		return OrgConfigResources{}, err
 	}
 
-	return OrgConfig{}, ErrorNotImplemented
+	resources := OrgConfigResources{}
+	for category, names := range orgResources {
+		resourceNames := []string{}
+		for name := range names {
+			resourceNames = append(resourceNames, name)
+		}
+		resources[category] = resourceNames
+	}
+	return resources, nil
 }
 
 func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
