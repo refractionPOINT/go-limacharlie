@@ -39,7 +39,7 @@ type SyncOptions struct {
 type DRRuleName = string
 
 type OrgSyncFPRule struct {
-	Detection Dict `json:"detect" yaml:"detect"`
+	Detection Dict `json:"data" yaml:"data"`
 }
 
 func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
@@ -164,15 +164,24 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 	return string(bytes) == string(otherBytes)
 }
 
+type orgSyncResources = map[ResourceName][]string
+type orgSyncDRRules = map[DRRuleName]CoreDRRule
+type orgSyncFPRules = map[FPRuleName]OrgSyncFPRule
+type orgSyncOutputs = map[OutputName]OutputConfig
+type orgSyncIntegrityRules = map[IntegrityRuleName]OrgSyncIntegrityRule
+type orgSyncExfilRules = ExfilRulesType
+type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
+type orgSyncNetPolicies = NetPoliciesByName
+
 type OrgConfig struct {
-	Resources   map[ResourceName][]string                  `json:"resources" yaml:"resources"`
-	DRRules     map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
-	FPRules     map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
-	Outputs     map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
-	Integrity   map[IntegrityRuleName]OrgSyncIntegrityRule `json:"integrity" yaml:"integrity"`
-	Exfil       ExfilRulesType                             `json:"exfil" yaml:"exfil"`
-	Artifacts   map[ArtifactRuleName]OrgSyncArtifactRule   `json:"artifact" yaml:"artifact"`
-	NetPolicies NetPoliciesByName                          `json:"net-policy" yaml:"net-policy"`
+	Resources   orgSyncResources      `json:"resources" yaml:"resources"`
+	DRRules     orgSyncDRRules        `json:"rules" yaml:"rules"`
+	FPRules     orgSyncFPRules        `json:"fps" yaml:"fps"`
+	Outputs     orgSyncOutputs        `json:"outputs" yaml:"outputs"`
+	Integrity   orgSyncIntegrityRules `json:"integrity" yaml:"integrity"`
+	Exfil       orgSyncExfilRules     `json:"exfil" yaml:"exfil"`
+	Artifacts   orgSyncArtifacts      `json:"artifact" yaml:"artifact"`
+	NetPolicies orgSyncNetPolicies    `json:"net-policy" yaml:"net-policy"`
 }
 
 var OrgSyncOperationElementType = struct {
@@ -214,8 +223,184 @@ func (o OrgSyncOperation) String() string {
 	return fmt.Sprintf("%s %s %s", op, o.ElementType, o.ElementName)
 }
 
-func (org Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
-	return OrgConfig{}, ErrorNotImplemented
+func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err error) {
+	if options.SyncResources {
+		orgConfig.Resources, err = org.syncFetchResources()
+		if err != nil {
+			return orgConfig, fmt.Errorf("resources: %v", err)
+		}
+	}
+	if options.SyncDRRules {
+		who, err := org.client.whoAmI()
+		if err != nil {
+			return orgConfig, fmt.Errorf("dr-rule: %v", err)
+		}
+		orgConfig.DRRules, err = org.syncFetchDRRules(who)
+		if err != nil {
+			return orgConfig, fmt.Errorf("dr-rule: %v", err)
+		}
+	}
+	if options.SyncFPRules {
+		orgConfig.FPRules, err = org.syncFetchFPRules()
+		if err != nil {
+			return orgConfig, fmt.Errorf("fp-rule: %v", err)
+		}
+	}
+	if options.SyncOutputs {
+		orgConfig.Outputs, err = org.syncFetchOutputs()
+		if err != nil {
+			return orgConfig, fmt.Errorf("outputs: %v", err)
+		}
+	}
+	if options.SyncIntegrity {
+		orgConfig.Integrity, err = org.syncFetchIntegrity()
+		if err != nil {
+			return orgConfig, fmt.Errorf("integrity: %v", err)
+		}
+	}
+	if options.SyncArtifacts {
+		orgConfig.Artifacts, err = org.syncFetchArtifacts()
+		if err != nil {
+			return orgConfig, fmt.Errorf("artifact: %v", err)
+		}
+	}
+	if options.SyncExfil {
+		orgConfig.Exfil, err = org.syncFetchExfil()
+		if err != nil {
+			return orgConfig, fmt.Errorf("exfil: %v", err)
+		}
+	}
+	if options.SyncNetPolicies {
+		orgConfig.NetPolicies, err = org.syncFetchNetPolicies()
+		if err != nil {
+			return orgConfig, fmt.Errorf("net-policy: %v", err)
+		}
+	}
+	return orgConfig, nil
+}
+
+func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
+	orgNetPolicies, err := org.NetPolicies()
+	if err != nil {
+		return nil, err
+	}
+	netPolicies := orgSyncNetPolicies{}
+	for name, policy := range orgNetPolicies {
+		netPolicies[name] = policy
+	}
+	return netPolicies, nil
+}
+
+func (org Organization) syncFetchExfil() (orgSyncExfilRules, error) {
+	exfils := orgSyncExfilRules{}
+	orgExfil, err := org.ExfilRules()
+	if err != nil {
+		return exfils, err
+	}
+
+	for name, rule := range orgExfil.Events {
+		exfils.Events[name] = rule
+	}
+	for name, rule := range orgExfil.Performance {
+		exfils.Performance[name] = rule
+	}
+	for name, rule := range orgExfil.Watches {
+		exfils.Watches[name] = rule
+	}
+	return exfils, nil
+}
+
+func (org Organization) syncFetchArtifacts() (orgSyncArtifacts, error) {
+	orgArtifacts, err := org.ArtifactsRules()
+	if err != nil {
+		return nil, err
+	}
+	rules := orgSyncArtifacts{}
+	for name, artifactRule := range orgArtifacts {
+		rules[name] = OrgSyncArtifactRule{
+			IsIgnoreCert:   artifactRule.IsIgnoreCert,
+			IsDeleteAfter:  artifactRule.IsDeleteAfter,
+			DaysRetentions: artifactRule.DaysRetentions,
+			Patterns:       artifactRule.Patterns,
+			Tags:           artifactRule.Filters.Tags,
+			Platforms:      artifactRule.Filters.Platforms,
+		}
+	}
+	return rules, nil
+}
+
+func (org Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
+	orgRules, err := org.IntegrityRules()
+	if err != nil {
+		return nil, err
+	}
+	rules := orgSyncIntegrityRules{}
+	for ruleName, rule := range orgRules {
+		rules[ruleName] = OrgSyncIntegrityRule{
+			LastUpdated: rule.LastUpdated,
+			CreatedBy:   rule.CreatedBy,
+			Patterns:    rule.Patterns,
+			Tags:        rule.Filters.Tags,
+			Platforms:   rule.Filters.Platforms,
+		}
+	}
+	return rules, nil
+}
+
+func (org Organization) syncFetchOutputs() (orgSyncOutputs, error) {
+	orgOutputs, err := org.Outputs()
+	if err != nil {
+		return nil, err
+	}
+	return orgOutputs, nil
+}
+
+func (org Organization) syncFetchFPRules() (orgSyncFPRules, error) {
+	orgRules, err := org.FPRules()
+	if err != nil {
+		return nil, err
+	}
+	rules := orgSyncFPRules{}
+	for ruleName, rule := range orgRules {
+		rules[ruleName] = OrgSyncFPRule{
+			Detection: rule.Detection,
+		}
+	}
+	return rules, nil
+}
+
+func (org Organization) syncFetchResources() (orgSyncResources, error) {
+	orgResources, err := org.Resources()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := orgSyncResources{}
+	for category, names := range orgResources {
+		resourceNames := []string{}
+		for name := range names {
+			resourceNames = append(resourceNames, name)
+		}
+		resources[category] = resourceNames
+	}
+	return resources, nil
+}
+
+func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules, error) {
+	rules := orgSyncDRRules{}
+	availableNamespaces := org.resolveAvailableNamespaces(who)
+	orgRules, err := org.drRulesFromNamespaces(availableNamespaces)
+	if err != nil {
+		return rules, err
+	}
+	for ruleName, rule := range orgRules {
+		// ignore replicant rule
+		if strings.HasPrefix(ruleName, "__") {
+			continue
+		}
+		rules[ruleName] = rule
+	}
+	return rules, nil
 }
 
 func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
@@ -287,7 +472,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 	return ops, nil
 }
 
-func (org Organization) syncNetPolicies(netPolicies NetPoliciesByName, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgNetPolicies, err := org.NetPolicies()
 	if err != nil {
@@ -363,7 +548,7 @@ func (org Organization) syncNetPolicies(netPolicies NetPoliciesByName, options S
 	return ops, nil
 }
 
-func (org Organization) syncArtifacts(artifacts map[ArtifactRuleName]OrgSyncArtifactRule, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgArtifacts, err := org.ArtifactsRules()
 	if err != nil {
@@ -437,7 +622,7 @@ func (org Organization) syncArtifacts(artifacts map[ArtifactRuleName]OrgSyncArti
 	return ops, nil
 }
 
-func (org Organization) syncExfil(exfil ExfilRulesType, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncExfil(exfil orgSyncExfilRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgRules, err := org.ExfilRules()
 	if err != nil {
@@ -567,7 +752,7 @@ func (org Organization) syncExfil(exfil ExfilRulesType, options SyncOptions) ([]
 	return ops, nil
 }
 
-func (org Organization) syncIntegrity(integrity map[IntegrityRuleName]OrgSyncIntegrityRule, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgIntRules, err := org.IntegrityRules()
 	if err != nil {
@@ -646,7 +831,7 @@ func (org Organization) syncIntegrity(integrity map[IntegrityRuleName]OrgSyncInt
 	return ops, nil
 }
 
-func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncOutputs(outputs orgSyncOutputs, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgOutputs, err := org.Outputs()
 	if err != nil {
@@ -721,7 +906,7 @@ func (org Organization) syncOutputs(outputs map[OutputName]OutputConfig, options
 	return ops, nil
 }
 
-func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgRules, err := org.FPRules()
 	if err != nil {
@@ -796,7 +981,7 @@ func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options 
 	return ops, nil
 }
 
-func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName]CoreDRRule, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) resolveAvailableNamespaces(who whoAmIJsonResponse) map[string]struct{} {
 	// Check which namespaces we have available.
 	availableNamespaces := map[string]struct{}{}
 	if who.hasPermissionForOrg(org.client.options.OID, "dr.list") {
@@ -808,23 +993,34 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
 		availableNamespaces["replicant"] = struct{}{}
 	}
+	return availableNamespaces
+}
 
-	ops := []OrgSyncOperation{}
-	existingRules := map[DRRuleName]CoreDRRule{}
-
+func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (existingRules orgSyncDRRules, err error) {
+	existingRules = orgSyncDRRules{}
 	// Get rules from all the namespaces we have access to.
-	for ns := range availableNamespaces {
+	for ns := range namespaces {
 		tmpRules, err := org.DRRules(WithNamespace(ns))
 		if err != nil {
-			return ops, fmt.Errorf("DRRules %s: %v", ns, err)
+			return existingRules, fmt.Errorf("DRRules %s: %v", ns, err)
 		}
 		for ruleName, rule := range tmpRules {
 			parsedRule := CoreDRRule{}
 			if err := rule.UnMarshalToStruct(&parsedRule); err != nil {
-				return ops, fmt.Errorf("UnMarshalToStruct %s: %v", ruleName, err)
+				return existingRules, fmt.Errorf("UnMarshalToStruct %s: %v", ruleName, err)
 			}
 			existingRules[ruleName] = parsedRule
 		}
+	}
+	return existingRules, nil
+}
+
+func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
+	availableNamespaces := org.resolveAvailableNamespaces(who)
+	ops := []OrgSyncOperation{}
+	existingRules, err := org.drRulesFromNamespaces(availableNamespaces)
+	if err != nil {
+		return ops, err
 	}
 
 	// Start by adding missing rules.
@@ -898,7 +1094,7 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 	return ops, nil
 }
 
-func (org Organization) syncResources(resources map[ResourceName][]string, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncResources(resources orgSyncResources, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgResources, err := org.Resources()
 	if err != nil {
