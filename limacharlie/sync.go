@@ -164,10 +164,10 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 	return string(bytes) == string(otherBytes)
 }
 
-type OrgConfigResources = map[ResourceName][]string
+type orgConfigResources = map[ResourceName][]string
 
 type OrgConfig struct {
-	Resources   OrgConfigResources                         `json:"resources" yaml:"resources"`
+	Resources   orgConfigResources                         `json:"resources" yaml:"resources"`
 	DRRules     map[DRRuleName]CoreDRRule                  `json:"rules" yaml:"rules"`
 	FPRules     map[FPRuleName]OrgSyncFPRule               `json:"fps" yaml:"fps"`
 	Outputs     map[OutputName]OutputConfig                `json:"outputs" yaml:"outputs"`
@@ -220,11 +220,18 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 	if options.SyncResources {
 		orgConfig.Resources, err = org.syncFetchResources()
 		if err != nil {
-			return orgConfig, err
+			return orgConfig, fmt.Errorf("resources: %v", err)
 		}
 	}
 	if options.SyncDRRules {
-		return orgConfig, ErrorNotImplemented
+		who, err := org.client.whoAmI()
+		if err != nil {
+			return orgConfig, fmt.Errorf("dr-rule: %v", err)
+		}
+		orgConfig.DRRules, err = org.syncFetchDRRules(who)
+		if err != nil {
+			return orgConfig, fmt.Errorf("dr-rule: %v", err)
+		}
 	}
 	if options.SyncFPRules {
 		return orgConfig, ErrorNotImplemented
@@ -247,13 +254,13 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 	return orgConfig, nil
 }
 
-func (org Organization) syncFetchResources() (OrgConfigResources, error) {
+func (org Organization) syncFetchResources() (orgConfigResources, error) {
 	orgResources, err := org.Resources()
 	if err != nil {
-		return OrgConfigResources{}, err
+		return nil, err
 	}
 
-	resources := OrgConfigResources{}
+	resources := orgConfigResources{}
 	for category, names := range orgResources {
 		resourceNames := []string{}
 		for name := range names {
@@ -262,6 +269,23 @@ func (org Organization) syncFetchResources() (OrgConfigResources, error) {
 		resources[category] = resourceNames
 	}
 	return resources, nil
+}
+
+func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (map[DRRuleName]CoreDRRule, error) {
+	rules := map[DRRuleName]CoreDRRule{}
+	availableNamespaces := org.resolveAvailableNamespaces(who)
+	orgRules, err := org.drRulesFromNamespaces(availableNamespaces)
+	if err != nil {
+		return rules, err
+	}
+	for ruleName, rule := range orgRules {
+		// ignore replicant rule
+		if strings.HasPrefix(ruleName, "__") {
+			continue
+		}
+		rules[ruleName] = rule
+	}
+	return rules, nil
 }
 
 func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
@@ -842,7 +866,7 @@ func (org Organization) syncFPRules(rules map[FPRuleName]OrgSyncFPRule, options 
 	return ops, nil
 }
 
-func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName]CoreDRRule, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) resolveAvailableNamespaces(who whoAmIJsonResponse) map[string]struct{} {
 	// Check which namespaces we have available.
 	availableNamespaces := map[string]struct{}{}
 	if who.hasPermissionForOrg(org.client.options.OID, "dr.list") {
@@ -854,23 +878,34 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName
 	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
 		availableNamespaces["replicant"] = struct{}{}
 	}
+	return availableNamespaces
+}
 
-	ops := []OrgSyncOperation{}
-	existingRules := map[DRRuleName]CoreDRRule{}
-
+func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (existingRules map[DRRuleName]CoreDRRule, err error) {
+	existingRules = map[DRRuleName]CoreDRRule{}
 	// Get rules from all the namespaces we have access to.
-	for ns := range availableNamespaces {
+	for ns := range namespaces {
 		tmpRules, err := org.DRRules(WithNamespace(ns))
 		if err != nil {
-			return ops, fmt.Errorf("DRRules %s: %v", ns, err)
+			return existingRules, fmt.Errorf("DRRules %s: %v", ns, err)
 		}
 		for ruleName, rule := range tmpRules {
 			parsedRule := CoreDRRule{}
 			if err := rule.UnMarshalToStruct(&parsedRule); err != nil {
-				return ops, fmt.Errorf("UnMarshalToStruct %s: %v", ruleName, err)
+				return existingRules, fmt.Errorf("UnMarshalToStruct %s: %v", ruleName, err)
 			}
 			existingRules[ruleName] = parsedRule
 		}
+	}
+	return existingRules, nil
+}
+
+func (org Organization) syncDRRules(who whoAmIJsonResponse, rules map[DRRuleName]CoreDRRule, options SyncOptions) ([]OrgSyncOperation, error) {
+	availableNamespaces := org.resolveAvailableNamespaces(who)
+	ops := []OrgSyncOperation{}
+	existingRules, err := org.drRulesFromNamespaces(availableNamespaces)
+	if err != nil {
+		return ops, err
 	}
 
 	// Start by adding missing rules.
