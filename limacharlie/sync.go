@@ -169,7 +169,7 @@ type orgSyncDRRules = map[DRRuleName]CoreDRRule
 type orgSyncFPRules = map[FPRuleName]OrgSyncFPRule
 type orgSyncOutputs = map[OutputName]OutputConfig
 type orgSyncIntegrityRules = map[IntegrityRuleName]OrgSyncIntegrityRule
-type orgSyncExfils = ExfilRulesType
+type orgSyncExfilRules = ExfilRulesType
 type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
 
@@ -179,7 +179,7 @@ type OrgConfig struct {
 	FPRules     orgSyncFPRules        `json:"fps" yaml:"fps"`
 	Outputs     orgSyncOutputs        `json:"outputs" yaml:"outputs"`
 	Integrity   orgSyncIntegrityRules `json:"integrity" yaml:"integrity"`
-	Exfil       orgSyncExfils         `json:"exfil" yaml:"exfil"`
+	Exfil       orgSyncExfilRules     `json:"exfil" yaml:"exfil"`
 	Artifacts   orgSyncArtifacts      `json:"artifact" yaml:"artifact"`
 	NetPolicies orgSyncNetPolicies    `json:"net-policy" yaml:"net-policy"`
 }
@@ -265,12 +265,34 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncExfil {
-		return orgConfig, ErrorNotImplemented
+		orgConfig.Exfil, err = org.syncFetchExfil()
+		if err != nil {
+			return orgConfig, fmt.Errorf("exfil: %v", err)
+		}
 	}
 	if options.SyncNetPolicies {
 		return orgConfig, ErrorNotImplemented
 	}
 	return orgConfig, nil
+}
+
+func (org Organization) syncFetchExfil() (orgSyncExfilRules, error) {
+	exfils := orgSyncExfilRules{}
+	orgExfil, err := org.ExfilRules()
+	if err != nil {
+		return exfils, err
+	}
+
+	for name, rule := range orgExfil.Events {
+		exfils.Events[name] = rule
+	}
+	for name, rule := range orgExfil.Performance {
+		exfils.Performance[name] = rule
+	}
+	for name, rule := range orgExfil.Watches {
+		exfils.Watches[name] = rule
+	}
+	return exfils, nil
 }
 
 func (org Organization) syncFetchArtifacts() (orgSyncArtifacts, error) {
@@ -585,7 +607,7 @@ func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOp
 	return ops, nil
 }
 
-func (org Organization) syncExfil(exfil orgSyncExfils, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncExfil(exfil orgSyncExfilRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 	orgRules, err := org.ExfilRules()
 	if err != nil {
