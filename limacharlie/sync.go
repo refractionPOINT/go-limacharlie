@@ -215,6 +215,31 @@ func (o OrgSyncOperation) String() string {
 }
 
 func (org Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
+	if options.SyncResources {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncDRRules {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncFPRules {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncOutputs {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncIntegrity {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncArtifacts {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncExfil {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+	if options.SyncNetPolicies {
+		return OrgConfig{}, ErrorNotImplemented
+	}
+
 	return OrgConfig{}, ErrorNotImplemented
 }
 
