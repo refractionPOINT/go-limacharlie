@@ -39,7 +39,7 @@ type SyncOptions struct {
 type DRRuleName = string
 
 type OrgSyncFPRule struct {
-	Detection Dict `json:"detect" yaml:"detect"`
+	Detection Dict `json:"data" yaml:"data"`
 }
 
 func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
@@ -241,7 +241,10 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncFPRules {
-		return orgConfig, ErrorNotImplemented
+		orgConfig.FPRules, err = org.syncFetchFPRules()
+		if err != nil {
+			return orgConfig, fmt.Errorf("fp-rule: %v", err)
+		}
 	}
 	if options.SyncOutputs {
 		return orgConfig, ErrorNotImplemented
@@ -259,6 +262,20 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		return orgConfig, ErrorNotImplemented
 	}
 	return orgConfig, nil
+}
+
+func (org Organization) syncFetchFPRules() (orgSyncFPRules, error) {
+	orgRules, err := org.FPRules()
+	if err != nil {
+		return nil, err
+	}
+	rules := orgSyncFPRules{}
+	for ruleName, rule := range orgRules {
+		rules[ruleName] = OrgSyncFPRule{
+			Detection: rule.Detection,
+		}
+	}
+	return rules, nil
 }
 
 func (org Organization) syncFetchResources() (orgSyncResources, error) {

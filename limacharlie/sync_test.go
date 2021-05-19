@@ -299,17 +299,17 @@ func TestSyncPushFPRules(t *testing.T) {
 	orgRules := `
 fps:
   fp0:
-    detect:
+    data:
       op: ends with
       path: detect/event/FILE_PATH
       value: fp.exe
   fp1:
-    detect:
+    data:
       op: is
       path: routing/hostname
       value: google.com
   fp2:
-    detect:
+    data:
       op: is
       path: DOMAIN_NAME
       value: 8.8.8.8
@@ -346,17 +346,17 @@ fps:
 	orgRulesForce := `
 fps:
   fp0:
-    detect:
+    data:
       op: ends with
       path: detect/event/FILE_PATH
       value: fp.exe
   fp11:
-    detect:
+    data:
       op: is
       path: routing/hostname
       value: google.somethingelse
   fp12:
-    detect:
+    data:
       op: is
       path: DOMAIN_NAME
       value: 8.8.4.4
