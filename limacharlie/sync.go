@@ -247,7 +247,10 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncOutputs {
-		return orgConfig, ErrorNotImplemented
+		orgConfig.Outputs, err = org.syncFetchOutputs()
+		if err != nil {
+			return orgConfig, fmt.Errorf("outputs: %v", err)
+		}
 	}
 	if options.SyncIntegrity {
 		return orgConfig, ErrorNotImplemented
@@ -262,6 +265,14 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		return orgConfig, ErrorNotImplemented
 	}
 	return orgConfig, nil
+}
+
+func (org Organization) syncFetchOutputs() (orgSyncOutputs, error) {
+	orgOutputs, err := org.Outputs()
+	if err != nil {
+		return nil, err
+	}
+	return orgOutputs, nil
 }
 
 func (org Organization) syncFetchFPRules() (orgSyncFPRules, error) {
