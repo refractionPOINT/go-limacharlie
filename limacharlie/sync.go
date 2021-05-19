@@ -259,7 +259,10 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncArtifacts {
-		return orgConfig, ErrorNotImplemented
+		orgConfig.Artifacts, err = org.syncFetchArtifacts()
+		if err != nil {
+			return orgConfig, fmt.Errorf("artifact: %v", err)
+		}
 	}
 	if options.SyncExfil {
 		return orgConfig, ErrorNotImplemented
@@ -268,6 +271,25 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		return orgConfig, ErrorNotImplemented
 	}
 	return orgConfig, nil
+}
+
+func (org Organization) syncFetchArtifacts() (orgSyncArtifacts, error) {
+	orgArtifacts, err := org.ArtifactsRules()
+	if err != nil {
+		return nil, err
+	}
+	rules := orgSyncArtifacts{}
+	for name, artifactRule := range orgArtifacts {
+		rules[name] = OrgSyncArtifactRule{
+			IsIgnoreCert:   artifactRule.IsIgnoreCert,
+			IsDeleteAfter:  artifactRule.IsDeleteAfter,
+			DaysRetentions: artifactRule.DaysRetentions,
+			Patterns:       artifactRule.Patterns,
+			Tags:           artifactRule.Filters.Tags,
+			Platforms:      artifactRule.Filters.Platforms,
+		}
+	}
+	return rules, nil
 }
 
 func (org Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
