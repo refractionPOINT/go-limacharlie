@@ -271,9 +271,24 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncNetPolicies {
-		return orgConfig, ErrorNotImplemented
+		orgConfig.NetPolicies, err = org.syncFetchNetPolicies()
+		if err != nil {
+			return orgConfig, fmt.Errorf("net-policy: %v", err)
+		}
 	}
 	return orgConfig, nil
+}
+
+func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
+	orgNetPolicies, err := org.NetPolicies()
+	if err != nil {
+		return nil, err
+	}
+	netPolicies := orgSyncNetPolicies{}
+	for name, policy := range orgNetPolicies {
+		netPolicies[name] = policy
+	}
+	return netPolicies, nil
 }
 
 func (org Organization) syncFetchExfil() (orgSyncExfilRules, error) {
