@@ -52,7 +52,7 @@ func TestDRRuleAddDelete(t *testing.T) {
 		t.Errorf("test rule not found: %+v", rules)
 	}
 
-	err = org.DRDelRule(testRuleName)
+	err = org.DRRuleDelete(testRuleName)
 	a.NoError(err)
 
 	rules, err = org.DRRules()
