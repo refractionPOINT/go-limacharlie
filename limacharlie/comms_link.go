@@ -37,15 +37,17 @@ func (r Room) LinkGet(linkType ...string) (CommsRoomLinks, error) {
 	return resp, nil
 }
 
-func (r Room) LinkAdd(linkType string, linkValue string, messageID string) (string, error) {
+func (r Room) LinkAdd(linkType string, linkValue string, messageID ...string) (string, error) {
 	resp := Dict{}
-	req := makeDefaultRequest(&resp).withURLRoot("/").withFormData(
-		Dict{
-			"type":  linkType,
-			"value": linkValue,
-			"mid":   messageID,
-		},
-	)
+	data := Dict{
+		"type":  linkType,
+		"value": linkValue,
+	}
+	if len(messageID) > 0 {
+		data["mid"] = messageID
+	}
+
+	req := makeDefaultRequest(&resp).withURLRoot("/").withFormData(data)
 	if err := r.c.o.client.reliableRequest(http.MethodPost, r.linkUrl(), req); err != nil {
 		return "", err
 	}
@@ -62,13 +64,13 @@ func (r Room) LinkAdd(linkType string, linkValue string, messageID string) (stri
 
 func (r Room) LinkDelete(linkType string, linkValue string) error {
 	resp := Dict{}
-	req := makeDefaultRequest(&resp).withURLRoot("/").withFormData(
+	req := makeDefaultRequest(&resp).withURLRoot("/").withQueryData(
 		Dict{
 			"type":  linkType,
 			"value": linkValue,
 		},
 	)
-	if err := r.c.o.client.reliableRequest(http.MethodPost, r.linkUrl(), req); err != nil {
+	if err := r.c.o.client.reliableRequest(http.MethodDelete, r.linkUrl(), req); err != nil {
 		return err
 	}
 	return nil

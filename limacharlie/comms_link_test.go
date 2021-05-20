@@ -21,14 +21,12 @@ func TestCommsLinkAddDelete(t *testing.T) {
 		defer room.Delete()
 	}
 
+	linkType := "linktesttype"
+
 	links, err := room.LinkGet()
 	a.NoError(err)
 	a.Empty(links.Links)
-
-	mid, err := room.Post(NewMessage{Type: "chat", Content: MessageText{"test-message"}})
-	a.NoError(err)
-
-	linkID, err := room.LinkAdd("link-test-type", "link-test-value", mid)
+	linkID, err := room.LinkAdd(linkType, "link-test-value")
 	a.NoError(err)
 	a.NotEmpty(linkID)
 
@@ -36,12 +34,12 @@ func TestCommsLinkAddDelete(t *testing.T) {
 	a.NoError(err)
 	a.Equal(1, len(links.Links))
 	link := links.Links[0]
-	a.Equal(mid, link.MessageID)
+	a.NotEmpty(link.MessageID)
 	a.Equal("link-test-value", link.Value)
-	a.Equal("link-test-type", link.Type)
+	a.Equal(linkType, link.Type)
 	a.Equal(room.ID, link.Room)
 
-	a.NoError(room.LinkDelete("link-test-type", "link-test-value"))
+	a.NoError(room.LinkDelete(linkType, "link-test-value"))
 
 	links, err = room.LinkGet()
 	a.NoError(err)
