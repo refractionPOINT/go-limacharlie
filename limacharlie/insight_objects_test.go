@@ -33,3 +33,14 @@ func TestInsightObjectsPerObject(t *testing.T) {
 	a.Equal("%google%", resp.IndicatorName)
 	a.Equal(InsightObjectTypes.Domain, resp.ObjectType)
 }
+
+func TestInsightObjectsBatch(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	_, err := org.InsightObjectsBatch(InsightObjectsBatchRequest{
+		Objects: map[InsightObjectType][]string{
+			InsightObjectTypes.Domain: {"google.com", "microsoft.com"},
+		},
+	})
+	a.NoError(err)
+}

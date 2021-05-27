@@ -82,6 +82,32 @@ func (org Organization) InsightObjectsPerObject(insightReq InsightObjectsRequest
 	return resp, nil
 }
 
+type InsightObjectsBatchRequest struct {
+	Objects         map[InsightObjectType][]string
+	IsCaseSensitive bool
+}
+
+type InsightObjectBatchResponse struct {
+	FromCache   bool `json:"from_cache"`
+	Last1Day    Dict `json:"last_1_days"`
+	Last7Days   Dict `json:"last_7_days"`
+	Last30Days  Dict `json:"last_30_days"`
+	Last365Days Dict `json:"last_365_days"`
+}
+
+func (org Organization) InsightObjectsBatch(insightReq InsightObjectsBatchRequest) (InsightObjectBatchResponse, error) {
+	req := Dict{
+		"objects":        insightReq.Objects,
+		"case_sensitive": insightReq.IsCaseSensitive,
+	}
+	var resp InsightObjectBatchResponse
+	request := makeDefaultRequest(&resp).withFormData(req)
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/objects", org.client.options.OID), request); err != nil {
+		return InsightObjectBatchResponse{}, err
+	}
+	return resp, nil
+}
+
 func (org Organization) insightObjects(insightReq InsightObjectsRequest, perObject bool, resp interface{}) error {
 	req := Dict{
 		"name":           insightReq.IndicatorName,
