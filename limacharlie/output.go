@@ -146,7 +146,6 @@ type outputResponse struct {
 	Type OutputDataType `json:"for"`
 }
 
-
 // Outputs returns all outputs by name
 func (org Organization) Outputs() (OutputsByName, error) {
 	outputsByOrg := map[string]map[OutputName]outputResponse{}
