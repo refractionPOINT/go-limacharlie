@@ -298,11 +298,22 @@ func (org Organization) syncFetchExfil() (orgSyncExfilRules, error) {
 		return exfils, err
 	}
 
+	if len(orgExfil.Events) != 0 {
+		exfils.Events = make(map[string]ExfilRuleEvent)
+	}
 	for name, rule := range orgExfil.Events {
 		exfils.Events[name] = rule
 	}
+
+	if len(orgExfil.Performance) != 0 {
+		exfils.Performance = make(Dict)
+	}
 	for name, rule := range orgExfil.Performance {
 		exfils.Performance[name] = rule
+	}
+
+	if len(orgExfil.Watches) != 0 {
+		exfils.Watches = make(map[string]ExfilRuleWatch)
 	}
 	for name, rule := range orgExfil.Watches {
 		exfils.Watches[name] = rule
