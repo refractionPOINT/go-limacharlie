@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"testing"
 	"time"
@@ -1193,5 +1194,98 @@ rules:
 	}
 }
 func TestPushMultiFiles(t *testing.T) {
+	files := map[string][]byte{
+		"f1": []byte(`version: 3
+resources:
+  replicant:
+  - a1
+  - a2
+  - a3
+`),
+		"r": []byte(`version: 3
+include:
+- s/f2
+- f1
+`),
+		"s/f2": []byte(`version: 3
+include:
+- f3
+rules:
+  r1:
+    name: r1
+    namespace: managed
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
+`),
+		"s/f3": []byte(`version: 3
+rules:
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+`),
+	}
 
+	expected := `version: 3
+resources:
+  replicant:
+  - a1
+  - a2
+  - a3
+rules:
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
+`
+
+	ldr := func(parent string, configFile string) ([]byte, error) {
+		full := filepath.Join(filepath.Dir(parent), configFile)
+		d, ok := files[full]
+		if !ok {
+			return nil, fmt.Errorf("file not found: %s", full)
+		}
+		return d, nil
+	}
+
+	out, err := loadEffectiveConfig("", "r", SyncOptions{
+		IncludeLoader: ldr,
+	})
+	if err != nil {
+		t.Errorf("failed to load: %v", err)
+	}
+
+	yOut, err := yaml.Marshal(out)
+	if err != nil {
+		t.Errorf("yaml: %v", err)
+	} else if string(yOut) != expected {
+		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
+	}
 }

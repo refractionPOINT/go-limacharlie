@@ -213,10 +213,10 @@ func (o *OrgConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		D string `yaml:"include"`
 	}{}
 	multiInclude := struct {
-		D []string `yaml::"include"`
+		D []string `yaml:"include"`
 	}{}
 
-	if err := unmarshal(&singleInclude); err == nil {
+	if err := unmarshal(&singleInclude); err == nil && len(singleInclude.D) != 0 {
 		org.Includes = []string{singleInclude.D}
 	} else if err := unmarshal(&multiInclude); err == nil {
 		org.Includes = multiInclude.D
@@ -620,23 +620,23 @@ func (org Organization) SyncPushFromFiles(rootConfigFile string, options SyncOpt
 	// If no custom loader was included, default to the built-in
 	// local file system loader.
 	if options.IncludeLoader == nil {
-		options.IncludeLoader = org.localFileIncludeLoader
+		options.IncludeLoader = localFileIncludeLoader
 	}
-	conf, err := org.loadEffectiveConfig("", rootConfigFile, options)
+	conf, err := loadEffectiveConfig("", rootConfigFile, options)
 	if err != nil {
 		return nil, err
 	}
 	return org.SyncPush(conf, options)
 }
 
-func (org Organization) loadEffectiveConfig(parent string, configFile string, options SyncOptions) (OrgConfig, error) {
+func loadEffectiveConfig(parent string, configFile string, options SyncOptions) (OrgConfig, error) {
 	thisConfig, err := loadConfWithOptions(parent, configFile, options)
 	if err != nil {
 		return OrgConfig{}, err
 	}
 
 	for _, toInclude := range thisConfig.Includes {
-		incConf, err := loadConfWithOptions(configFile, toInclude, options)
+		incConf, err := loadEffectiveConfig(configFile, toInclude, options)
 		if err != nil {
 			return OrgConfig{}, err
 		}
@@ -665,7 +665,7 @@ func loadConfWithOptions(parent string, configFile string, options SyncOptions) 
 	return thisConfig, nil
 }
 
-func (org Organization) localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
+func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
 	// If this is the first include (empty parent), target file is not absolute, assume CWD.
 	root := ""
 	var err error
