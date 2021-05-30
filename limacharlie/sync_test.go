@@ -1100,3 +1100,98 @@ net-policy:
 		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
 	}
 }
+
+func TestMerge(t *testing.T) {
+	o1 := OrgConfig{
+		Version: 3,
+		Resources: orgSyncResources{
+			"replicant": []string{
+				"a1",
+				"a2",
+			},
+		},
+		DRRules: orgSyncDRRules{
+			"r1": CoreDRRule{
+				Name:      "r1",
+				Namespace: "managed",
+				Detect: Dict{
+					"t": "v",
+				},
+				Response: List{
+					"l1",
+					"l2",
+				},
+			},
+			"r2": CoreDRRule{
+				Name:      "r2",
+				Namespace: "managed",
+				Detect: Dict{
+					"t": "v",
+				},
+				Response: List{
+					"l1",
+					"l2",
+				},
+			},
+		},
+	}
+	o2 := OrgConfig{
+		Resources: orgSyncResources{
+			"replicant": []string{
+				"a3",
+				"a1",
+			},
+		},
+		DRRules: orgSyncDRRules{
+			"r1": CoreDRRule{
+				Name:      "r1",
+				Namespace: "general",
+				Detect: Dict{
+					"t": "v1",
+				},
+				Response: List{
+					"l11",
+					"l21",
+				},
+			},
+		},
+	}
+	expected := `version: 3
+resources:
+  replicant:
+  - a1
+  - a2
+  - a3
+rules:
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
+`
+
+	out := o1.Merge(o2)
+
+	yOut, err := yaml.Marshal(out)
+	if err != nil {
+		t.Errorf("yaml: %v", err)
+	}
+
+	if string(yOut) != expected {
+		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
+	}
+}
+func TestPushMultiFiles(t *testing.T) {
+
+}

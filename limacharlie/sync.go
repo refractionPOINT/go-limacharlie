@@ -185,14 +185,14 @@ type orgSyncNetPolicies NetPoliciesByName
 type OrgConfig struct {
 	Version     int                   `json:"version" yaml:"version"`
 	Includes    []string              `json:"-" yaml:"-"`
-	Resources   orgSyncResources      `json:"resources" yaml:"resources"`
-	DRRules     orgSyncDRRules        `json:"rules" yaml:"rules"`
-	FPRules     orgSyncFPRules        `json:"fps" yaml:"fps"`
-	Outputs     orgSyncOutputs        `json:"outputs" yaml:"outputs"`
-	Integrity   orgSyncIntegrityRules `json:"integrity" yaml:"integrity"`
-	Exfil       orgSyncExfilRules     `json:"exfil" yaml:"exfil"`
-	Artifacts   orgSyncArtifacts      `json:"artifact" yaml:"artifact"`
-	NetPolicies orgSyncNetPolicies    `json:"net-policy" yaml:"net-policy"`
+	Resources   orgSyncResources      `json:"resources,omitempty" yaml:"resources,omitempty"`
+	DRRules     orgSyncDRRules        `json:"rules,omitempty" yaml:"rules,omitempty"`
+	FPRules     orgSyncFPRules        `json:"fps,omitempty" yaml:"fps,omitempty"`
+	Outputs     orgSyncOutputs        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Integrity   orgSyncIntegrityRules `json:"integrity,omitempty" yaml:"integrity,omitempty"`
+	Exfil       orgSyncExfilRules     `json:"exfil,omitempty" yaml:"exfil,omitempty"`
+	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
+	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -477,6 +477,7 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("net-policy: %v", err)
 		}
 	}
+	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
 }
 
