@@ -5,9 +5,9 @@ import "encoding/json"
 type ExfilRuleName = string
 
 type ExfilRulesType struct {
-	Performance Dict                             `json:"perf" yaml:"perf"`
-	Events      map[ExfilRuleName]ExfilRuleEvent `json:"list" yaml:"list"`
-	Watches     map[ExfilRuleName]ExfilRuleWatch `json:"watch" yaml:"watch"`
+	Performance Dict                             `json:"perf,omitempty" yaml:"perf,omitempty"`
+	Events      map[ExfilRuleName]ExfilRuleEvent `json:"list,omitempty" yaml:"list,omitempty"`
+	Watches     map[ExfilRuleName]ExfilRuleWatch `json:"watch,omitempty" yaml:"watch,omitempty"`
 }
 
 type ExfilRuleBase struct {
