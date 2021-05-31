@@ -173,14 +173,14 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 	return string(bytes) == string(otherBytes)
 }
 
-type orgSyncResources map[ResourceName][]string
-type orgSyncDRRules map[DRRuleName]CoreDRRule
-type orgSyncFPRules map[FPRuleName]OrgSyncFPRule
-type orgSyncOutputs map[OutputName]OutputConfig
-type orgSyncIntegrityRules map[IntegrityRuleName]OrgSyncIntegrityRule
-type orgSyncExfilRules ExfilRulesType
-type orgSyncArtifacts map[ArtifactRuleName]OrgSyncArtifactRule
-type orgSyncNetPolicies NetPoliciesByName
+type orgSyncResources = map[ResourceName][]string
+type orgSyncDRRules = map[DRRuleName]CoreDRRule
+type orgSyncFPRules = map[FPRuleName]OrgSyncFPRule
+type orgSyncOutputs = map[OutputName]OutputConfig
+type orgSyncIntegrityRules = map[IntegrityRuleName]OrgSyncIntegrityRule
+type orgSyncExfilRules = ExfilRulesType
+type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
+type orgSyncNetPolicies = NetPoliciesByName
 
 type OrgConfig struct {
 	Version     int                   `json:"version" yaml:"version"`
@@ -234,23 +234,23 @@ func (o *OrgConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
-	o.Resources = o.Resources.merge(conf.Resources)
-	o.DRRules = o.DRRules.merge(conf.DRRules)
-	o.FPRules = o.FPRules.merge(conf.FPRules)
-	o.Outputs = o.Outputs.merge(conf.Outputs)
-	o.Integrity = o.Integrity.merge(conf.Integrity)
-	o.Exfil = o.Exfil.merge(conf.Exfil)
-	o.Artifacts = o.Artifacts.merge(conf.Artifacts)
-	o.NetPolicies = o.NetPolicies.merge(conf.NetPolicies)
+	o.Resources = o.mergeResources(conf.Resources)
+	o.DRRules = o.mergeDRRules(conf.DRRules)
+	o.FPRules = o.mergeFPRules(conf.FPRules)
+	o.Outputs = o.mergeOutputs(conf.Outputs)
+	o.Integrity = o.mergeIntegrity(conf.Integrity)
+	o.Exfil = o.mergeExfil(conf.Exfil)
+	o.Artifacts = o.mergeArtifacts(conf.Artifacts)
+	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	return o
 }
 
-func (a orgSyncResources) merge(b orgSyncResources) orgSyncResources {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeResources(b orgSyncResources) orgSyncResources {
+	if a.Resources == nil && b == nil {
 		return nil
 	}
 	n := map[string][]string{}
-	for k, v := range a {
+	for k, v := range a.Resources {
 		n[k] = v
 	}
 	for k, v := range b {
@@ -269,12 +269,12 @@ func (a orgSyncResources) merge(b orgSyncResources) orgSyncResources {
 	return n
 }
 
-func (a orgSyncDRRules) merge(b orgSyncDRRules) orgSyncDRRules {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeDRRules(b orgSyncDRRules) orgSyncDRRules {
+	if a.DRRules == nil && b == nil {
 		return nil
 	}
 	n := orgSyncDRRules{}
-	for k, v := range a {
+	for k, v := range a.DRRules {
 		n[k] = v
 	}
 	for k, v := range b {
@@ -283,12 +283,12 @@ func (a orgSyncDRRules) merge(b orgSyncDRRules) orgSyncDRRules {
 	return n
 }
 
-func (a orgSyncFPRules) merge(b orgSyncFPRules) orgSyncFPRules {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeFPRules(b orgSyncFPRules) orgSyncFPRules {
+	if a.FPRules == nil && b == nil {
 		return nil
 	}
 	n := orgSyncFPRules{}
-	for k, v := range a {
+	for k, v := range a.FPRules {
 		n[k] = v
 	}
 	for k, v := range b {
@@ -297,12 +297,12 @@ func (a orgSyncFPRules) merge(b orgSyncFPRules) orgSyncFPRules {
 	return n
 }
 
-func (a orgSyncOutputs) merge(b orgSyncOutputs) orgSyncOutputs {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeOutputs(b orgSyncOutputs) orgSyncOutputs {
+	if a.Outputs == nil && b == nil {
 		return nil
 	}
 	n := orgSyncOutputs{}
-	for k, v := range a {
+	for k, v := range a.Outputs {
 		n[k] = v
 	}
 	for k, v := range b {
@@ -311,12 +311,12 @@ func (a orgSyncOutputs) merge(b orgSyncOutputs) orgSyncOutputs {
 	return n
 }
 
-func (a orgSyncIntegrityRules) merge(b orgSyncIntegrityRules) orgSyncIntegrityRules {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeIntegrity(b orgSyncIntegrityRules) orgSyncIntegrityRules {
+	if a.Integrity == nil && b == nil {
 		return nil
 	}
 	n := orgSyncIntegrityRules{}
-	for k, v := range a {
+	for k, v := range a.Integrity {
 		n[k] = v
 	}
 	for k, v := range b {
@@ -325,29 +325,29 @@ func (a orgSyncIntegrityRules) merge(b orgSyncIntegrityRules) orgSyncIntegrityRu
 	return n
 }
 
-func (a orgSyncExfilRules) merge(b orgSyncExfilRules) orgSyncExfilRules {
+func (a OrgConfig) mergeExfil(b orgSyncExfilRules) orgSyncExfilRules {
 	n := orgSyncExfilRules{}
-	if a.Performance != nil || b.Performance != nil {
+	if a.Exfil.Performance != nil || b.Performance != nil {
 		n.Performance = Dict{}
-		for k, v := range a.Performance {
+		for k, v := range a.Exfil.Performance {
 			n.Performance[k] = v
 		}
 		for k, v := range b.Performance {
 			n.Performance[k] = v
 		}
 	}
-	if a.Events != nil || b.Events != nil {
+	if a.Exfil.Events != nil || b.Events != nil {
 		n.Events = map[string]ExfilRuleEvent{}
-		for k, v := range a.Events {
+		for k, v := range a.Exfil.Events {
 			n.Events[k] = v
 		}
 		for k, v := range b.Events {
 			n.Events[k] = v
 		}
 	}
-	if a.Watches != nil || b.Watches != nil {
+	if a.Exfil.Watches != nil || b.Watches != nil {
 		n.Watches = map[string]ExfilRuleWatch{}
-		for k, v := range a.Watches {
+		for k, v := range a.Exfil.Watches {
 			n.Watches[k] = v
 		}
 		for k, v := range b.Watches {
@@ -357,12 +357,12 @@ func (a orgSyncExfilRules) merge(b orgSyncExfilRules) orgSyncExfilRules {
 	return n
 }
 
-func (a orgSyncArtifacts) merge(b orgSyncArtifacts) orgSyncArtifacts {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeArtifacts(b orgSyncArtifacts) orgSyncArtifacts {
+	if a.Artifacts == nil && b == nil {
 		return nil
 	}
 	n := orgSyncArtifacts{}
-	for k, v := range a {
+	for k, v := range a.Artifacts {
 		n[k] = v
 	}
 	for k, v := range b {
@@ -371,12 +371,12 @@ func (a orgSyncArtifacts) merge(b orgSyncArtifacts) orgSyncArtifacts {
 	return n
 }
 
-func (a orgSyncNetPolicies) merge(b orgSyncNetPolicies) orgSyncNetPolicies {
-	if a == nil && b == nil {
+func (a OrgConfig) mergeNetPolicies(b orgSyncNetPolicies) orgSyncNetPolicies {
+	if a.NetPolicies == nil && b == nil {
 		return nil
 	}
 	n := orgSyncNetPolicies{}
-	for k, v := range a {
+	for k, v := range a.NetPolicies {
 		n[k] = v
 	}
 	for k, v := range b {
