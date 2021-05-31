@@ -3,7 +3,12 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -34,7 +39,11 @@ type SyncOptions struct {
 	SyncExfil       bool `json:"sync_exfil"`
 	SyncArtifacts   bool `json:"sync_artifacts"`
 	SyncNetPolicies bool `json:"sync_net_policies"`
+
+	IncludeLoader IncludeLoaderCB `json:"-"`
 }
+
+type IncludeLoaderCB = func(parentFilePath string, filePathToInclude string) ([]byte, error)
 
 type DRRuleName = string
 
@@ -164,24 +173,216 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 	return string(bytes) == string(otherBytes)
 }
 
-type orgSyncResources = map[ResourceName][]string
-type orgSyncDRRules = map[DRRuleName]CoreDRRule
-type orgSyncFPRules = map[FPRuleName]OrgSyncFPRule
-type orgSyncOutputs = map[OutputName]OutputConfig
-type orgSyncIntegrityRules = map[IntegrityRuleName]OrgSyncIntegrityRule
-type orgSyncExfilRules = ExfilRulesType
-type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
-type orgSyncNetPolicies = NetPoliciesByName
+type orgSyncResources map[ResourceName][]string
+type orgSyncDRRules map[DRRuleName]CoreDRRule
+type orgSyncFPRules map[FPRuleName]OrgSyncFPRule
+type orgSyncOutputs map[OutputName]OutputConfig
+type orgSyncIntegrityRules map[IntegrityRuleName]OrgSyncIntegrityRule
+type orgSyncExfilRules ExfilRulesType
+type orgSyncArtifacts map[ArtifactRuleName]OrgSyncArtifactRule
+type orgSyncNetPolicies NetPoliciesByName
 
 type OrgConfig struct {
-	Resources   orgSyncResources      `json:"resources" yaml:"resources"`
-	DRRules     orgSyncDRRules        `json:"rules" yaml:"rules"`
-	FPRules     orgSyncFPRules        `json:"fps" yaml:"fps"`
-	Outputs     orgSyncOutputs        `json:"outputs" yaml:"outputs"`
-	Integrity   orgSyncIntegrityRules `json:"integrity" yaml:"integrity"`
-	Exfil       orgSyncExfilRules     `json:"exfil" yaml:"exfil"`
-	Artifacts   orgSyncArtifacts      `json:"artifact" yaml:"artifact"`
-	NetPolicies orgSyncNetPolicies    `json:"net-policy" yaml:"net-policy"`
+	Version     int                   `json:"version" yaml:"version"`
+	Includes    []string              `json:"-" yaml:"-"`
+	Resources   orgSyncResources      `json:"resources,omitempty" yaml:"resources,omitempty"`
+	DRRules     orgSyncDRRules        `json:"rules,omitempty" yaml:"rules,omitempty"`
+	FPRules     orgSyncFPRules        `json:"fps,omitempty" yaml:"fps,omitempty"`
+	Outputs     orgSyncOutputs        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Integrity   orgSyncIntegrityRules `json:"integrity,omitempty" yaml:"integrity,omitempty"`
+	Exfil       orgSyncExfilRules     `json:"exfil,omitempty" yaml:"exfil,omitempty"`
+	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
+	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
+}
+
+type orgConfigRaw OrgConfig
+
+func (o *OrgConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// Custom yaml unmarshal since our official format
+	// for config files supports the "include" key containing
+	// either a single import or a list of imports.
+
+	// Start with the base unmarshal.
+	org := orgConfigRaw{}
+	if err := unmarshal(&org); err != nil {
+		return err
+	}
+
+	// Manually unmarshal the includes.
+	singleInclude := struct {
+		D string `yaml:"include"`
+	}{}
+	multiInclude := struct {
+		D []string `yaml:"include"`
+	}{}
+
+	if err := unmarshal(&singleInclude); err == nil && len(singleInclude.D) != 0 {
+		org.Includes = []string{singleInclude.D}
+	} else if err := unmarshal(&multiInclude); err == nil {
+		org.Includes = multiInclude.D
+	} else {
+		// Is there an unknown include statement.
+		d := map[string]interface{}{}
+		unmarshal(&d)
+		if inc, ok := d["include"]; ok {
+			return fmt.Errorf("unknown include format: %T", inc)
+		}
+	}
+
+	*o = OrgConfig(org)
+	return nil
+}
+
+func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
+	o.Resources = o.Resources.merge(conf.Resources)
+	o.DRRules = o.DRRules.merge(conf.DRRules)
+	o.FPRules = o.FPRules.merge(conf.FPRules)
+	o.Outputs = o.Outputs.merge(conf.Outputs)
+	o.Integrity = o.Integrity.merge(conf.Integrity)
+	o.Exfil = o.Exfil.merge(conf.Exfil)
+	o.Artifacts = o.Artifacts.merge(conf.Artifacts)
+	o.NetPolicies = o.NetPolicies.merge(conf.NetPolicies)
+	return o
+}
+
+func (a orgSyncResources) merge(b orgSyncResources) orgSyncResources {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := map[string][]string{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		s := map[string]struct{}{}
+		if e, ok := n[k]; ok {
+			for _, sub := range e {
+				s[sub] = struct{}{}
+			}
+		}
+		for _, sub := range v {
+			if _, ok := s[sub]; !ok {
+				n[k] = append(n[k], sub)
+			}
+		}
+	}
+	return n
+}
+
+func (a orgSyncDRRules) merge(b orgSyncDRRules) orgSyncDRRules {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := orgSyncDRRules{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
+func (a orgSyncFPRules) merge(b orgSyncFPRules) orgSyncFPRules {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := orgSyncFPRules{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
+func (a orgSyncOutputs) merge(b orgSyncOutputs) orgSyncOutputs {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := orgSyncOutputs{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
+func (a orgSyncIntegrityRules) merge(b orgSyncIntegrityRules) orgSyncIntegrityRules {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := orgSyncIntegrityRules{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
+func (a orgSyncExfilRules) merge(b orgSyncExfilRules) orgSyncExfilRules {
+	n := orgSyncExfilRules{}
+	if a.Performance != nil || b.Performance != nil {
+		n.Performance = Dict{}
+		for k, v := range a.Performance {
+			n.Performance[k] = v
+		}
+		for k, v := range b.Performance {
+			n.Performance[k] = v
+		}
+	}
+	if a.Events != nil || b.Events != nil {
+		n.Events = map[string]ExfilRuleEvent{}
+		for k, v := range a.Events {
+			n.Events[k] = v
+		}
+		for k, v := range b.Events {
+			n.Events[k] = v
+		}
+	}
+	if a.Watches != nil || b.Watches != nil {
+		n.Watches = map[string]ExfilRuleWatch{}
+		for k, v := range a.Watches {
+			n.Watches[k] = v
+		}
+		for k, v := range b.Watches {
+			n.Watches[k] = v
+		}
+	}
+	return n
+}
+
+func (a orgSyncArtifacts) merge(b orgSyncArtifacts) orgSyncArtifacts {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := orgSyncArtifacts{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
+func (a orgSyncNetPolicies) merge(b orgSyncNetPolicies) orgSyncNetPolicies {
+	if a == nil && b == nil {
+		return nil
+	}
+	n := orgSyncNetPolicies{}
+	for k, v := range a {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
 }
 
 var OrgSyncOperationElementType = struct {
@@ -276,6 +477,7 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("net-policy: %v", err)
 		}
 	}
+	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
 }
 
@@ -412,6 +614,85 @@ func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules
 		rules[ruleName] = rule
 	}
 	return rules, nil
+}
+
+func (org Organization) SyncPushFromFiles(rootConfigFile string, options SyncOptions) ([]OrgSyncOperation, error) {
+	// If no custom loader was included, default to the built-in
+	// local file system loader.
+	if options.IncludeLoader == nil {
+		options.IncludeLoader = localFileIncludeLoader
+	}
+	conf, err := loadEffectiveConfig("", rootConfigFile, options)
+	if err != nil {
+		return nil, err
+	}
+	return org.SyncPush(conf, options)
+}
+
+func loadEffectiveConfig(parent string, configFile string, options SyncOptions) (OrgConfig, error) {
+	thisConfig, err := loadConfWithOptions(parent, configFile, options)
+	if err != nil {
+		return OrgConfig{}, err
+	}
+
+	for _, toInclude := range thisConfig.Includes {
+		incConf, err := loadEffectiveConfig(configFile, toInclude, options)
+		if err != nil {
+			return OrgConfig{}, err
+		}
+		thisConfig = thisConfig.Merge(incConf)
+	}
+	return thisConfig, nil
+}
+
+func loadConfWithOptions(parent string, configFile string, options SyncOptions) (OrgConfig, error) {
+	conf, err := options.IncludeLoader(parent, configFile)
+	if err != nil {
+		return OrgConfig{}, err
+	}
+
+	thisConfig := OrgConfig{}
+	if err := yaml.Unmarshal(conf, &thisConfig); err != nil {
+		return OrgConfig{}, err
+	}
+
+	if thisConfig.Version <= 0 {
+		return OrgConfig{}, fmt.Errorf("invalid version found (%s): %v", configFile, thisConfig.Version)
+	}
+	if thisConfig.Version > OrgConfigLatestVersion {
+		return OrgConfig{}, fmt.Errorf("version not supported (%s): %v", configFile, thisConfig.Version)
+	}
+	return thisConfig, nil
+}
+
+func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
+	// If this is the first include (empty parent), target file is not absolute, assume CWD.
+	root := ""
+	var err error
+	if parent == "" {
+		if !filepath.IsAbs(toInclude) {
+			if root, err = os.Getwd(); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		root = filepath.Dir(parent)
+	}
+
+	toInclude = filepath.Join(root, toInclude)
+
+	f, err := os.Open(toInclude)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {

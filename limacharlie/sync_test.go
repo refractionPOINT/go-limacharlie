@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"testing"
 	"time"
@@ -1098,5 +1099,193 @@ net-policy:
 		a.True(found, "net policy not found %s", name)
 		orgPolicy = orgPolicy.WithName(name)
 		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
+	}
+}
+
+func TestMerge(t *testing.T) {
+	o1 := OrgConfig{
+		Version: 3,
+		Resources: orgSyncResources{
+			"replicant": []string{
+				"a1",
+				"a2",
+			},
+		},
+		DRRules: orgSyncDRRules{
+			"r1": CoreDRRule{
+				Name:      "r1",
+				Namespace: "managed",
+				Detect: Dict{
+					"t": "v",
+				},
+				Response: List{
+					"l1",
+					"l2",
+				},
+			},
+			"r2": CoreDRRule{
+				Name:      "r2",
+				Namespace: "managed",
+				Detect: Dict{
+					"t": "v",
+				},
+				Response: List{
+					"l1",
+					"l2",
+				},
+			},
+		},
+	}
+	o2 := OrgConfig{
+		Resources: orgSyncResources{
+			"replicant": []string{
+				"a3",
+				"a1",
+			},
+		},
+		DRRules: orgSyncDRRules{
+			"r1": CoreDRRule{
+				Name:      "r1",
+				Namespace: "general",
+				Detect: Dict{
+					"t": "v1",
+				},
+				Response: List{
+					"l11",
+					"l21",
+				},
+			},
+		},
+	}
+	expected := `version: 3
+resources:
+  replicant:
+  - a1
+  - a2
+  - a3
+rules:
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
+`
+
+	out := o1.Merge(o2)
+
+	yOut, err := yaml.Marshal(out)
+	if err != nil {
+		t.Errorf("yaml: %v", err)
+	}
+
+	if string(yOut) != expected {
+		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
+	}
+}
+func TestPushMultiFiles(t *testing.T) {
+	files := map[string][]byte{
+		"f1": []byte(`version: 3
+resources:
+  replicant:
+  - a1
+  - a2
+  - a3
+`),
+		"r": []byte(`version: 3
+include:
+- s/f2
+- f1
+`),
+		"s/f2": []byte(`version: 3
+include:
+- f3
+rules:
+  r1:
+    name: r1
+    namespace: managed
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
+`),
+		"s/f3": []byte(`version: 3
+rules:
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+`),
+	}
+
+	expected := `version: 3
+resources:
+  replicant:
+  - a1
+  - a2
+  - a3
+rules:
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
+`
+
+	ldr := func(parent string, configFile string) ([]byte, error) {
+		full := filepath.Join(filepath.Dir(parent), configFile)
+		d, ok := files[full]
+		if !ok {
+			return nil, fmt.Errorf("file not found: %s", full)
+		}
+		return d, nil
+	}
+
+	out, err := loadEffectiveConfig("", "r", SyncOptions{
+		IncludeLoader: ldr,
+	})
+	if err != nil {
+		t.Errorf("failed to load: %v", err)
+	}
+
+	yOut, err := yaml.Marshal(out)
+	if err != nil {
+		t.Errorf("yaml: %v", err)
+	} else if string(yOut) != expected {
+		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
 	}
 }
