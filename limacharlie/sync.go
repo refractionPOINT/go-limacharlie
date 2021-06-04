@@ -3,7 +3,7 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -687,7 +687,7 @@ func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
 	}
 	defer f.Close()
 
-	data, err := io.ReadAll(f)
+	data, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,6 @@
 module github.com/refractionPOINT/go-limacharlie/limacharlie
 
-go 1.14
+go 1.13
 
 require (
 	github.com/google/uuid v1.2.0
