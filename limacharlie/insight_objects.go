@@ -34,7 +34,7 @@ var InsightObjectTypeInfoTypes = struct {
 	Location InsightObjectTypeInfoType
 }{
 	Summary:  "summary",
-	Location: "location",
+	Location: "locations",
 }
 
 type InsightObjectsRequest struct {
