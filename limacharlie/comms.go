@@ -89,12 +89,18 @@ var CommsMessageTypes = struct {
 	TaskResponse string
 	Error        string
 	CommandAck   string
+	Markdown     string
+	Json         string
+	Yaml         string
 }{
 	Chat:         "chat",
 	Task:         "task",
 	TaskResponse: "task-response",
 	Error:        "error",
 	CommandAck:   "cmdack",
+	Markdown:     "markdown",
+	Json:         "json",
+	Yaml:         "yaml",
 }
 
 var CommsCoreStatuses = struct {
