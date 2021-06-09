@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,26 +11,28 @@ import (
 type unsubscribeReplicantCB = func()
 
 func findUnsubscribeCallback(org *Organization, category string, name string) (unsubscribeReplicantCB, error) {
+	// To simplify all tests, we assume no resources are subscribed to
+	// and all subscriptions need to be undone after.
 	cb := func() {
 		org.ResourceUnsubscribe(name, category)
 	}
+	org.ResourceSubscribe(name, category)
+	time.Sleep(5 * time.Second)
+
 	resources, err := org.Resources()
 	if err != nil {
 		return nil, nil
 	}
 
-	resourceCatReplicant, found := resources[category]
+	resourceCat, found := resources[category]
 	if !found {
-		org.ResourceSubscribe(name, category)
-		time.Sleep(5 * time.Second)
-		return cb, nil
+		return nil, fmt.Errorf("failed to subscribe to ressource %s/%s", category, name)
 	}
 
-	if _, found = resourceCatReplicant[name]; found {
-		return nil, nil
+	if _, found = resourceCat[name]; !found {
+		return nil, fmt.Errorf("failed to subscribe to ressource %s/%s", category, name)
 	}
-	org.ResourceSubscribe(name, category)
-	time.Sleep(5 * time.Second)
+
 	return cb, nil
 }
 
