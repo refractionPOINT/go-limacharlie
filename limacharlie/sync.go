@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -325,7 +326,20 @@ func (a OrgConfig) mergeIntegrity(b orgSyncIntegrityRules) orgSyncIntegrityRules
 	return n
 }
 
+func IsInterfaceNil(v interface{}) bool {
+	return v == nil || reflect.ValueOf(v).Kind() == reflect.Ptr && reflect.ValueOf(v).IsNil()
+}
+
 func (a OrgConfig) mergeExfil(b *orgSyncExfilRules) *orgSyncExfilRules {
+	if IsInterfaceNil(a.Exfil) && IsInterfaceNil(b) {
+		return nil
+	}
+	if IsInterfaceNil(a.Exfil) {
+		a.Exfil = &orgSyncExfilRules{}
+	}
+	if IsInterfaceNil(b) {
+		b = &orgSyncExfilRules{}
+	}
 	n := &orgSyncExfilRules{}
 	if a.Exfil.Performance != nil || b.Performance != nil {
 		n.Performance = Dict{}
