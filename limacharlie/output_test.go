@@ -1,9 +1,12 @@
 package limacharlie
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"gopkg.in/yaml.v2"
 )
 
 func TestOutputList(t *testing.T) {
@@ -63,4 +66,63 @@ func TestOutputAddDelete(t *testing.T) {
 
 	_, err = org.OutputDel(testOutputName)
 	a.NoError(err)
+}
+
+func TestOutputMarshalingYAML(t *testing.T) {
+	testOutput := OutputConfig{
+		Name:   "test-lc-go-sdk-out",
+		Module: OutputTypes.Syslog,
+		Type:   OutputType.Event,
+
+		DestinationHost: "1.1.1.1:22",
+		TLS:             true,
+		StrictTLS:       true,
+		NoHeader:        true,
+	}
+	expected := `dest_host: 1.1.1.1:22
+is_no_header: "true"
+is_strict_tls: "true"
+is_tls: "true"
+module: syslog
+name: test-lc-go-sdk-out
+type: event
+`
+
+	y, err := yaml.Marshal(testOutput)
+	if err != nil {
+		t.Errorf("failed to marshal output to yaml: %v", err)
+	}
+	if string(y) != expected {
+		t.Errorf("mismatch: %s != %s", y, expected)
+	}
+}
+
+func TestOutputUnMarshalingYAML(t *testing.T) {
+	testOutput := `dest_host: 1.1.1.1:22
+is_no_header: "true"
+is_strict_tls: "true"
+is_tls: "true"
+module: syslog
+name: test-lc-go-sdk-out
+type: event
+`
+	expected := OutputConfig{
+		Name:   "test-lc-go-sdk-out",
+		Module: OutputTypes.Syslog,
+		Type:   OutputType.Event,
+
+		DestinationHost: "1.1.1.1:22",
+		TLS:             true,
+		StrictTLS:       true,
+		NoHeader:        true,
+	}
+
+	y := OutputConfig{}
+	err := yaml.Unmarshal([]byte(testOutput), &y)
+	if err != nil {
+		t.Errorf("failed to marshal output to yaml: %v", err)
+	}
+	if fmt.Sprintf("%#v", y) != fmt.Sprintf("%#v", expected) {
+		t.Errorf("mismatch: %#v != %#v", y, expected)
+	}
 }
