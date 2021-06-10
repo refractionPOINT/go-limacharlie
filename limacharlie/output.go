@@ -70,13 +70,13 @@ type OutputConfig struct {
 	Module OutputModuleType `json:"module"`
 	Type   OutputDataType   `json:"type"`
 
-	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempty,string"`
-	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string" yaml:"is_delete_on_failure,omitempty,string"`
+	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempt"`
+	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string" yaml:"is_delete_on_failure,omitempty"`
 	InvestigationID   string `json:"inv_id,omitempty" yaml:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty" yaml:"tag,omitempty"`
 	Category          string `json:"cat,omitempty" yaml:"cat,omitempty"`
 	SensorID          string `json:"sid,omitempty" yaml:"sid,omitempty"`
-	Flat              bool   `json:"is_flat,omitempty,string" yaml:"is_flat,omitempty,string"`
+	Flat              bool   `json:"is_flat,omitempty,string" yaml:"is_flat,omitempty"`
 	Directory         string `json:"dir,omitempty" yaml:"dir,omitempty"`
 	DestinationHost   string `json:"dest_host,omitempty" yaml:"dest_host,omitempty"`
 	SlackToken        string `json:"slack_api_token,omitempty" yaml:"slack_api_token,omitempty"`
@@ -84,22 +84,22 @@ type OutputConfig struct {
 	Bucket            string `json:"bucket,omitempty" yaml:"bucket,omitempty"`
 	UserName          string `json:"username,omitempty" yaml:"username,omitempty"`
 	Password          string `json:"password,omitempty" yaml:"password,omitempty"`
-	TLS               bool   `json:"is_tls,omitempty,string" yaml:"is_tls,omitempty,string"`
-	StrictTLS         bool   `json:"is_strict_tls,omitempty,string" yaml:"is_strict_tls,omitempty,string"`
-	NoHeader          bool   `json:"is_no_header,omitempty,string" yaml:"is_no_header,omitempty,string"`
+	TLS               bool   `json:"is_tls,omitempty,string" yaml:"is_tls,omitempty"`
+	StrictTLS         bool   `json:"is_strict_tls,omitempty,string" yaml:"is_strict_tls,omitempty"`
+	NoHeader          bool   `json:"is_no_header,omitempty,string" yaml:"is_no_header,omitempty"`
 	StructuredData    string `json:"structured_data,omitempty" yaml:"structured_data,omitempty"`
 	SecretKey         string `json:"secret_key,omitempty" yaml:"secret_key,omitempty"`
 	EventWhiteList    string `json:"event_white_list,omitempty" yaml:"event_white_list,omitempty"`
 	EventBlackList    string `json:"event_black_list,omitempty" yaml:"event_black_list,omitempty"`
-	SecondsPerFile    int    `json:"sec_per_file,omitempty,string" yaml:"sec_per_file,omitempty,string"`
+	SecondsPerFile    int    `json:"sec_per_file,omitempty,string" yaml:"sec_per_file,omitempty"`
 	DestinationEmail  string `json:"dest_email,omitempty" yaml:"dest_email,omitempty"`
 	FromEmail         string `json:"from_email,omitempty" yaml:"from_email,omitempty"`
-	Readable          bool   `json:"is_readable,omitempty,string" yaml:"is_readable,omitempty,string"`
+	Readable          bool   `json:"is_readable,omitempty,string" yaml:"is_readable,omitempty"`
 	Subject           string `json:"subject,omitempty" yaml:"subject,omitempty"`
-	StartTLS          bool   `json:"is_starttls,omitempty,string" yaml:"is_starttls,omitempty,string"`
-	AuthLogin         bool   `json:"is_authlogin,omitempty,string" yaml:"is_authlogin,omitempty,string"`
-	Indexing          bool   `json:"is_indexing,omitempty,string" yaml:"is_indexing,omitempty,string"`
-	Compressing       bool   `json:"is_compression,omitempty,string" yaml:"is_compression,omitempty,string"`
+	StartTLS          bool   `json:"is_starttls,omitempty,string" yaml:"is_starttls,omitempty"`
+	AuthLogin         bool   `json:"is_authlogin,omitempty,string" yaml:"is_authlogin,omitempty"`
+	Indexing          bool   `json:"is_indexing,omitempty,string" yaml:"is_indexing,omitempty"`
+	Compressing       bool   `json:"is_compression,omitempty,string" yaml:"is_compression,omitempty"`
 	CategoryBlackList string `json:"cat_black_list,omitempty" yaml:"cat_black_list,omitempty"`
 	CategoryWhiteList string `json:"cat_white_list,omitempty" yaml:"cat_white_list,omitempty"`
 	RegionName        string `json:"region_name,omitempty" yaml:"region_name,omitempty"`
