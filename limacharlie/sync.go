@@ -579,6 +579,14 @@ func (org Organization) syncFetchOutputs() (orgSyncOutputs, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Delete-on-Failure Outputs are associated with temporary
+	// outputs so we skip them here.
+	for outputName, output := range orgOutputs {
+		if !output.DeleteOnFailure {
+			continue
+		}
+		delete(orgOutputs, outputName)
+	}
 	return orgOutputs, nil
 }
 
