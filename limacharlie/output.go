@@ -124,6 +124,38 @@ func (o OutputConfig) Equals(other OutputConfig) bool {
 	return string(otherBytes) == string(bytes)
 }
 
+func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// Outputs have some fields as "string" which is not
+	// supported by the YAML lib. So we use custom marshaling.
+	// Since JSON supports it, we'll leverage it.
+	genericVersion := map[string]interface{}{}
+	if err := unmarshal(&genericVersion); err != nil {
+		return err
+	}
+	rawJSON, err := json.Marshal(genericVersion)
+	if err != nil {
+		return err
+	}
+	newO := OutputConfig{}
+	if err := json.Unmarshal(rawJSON, &newO); err != nil {
+		return err
+	}
+	*o = newO
+	return nil
+}
+
+func (o OutputConfig) MarshalYAML() (interface{}, error) {
+	rawJSON, err := json.Marshal(o)
+	if err != nil {
+		return nil, err
+	}
+	genericVersion := map[string]interface{}{}
+	if err := json.Unmarshal(rawJSON, &genericVersion); err != nil {
+		return nil, err
+	}
+	return genericVersion, nil
+}
+
 // OutputsByName represents OutputConfig where the key is the name of the OutputConfig
 type OutputName = string
 type OutputsByName = map[OutputName]OutputConfig
