@@ -4,8 +4,8 @@ type IntegrityRule struct {
 	Patterns []string            `json:"patterns"`
 	Filters  IntegrityRuleFilter `json:"filters"`
 
-	CreatedBy   string `json:"by"`
-	LastUpdated uint64 `json:"updated"`
+	CreatedBy   string `json:"by,omitempty"`
+	LastUpdated uint64 `json:"updated,omitempty"`
 }
 
 type IntegrityRuleFilter struct {

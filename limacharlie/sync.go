@@ -65,11 +65,9 @@ func (r OrgSyncFPRule) DetectionEquals(fpRule FPRule) bool {
 }
 
 type OrgSyncIntegrityRule struct {
-	LastUpdated uint64   `json:"updated" yaml:"updated"`
-	CreatedBy   string   `json:"by" yaml:"by"`
-	Patterns    []string `json:"patterns" yaml:"patterns"`
-	Tags        []string `json:"tags" yaml:"tags"`
-	Platforms   []string `json:"platforms" yaml:"platforms"`
+	Patterns  []string `json:"patterns" yaml:"patterns"`
+	Tags      []string `json:"tags" yaml:"tags"`
+	Platforms []string `json:"platforms" yaml:"platforms"`
 }
 
 func (oir OrgSyncIntegrityRule) EqualsContent(ir IntegrityRule) bool {
@@ -502,6 +500,7 @@ func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
 	}
 	netPolicies := orgSyncNetPolicies{}
 	for name, policy := range orgNetPolicies {
+		policy.CreatedBy = ""
 		netPolicies[name] = policy
 	}
 	return netPolicies, nil
@@ -518,6 +517,9 @@ func (org Organization) syncFetchExfil() (*orgSyncExfilRules, error) {
 		exfils.Events = make(map[string]ExfilRuleEvent)
 	}
 	for name, rule := range orgExfil.Events {
+		rule.CreatedBy = ""
+		rule.LastUpdated = 0
+
 		exfils.Events[name] = rule
 	}
 
@@ -564,11 +566,9 @@ func (org Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
 	rules := orgSyncIntegrityRules{}
 	for ruleName, rule := range orgRules {
 		rules[ruleName] = OrgSyncIntegrityRule{
-			LastUpdated: rule.LastUpdated,
-			CreatedBy:   rule.CreatedBy,
-			Patterns:    rule.Patterns,
-			Tags:        rule.Filters.Tags,
-			Platforms:   rule.Filters.Platforms,
+			Patterns:  rule.Patterns,
+			Tags:      rule.Filters.Tags,
+			Platforms: rule.Filters.Platforms,
 		}
 	}
 	return rules, nil

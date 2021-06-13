@@ -22,12 +22,12 @@ var NetPolicyTypes = struct {
 }
 
 type NetPolicy struct {
-	CreatedBy string        `json:"created_by"`
-	ExpiresOn uint64        `json:"expires_on"`
-	Name      string        `json:"name"`
-	OID       string        `json:"oid"`
-	Type      NetPolicyType `json:"type"`
-	Policy    Dict          `json:"policy"`
+	CreatedBy string        `json:"created_by,omitempty" yaml:"created_by,omitempty"`
+	ExpiresOn uint64        `json:"expires_on" yaml:"expires_on"`
+	Name      string        `json:"name" yaml:"name"`
+	OID       string        `json:"oid" yaml:"oid"`
+	Type      NetPolicyType `json:"type" yaml:"type"`
+	Policy    Dict          `json:"policy" yaml:"policy"`
 }
 
 func (n NetPolicy) jsonMarhsalContent() ([]byte, error) {
@@ -53,11 +53,11 @@ func (n NetPolicy) WithName(name string) NetPolicy {
 }
 
 type NetPolicyFirewallApplicable struct {
-	TimeDayStart uint   `json:"time_of_day_start"`
-	TimeDayEnd   uint   `json:"time_of_day_end"`
-	DayWeekStart uint   `json:"day_of_week_start"`
-	DayWeekEnd   uint   `json:"day_of_week_end"`
-	Timezone     string `json:"tz"`
+	TimeDayStart uint   `json:"time_of_day_start" yaml:"time_of_day_start"`
+	TimeDayEnd   uint   `json:"time_of_day_end" yaml:"time_of_day_end"`
+	DayWeekStart uint   `json:"day_of_week_start" yaml:"day_of_week_start"`
+	DayWeekEnd   uint   `json:"day_of_week_end" yaml:"day_of_week_end"`
+	Timezone     string `json:"tz" yaml:"tz"`
 }
 
 func (n NetPolicy) WithFirewallPolicy(bpfFilter string, isAllow bool, tag string, applicableTimes []NetPolicyFirewallApplicable, sources []string) NetPolicy {
