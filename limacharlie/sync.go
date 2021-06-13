@@ -501,6 +501,7 @@ func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
 	netPolicies := orgSyncNetPolicies{}
 	for name, policy := range orgNetPolicies {
 		policy.CreatedBy = ""
+		policy.OID = ""
 		netPolicies[name] = policy
 	}
 	return netPolicies, nil
@@ -534,6 +535,8 @@ func (org Organization) syncFetchExfil() (*orgSyncExfilRules, error) {
 		exfils.Watches = make(map[string]ExfilRuleWatch)
 	}
 	for name, rule := range orgExfil.Watches {
+		rule.CreatedBy = ""
+		rule.LastUpdated = 0
 		exfils.Watches[name] = rule
 	}
 	return exfils, nil
