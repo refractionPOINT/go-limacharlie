@@ -11,8 +11,8 @@ type ExfilRulesType struct {
 }
 
 type ExfilRuleBase struct {
-	LastUpdated uint64 `json:"updated"`
-	CreatedBy   string `json:"by"`
+	LastUpdated uint64 `json:"updated,omitempty" yaml:"updated,omitempty"`
+	CreatedBy   string `json:"by,omitempty" yaml:"by,omitempty"`
 }
 
 type ExfilEventFilters struct {
@@ -23,8 +23,8 @@ type ExfilEventFilters struct {
 type ExfilRuleEvent struct {
 	ExfilRuleBase
 
-	Events  []string          `json:"events"`
-	Filters ExfilEventFilters `json:"filters"`
+	Events  []string          `json:"events" yaml:"events"`
+	Filters ExfilEventFilters `json:"filters" yaml:"filters"`
 }
 
 func (r ExfilRuleEvent) jsonMarhsalContent() ([]byte, error) {
