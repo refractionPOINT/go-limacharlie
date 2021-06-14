@@ -10,18 +10,14 @@ type ExfilRulesType struct {
 	Watches     map[ExfilRuleName]ExfilRuleWatch `json:"watch,omitempty" yaml:"watch,omitempty"`
 }
 
-type ExfilRuleBase struct {
-	LastUpdated uint64 `json:"updated,omitempty" yaml:"updated,omitempty"`
-	CreatedBy   string `json:"by,omitempty" yaml:"by,omitempty"`
-}
-
 type ExfilEventFilters struct {
 	Tags      []string `json:"tags" yaml:"tags"`
 	Platforms []string `json:"platforms" yaml:"platforms"`
 }
 
 type ExfilRuleEvent struct {
-	ExfilRuleBase
+	LastUpdated uint64 `json:"updated,omitempty" yaml:"updated,omitempty"`
+	CreatedBy   string `json:"by,omitempty" yaml:"by,omitempty"`
 
 	Events  []string          `json:"events" yaml:"events"`
 	Filters ExfilEventFilters `json:"filters" yaml:"filters"`
@@ -91,7 +87,8 @@ func (org Organization) ExfilRuleEventDelete(name ExfilRuleName) error {
 }
 
 type ExfilRuleWatch struct {
-	ExfilRuleBase
+	LastUpdated uint64 `json:"updated,omitempty" yaml:"updated,omitempty"`
+	CreatedBy   string `json:"by,omitempty" yaml:"by,omitempty"`
 
 	Event    string            `json:"event" yaml:"event"`
 	Value    string            `json:"value" yaml:"value"`
