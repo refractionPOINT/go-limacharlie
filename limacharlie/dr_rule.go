@@ -31,7 +31,7 @@ type drAddRuleRequest struct {
 }
 
 type CoreDRRule struct {
-	Name      string `json:"name" yaml:"name"`
+	Name      string `json:"name,omitempty" yaml:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Detect    Dict   `json:"detect" yaml:"detect"`
 	Response  List   `json:"respond" yaml:"respond"`

@@ -15,7 +15,7 @@ type FPRuleName = string
 type FPRule struct {
 	Detection Dict       `json:"data" yaml:"data"`
 	OID       string     `json:"oid" yaml:"oid"`
-	Name      FPRuleName `json:"name" yaml:"name"`
+	Name      FPRuleName `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 // FPRules get all false positive rules from a LC organization.

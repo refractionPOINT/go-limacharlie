@@ -502,6 +502,7 @@ func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
 	for name, policy := range orgNetPolicies {
 		policy.CreatedBy = ""
 		policy.OID = ""
+		policy.Name = ""
 		netPolicies[name] = policy
 	}
 	return netPolicies, nil
@@ -600,6 +601,7 @@ func (org Organization) syncFetchFPRules() (orgSyncFPRules, error) {
 	}
 	rules := orgSyncFPRules{}
 	for ruleName, rule := range orgRules {
+		rule.Name = ""
 		rules[ruleName] = OrgSyncFPRule{
 			Detection: rule.Detection,
 		}
@@ -636,6 +638,7 @@ func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules
 		if strings.HasPrefix(ruleName, "__") {
 			continue
 		}
+		rule.Name = ""
 		rules[ruleName] = rule
 	}
 	return rules, nil
