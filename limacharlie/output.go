@@ -66,7 +66,7 @@ var OutputType = struct {
 
 // OutputConfig hold all the possible options used to configure an output
 type OutputConfig struct {
-	Name   string           `json:"name"`
+	Name   string           `json:"name,omitempty"`
 	Module OutputModuleType `json:"module"`
 	Type   OutputDataType   `json:"type"`
 
