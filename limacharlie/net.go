@@ -25,7 +25,7 @@ type NetPolicy struct {
 	CreatedBy string        `json:"created_by,omitempty" yaml:"created_by,omitempty"`
 	ExpiresOn uint64        `json:"expires_on" yaml:"expires_on"`
 	Name      string        `json:"name" yaml:"name"`
-	OID       string        `json:"oid" yaml:"oid"`
+	OID       string        `json:"oid" yaml:"oid,omitempty"`
 	Type      NetPolicyType `json:"type" yaml:"type"`
 	Policy    Dict          `json:"policy" yaml:"policy"`
 }
