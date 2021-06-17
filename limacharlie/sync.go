@@ -40,11 +40,21 @@ type SyncOptions struct {
 	SyncExfil       bool `json:"sync_exfil"`
 	SyncArtifacts   bool `json:"sync_artifacts"`
 	SyncNetPolicies bool `json:"sync_net_policies"`
+	SyncOrgValues   bool `json:"sync_org_values"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
 
 type IncludeLoaderCB = func(parentFilePath string, filePathToInclude string) ([]byte, error)
+
+var supportedOrgValues []string = []string{
+	"vt",
+	"otx",
+	"domain",
+	"shodan",
+	"pagerduty",
+	"twilio",
+}
 
 type DRRuleName = string
 
@@ -180,6 +190,7 @@ type orgSyncIntegrityRules = map[IntegrityRuleName]OrgSyncIntegrityRule
 type orgSyncExfilRules = ExfilRulesType
 type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
+type orgSyncOrgValues = map[OrgValueName]OrgValue
 
 type OrgConfig struct {
 	Version     int                   `json:"version" yaml:"version"`
@@ -192,6 +203,7 @@ type OrgConfig struct {
 	Exfil       *orgSyncExfilRules    `json:"exfil,omitempty" yaml:"exfil,omitempty"`
 	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
 	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
+	OrgValues   orgSyncOrgValues      `json:"org-value,omitempty" yaml:"org-value,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -241,6 +253,7 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.Exfil = o.mergeExfil(conf.Exfil)
 	o.Artifacts = o.mergeArtifacts(conf.Artifacts)
 	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
+	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
 	return o
 }
 
@@ -397,6 +410,20 @@ func (a OrgConfig) mergeNetPolicies(b orgSyncNetPolicies) orgSyncNetPolicies {
 	return n
 }
 
+func (a OrgConfig) mergeOrgValues(b orgSyncOrgValues) orgSyncOrgValues {
+	if a.OrgValues == nil && b == nil {
+		return nil
+	}
+	n := orgSyncOrgValues{}
+	for k, v := range a.OrgValues {
+		n[k] = v
+	}
+	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
 var OrgSyncOperationElementType = struct {
 	DRRule     string
 	FPRule     string
@@ -407,6 +434,7 @@ var OrgSyncOperationElementType = struct {
 	ExfilWatch string
 	Artifact   string
 	NetPolicy  string
+	OrgValue   string
 }{
 	DRRule:     "dr-rule",
 	FPRule:     "fp-rule",
@@ -417,6 +445,7 @@ var OrgSyncOperationElementType = struct {
 	ExfilWatch: "exfil-watch",
 	Artifact:   "artifact",
 	NetPolicy:  "net-policy",
+	OrgValue:   "org-value",
 }
 
 type OrgSyncOperation struct {
@@ -489,6 +518,12 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("net-policy: %v", err)
 		}
 	}
+	if options.SyncOrgValues {
+		orgConfig.OrgValues, err = org.syncFetchOrgValues()
+		if err != nil {
+			return orgConfig, fmt.Errorf("org-value: %v", err)
+		}
+	}
 	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
 }
@@ -506,6 +541,23 @@ func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
 		netPolicies[name] = policy
 	}
 	return netPolicies, nil
+}
+
+func (org Organization) syncFetchOrgValues() (orgSyncOrgValues, error) {
+	return org.getSupportedOrgValues()
+}
+
+func (org Organization) getSupportedOrgValues() (map[OrgValueName]OrgValue, error) {
+	ov := map[OrgValueName]OrgValue{}
+	for _, ovn := range supportedOrgValues {
+		ovi, err := org.OrgValueGet(ovn)
+		if err != nil {
+			// Likely the value was never set.
+			continue
+		}
+		ov[ovn] = ovi.Value
+	}
+	return ov, nil
 }
 
 func (org Organization) syncFetchExfil() (*orgSyncExfilRules, error) {
@@ -740,6 +792,13 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 			return ops, fmt.Errorf("resources: %v", err)
 		}
 	}
+	if options.SyncOrgValues {
+		newOps, err := org.syncOrgValues(conf.OrgValues, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("org-value: %v", err)
+		}
+	}
 	if options.SyncDRRules {
 		newOps, err := org.syncDRRules(who, conf.DRRules, options)
 		ops = append(ops, newOps...)
@@ -864,6 +923,83 @@ func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options 
 			IsRemoved:   true,
 		})
 
+	}
+	return ops, nil
+}
+
+func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
+	ops := []OrgSyncOperation{}
+	existingVals, err := org.getSupportedOrgValues()
+	if err != nil {
+		return ops, err
+	}
+	if values == nil {
+		values = orgSyncOrgValues{}
+	}
+
+	for name, val := range values {
+		if v, ok := existingVals[name]; ok {
+			if v == val {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.OrgValue,
+					ElementName: name,
+				})
+				continue
+			}
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.OrgValue,
+				ElementName: name,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.OrgValueSet(name, val); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.OrgValue,
+			ElementName: name,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// remove non existing in config
+	existingVals, err = org.getSupportedOrgValues()
+	if err != nil {
+		return ops, err
+	}
+
+	for name := range existingVals {
+		_, found := values[name]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.OrgValue,
+				ElementName: name,
+				IsRemoved:   true,
+			})
+			continue
+		}
+
+		if err := org.OrgValueSet(name, ""); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.OrgValue,
+			ElementName: name,
+			IsRemoved:   true,
+		})
 	}
 	return ops, nil
 }
