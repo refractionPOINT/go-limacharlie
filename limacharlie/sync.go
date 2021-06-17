@@ -948,6 +948,9 @@ func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions)
 	if err != nil {
 		return ops, err
 	}
+	if exfil == nil {
+		exfil = &orgSyncExfilRules{}
+	}
 
 	// watch
 	for ruleName, watch := range exfil.Watches {
