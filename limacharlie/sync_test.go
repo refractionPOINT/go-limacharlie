@@ -1289,3 +1289,94 @@ rules:
 		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
 	}
 }
+
+func TestSyncFullBidirectional(t *testing.T) {
+	rawConf := `version: 3
+resources:
+  api:
+  - vt
+  - comms
+  - insight
+  replicant:
+  - infrastructure-service
+  - integrity
+  - reliable-tasking
+  - responder
+  - sigma
+  - logging
+  - yara
+rules:
+  vt-domains:
+    name: vt-domains
+    namespace: general
+    detect:
+      event: DNS_REQUEST
+      metadata_rules:
+        length of: true
+        op: is greater than
+        path: /
+        value: 4
+      op: lookup
+      path: event/DOMAIN_NAME
+      resource: lcr://api/vt
+    respond:
+    - action: report
+      name: vt-bad-domain
+  vt-hashes:
+    name: vt-hashes
+    namespace: general
+    detect:
+      event: CODE_IDENTITY
+      metadata_rules:
+        length of: true
+        op: is greater than
+        path: /
+        value: 3
+      op: lookup
+      path: event/HASH
+      resource: lcr://api/vt
+    respond:
+    - action: report
+      name: vt-bad-hash
+integrity:
+  linux-key:
+    patterns:
+    - /home/*/.ssh/*
+    tags: []
+    platforms:
+    - linux
+artifact:
+  linux-logs:
+    is_ignore_cert: false
+    is_delete_after: false
+    days_retention: 30
+    patterns:
+    - /var/log/syslog.1
+    - /var/log/auth.log.1
+    tags: []
+    platforms:
+    - linux
+  windows-logs:
+    is_ignore_cert: false
+    is_delete_after: false
+    days_retention: 30
+    patterns:
+    - wel://system:*
+    - wel://security:*
+    - wel://application:*
+    tags: []
+    platforms:
+    - windows
+`
+	c := OrgConfig{}
+	if err := yaml.Unmarshal([]byte(rawConf), &c); err != nil {
+		t.Errorf("failed parsing yaml: %v", err)
+	}
+	newConf, err := yaml.Marshal(c)
+	if err != nil {
+		t.Errorf("failed producing yaml: %v", err)
+	}
+	if string(newConf) != rawConf {
+		t.Errorf("round trip through yaml failed to produce same output: %s\n\n!=\n\n%s", newConf, rawConf)
+	}
+}
