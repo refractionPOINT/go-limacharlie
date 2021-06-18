@@ -852,6 +852,10 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 }
 
 func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(netPolicies) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgNetPolicies, err := org.NetPolicies()
 	if err != nil {
@@ -928,6 +932,10 @@ func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options 
 }
 
 func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(values) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	existingVals, err := org.getSupportedOrgValues()
 	if err != nil {
@@ -1005,6 +1013,10 @@ func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptio
 }
 
 func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(artifacts) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgArtifacts, err := org.ArtifactsRules()
 	if err != nil {
@@ -1079,6 +1091,10 @@ func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOp
 }
 
 func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && (exfil == nil || (len(exfil.Events) == 0 && len(exfil.Performance) == 0 && len(exfil.Watches) == 0)) {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgRules, err := org.ExfilRules()
 	if err != nil {
@@ -1212,6 +1228,10 @@ func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions)
 }
 
 func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(integrity) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgIntRules, err := org.IntegrityRules()
 	if err != nil {
@@ -1291,6 +1311,10 @@ func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options S
 }
 
 func (org Organization) syncOutputs(outputs orgSyncOutputs, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(outputs) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgOutputs, err := org.Outputs()
 	if err != nil {
@@ -1366,6 +1390,10 @@ func (org Organization) syncOutputs(outputs orgSyncOutputs, options SyncOptions)
 }
 
 func (org Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(rules) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgRules, err := org.FPRules()
 	if err != nil {
@@ -1475,6 +1503,10 @@ func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (e
 }
 
 func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(rules) == 0 {
+		return nil, nil
+	}
+
 	availableNamespaces := org.resolveAvailableNamespaces(who)
 	ops := []OrgSyncOperation{}
 	existingRules, err := org.drRulesFromNamespaces(availableNamespaces)
@@ -1554,6 +1586,10 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules
 }
 
 func (org Organization) syncResources(resources orgSyncResources, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(resources) == 0 {
+		return nil, nil
+	}
+
 	ops := []OrgSyncOperation{}
 	orgResources, err := org.Resources()
 	if err != nil {

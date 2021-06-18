@@ -1290,6 +1290,37 @@ rules:
 	}
 }
 
+func TestSyncOrgValues(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	yamlValues := `org-value:
+otx: aaa
+twilio: bbb
+`
+	orgConf := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
+
+	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, IsDryRun: true, SyncNetPolicies: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsRemoved: true}, // that's a default
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole"},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "no_ssh", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	netPolicies, err = org.NetPolicies()
+	a.NoError(err)
+	a.Equal(netPoliciesCountStart+3, len(netPolicies))
+	for name, orgPolicy := range orgConfig.NetPolicies {
+		policy, found := netPolicies[name]
+		a.True(found, "net policy not found %s", name)
+		orgPolicy = orgPolicy.WithName(name)
+		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
+	}
+}
+
 func TestSyncFullBidirectional(t *testing.T) {
 	rawConf := `version: 3
 resources:
