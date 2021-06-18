@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 )
@@ -1293,32 +1294,48 @@ rules:
 func TestSyncOrgValues(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	yamlValues := `org-value:
-otx: aaa
-twilio: bbb
-`
+	ov1 := uuid.NewString()
+	ov2 := uuid.NewString()
+	yamlValues := fmt.Sprintf(`org-value:
+otx: %s
+twilio: %s
+`, ov1, ov2)
 	orgConf := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
 
-	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, IsDryRun: true, SyncNetPolicies: true})
+	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncNetPolicies: true})
 	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsRemoved: true}, // that's a default
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole"},
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "no_ssh", IsAdded: true},
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "twilio", IsAdded: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
-	netPolicies, err = org.NetPolicies()
+	ov, err := org.OrgValueGet("otx")
 	a.NoError(err)
-	a.Equal(netPoliciesCountStart+3, len(netPolicies))
-	for name, orgPolicy := range orgConfig.NetPolicies {
-		policy, found := netPolicies[name]
-		a.True(found, "net policy not found %s", name)
-		orgPolicy = orgPolicy.WithName(name)
-		a.True(policy.EqualsContent(orgPolicy), "net policies are not equal: %v != %v", policy, orgPolicy)
-	}
+	a.Equal(ov.Value, ov1)
+	ov, err = org.OrgValueGet("twilio")
+	a.NoError(err)
+	a.Equal(ov.Value, ov2)
+
+	yamlValues = fmt.Sprintf(`org-value:
+otx: %s
+`, ov1)
+	orgConf = OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
+
+	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncNetPolicies: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "twilio", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	ov, err = org.OrgValueGet("otx")
+	a.NoError(err)
+	a.Equal(ov.Value, ov1)
+	ov, err = org.OrgValueGet("twilio")
+	a.NoError(err)
+	a.Equal(ov.Value, "")
 }
 
 func TestSyncFullBidirectional(t *testing.T) {
