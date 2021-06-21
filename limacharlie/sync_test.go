@@ -1304,8 +1304,8 @@ func TestSyncOrgValues(t *testing.T) {
 	ov1 := uuid.NewString()
 	ov2 := uuid.NewString()
 	yamlValues := fmt.Sprintf(`org-value:
-otx: %s
-twilio: %s
+  otx: %s
+  twilio: %s
 `, ov1, ov2)
 	orgConf := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
@@ -1325,7 +1325,7 @@ twilio: %s
 	a.Equal(ov2, ov.Value)
 
 	yamlValues = fmt.Sprintf(`org-value:
-otx: %s
+  otx: %s
 `, ov1)
 	orgConf = OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))

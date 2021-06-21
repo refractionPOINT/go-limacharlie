@@ -932,15 +932,12 @@ func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options 
 }
 
 func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
-	fmt.Println(values)
-	fmt.Println(options)
 	if !options.IsForce && len(values) == 0 {
 		return nil, nil
 	}
 
 	ops := []OrgSyncOperation{}
 	existingVals, err := org.getSupportedOrgValues()
-	fmt.Println(existingVals)
 	if err != nil {
 		return ops, err
 	}
