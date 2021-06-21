@@ -1294,6 +1294,13 @@ rules:
 func TestSyncOrgValues(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+
+	// Start by zeroing out all values.
+	for _, v := range supportedOrgValues {
+		err := org.OrgValueSet(v, "")
+		a.NoError(err)
+	}
+
 	ov1 := uuid.NewString()
 	ov2 := uuid.NewString()
 	yamlValues := fmt.Sprintf(`org-value:
