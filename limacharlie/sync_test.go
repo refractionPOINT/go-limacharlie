@@ -1303,7 +1303,7 @@ twilio: %s
 	orgConf := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
 
-	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncNetPolicies: true})
+	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
 	a.NoError(err)
 	expectedOps := sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx", IsAdded: true},
@@ -1323,7 +1323,7 @@ otx: %s
 	orgConf = OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
 
-	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncNetPolicies: true})
+	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx", IsAdded: true},
