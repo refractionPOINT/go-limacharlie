@@ -1319,10 +1319,10 @@ twilio: %s
 	a.Equal(expectedOps, sortSyncOps(ops))
 	ov, err := org.OrgValueGet("otx")
 	a.NoError(err)
-	a.Equal(ov.Value, ov1)
+	a.Equal(ov1, ov.Value)
 	ov, err = org.OrgValueGet("twilio")
 	a.NoError(err)
-	a.Equal(ov.Value, ov2)
+	a.Equal(ov2, ov.Value)
 
 	yamlValues = fmt.Sprintf(`org-value:
 otx: %s
@@ -1339,10 +1339,10 @@ otx: %s
 	a.Equal(expectedOps, sortSyncOps(ops))
 	ov, err = org.OrgValueGet("otx")
 	a.NoError(err)
-	a.Equal(ov.Value, ov1)
+	a.Equal(ov1, ov.Value)
 	ov, err = org.OrgValueGet("twilio")
 	a.NoError(err)
-	a.Equal(ov.Value, "")
+	a.Equal("", ov.Value)
 }
 
 func TestSyncFullBidirectional(t *testing.T) {

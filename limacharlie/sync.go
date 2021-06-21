@@ -932,12 +932,15 @@ func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options 
 }
 
 func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
+	fmt.Println(values)
+	fmt.Println(options)
 	if !options.IsForce && len(values) == 0 {
 		return nil, nil
 	}
 
 	ops := []OrgSyncOperation{}
 	existingVals, err := org.getSupportedOrgValues()
+	fmt.Println(existingVals)
 	if err != nil {
 		return ops, err
 	}
@@ -946,14 +949,12 @@ func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptio
 	}
 
 	for name, val := range values {
-		if v, ok := existingVals[name]; ok {
-			if v == val {
-				ops = append(ops, OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.OrgValue,
-					ElementName: name,
-				})
-				continue
-			}
+		if v, ok := existingVals[name]; ok && v == val {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.OrgValue,
+				ElementName: name,
+			})
+			continue
 		}
 
 		if options.IsDryRun {
