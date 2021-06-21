@@ -1333,7 +1333,7 @@ func TestSyncOrgValues(t *testing.T) {
 	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx"},
 		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "twilio", IsRemoved: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
