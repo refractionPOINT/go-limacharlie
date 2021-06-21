@@ -985,9 +985,9 @@ func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptio
 		return ops, err
 	}
 
-	for name := range existingVals {
+	for name, v := range existingVals {
 		_, found := values[name]
-		if found {
+		if found || v == "" {
 			continue
 		}
 
