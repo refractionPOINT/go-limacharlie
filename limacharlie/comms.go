@@ -57,6 +57,14 @@ type MessageText struct {
 	Text string `json:"text"`
 }
 
+type MessageRequest struct {
+	Request map[string]interface{} `json:"request"`
+}
+
+type MessageResponse struct {
+	Response map[string]interface{} `json:"response"`
+}
+
 type MessageTasking struct {
 	Task    string   `json:"task"`
 	Sensors []string `json:"sensors"`
