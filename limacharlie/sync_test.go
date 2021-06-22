@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 )
@@ -1288,6 +1289,60 @@ rules:
 	} else if string(yOut) != expected {
 		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
 	}
+}
+
+func TestSyncOrgValues(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// Start by zeroing out all values.
+	for _, v := range supportedOrgValues {
+		err := org.OrgValueSet(v, "")
+		a.NoError(err)
+	}
+
+	ov1 := uuid.NewString()
+	ov2 := uuid.NewString()
+	yamlValues := fmt.Sprintf(`org-value:
+  otx: %s
+  twilio: %s
+`, ov1, ov2)
+	orgConf := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
+
+	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "twilio", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	ov, err := org.OrgValueGet("otx")
+	a.NoError(err)
+	a.Equal(ov1, ov.Value)
+	ov, err = org.OrgValueGet("twilio")
+	a.NoError(err)
+	a.Equal(ov2, ov.Value)
+
+	yamlValues = fmt.Sprintf(`org-value:
+  otx: %s
+`, ov1)
+	orgConf = OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
+
+	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "otx"},
+		{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "twilio", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	ov, err = org.OrgValueGet("otx")
+	a.NoError(err)
+	a.Equal(ov1, ov.Value)
+	ov, err = org.OrgValueGet("twilio")
+	a.NoError(err)
+	a.Equal("", ov.Value)
 }
 
 func TestSyncFullBidirectional(t *testing.T) {
