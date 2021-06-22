@@ -84,23 +84,27 @@ type MessageCommandAck struct {
 }
 
 var CommsMessageTypes = struct {
-	Chat         string
-	Task         string
-	TaskResponse string
-	Error        string
-	CommandAck   string
-	Markdown     string
-	Json         string
-	Yaml         string
+	Chat           string
+	Search         string
+	SearchResponse string
+	Task           string
+	TaskResponse   string
+	Error          string
+	CommandAck     string
+	Markdown       string
+	Json           string
+	Yaml           string
 }{
-	Chat:         "chat",
-	Task:         "task",
-	TaskResponse: "task-response",
-	Error:        "error",
-	CommandAck:   "cmdack",
-	Markdown:     "markdown",
-	Json:         "json",
-	Yaml:         "yaml",
+	Chat:           "chat",
+	Search:         "search",
+	SearchResponse: "search-response",
+	Task:           "task",
+	TaskResponse:   "task-response",
+	Error:          "error",
+	CommandAck:     "cmdack",
+	Markdown:       "markdown",
+	Json:           "json",
+	Yaml:           "yaml",
 }
 
 var CommsCoreStatuses = struct {
