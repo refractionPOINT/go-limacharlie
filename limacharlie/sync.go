@@ -715,8 +715,10 @@ func loadEffectiveConfig(parent string, configFile string, options SyncOptions) 
 		return OrgConfig{}, err
 	}
 
+	includePath := filepath.Join(parent, configFile)
+
 	for _, toInclude := range thisConfig.Includes {
-		incConf, err := loadEffectiveConfig(configFile, toInclude, options)
+		incConf, err := loadEffectiveConfig(includePath, toInclude, options)
 		if err != nil {
 			return OrgConfig{}, err
 		}
