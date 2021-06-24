@@ -140,6 +140,14 @@ func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := json.Unmarshal(rawJSON, &newO); err != nil {
 		return err
 	}
+	// When used for Sync, the format of the config file uses
+	// the key "for" instead of "type". For backwards compatibility
+	// we will do the swap when necessary.
+	if newO.Type == "" {
+		if t, ok := genericVersion["for"]; ok {
+			newO.Type, _ = t.(string)
+		}
+	}
 	*o = newO
 	return nil
 }
