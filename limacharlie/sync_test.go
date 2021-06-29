@@ -1020,8 +1020,6 @@ net-policy:
 	a.NoError(err)
 	expectedOps := sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "conn-telemetry", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "dns-telemetry", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole", IsAdded: true},
 	})
@@ -1097,7 +1095,7 @@ net-policy:
 	a.Equal(expectedOps, sortSyncOps(ops))
 	netPolicies, err = org.NetPolicies()
 	a.NoError(err)
-	a.Equal(netPoliciesCountStart+1, len(netPolicies))
+	a.Equal(netPoliciesCountStart-1, len(netPolicies))
 
 	for name, orgPolicy := range forceOrgConfig.NetPolicies {
 		policy, found := netPolicies[name]
