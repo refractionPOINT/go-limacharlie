@@ -1020,6 +1020,8 @@ net-policy:
 	a.NoError(err)
 	expectedOps := sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "conn-telemetry", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "dns-telemetry", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole", IsAdded: true},
 	})
@@ -1071,6 +1073,8 @@ net-policy:
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "default-allow-outbound", IsRemoved: true}, // that's a default
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "conn-telemetry", IsRemoved: true},         // also a default
+		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "dns-telemetry", IsRemoved: true},          // believe it or not, also default
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "allow-outbound", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "custom_google", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole"},
