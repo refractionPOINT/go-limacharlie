@@ -145,6 +145,14 @@ func TestSensorTags(t *testing.T) {
 		t.Errorf("unexpected tags: %v", tags)
 	}
 
+	allTags, err := org.GetAllTags()
+	if err != nil {
+		t.Errorf("failed to get all tags: %v", err)
+	}
+	if len(allTags) == 0 {
+		t.Errorf("unexpected all tags: %v", allTags)
+	}
+
 	if err := sensor.RemoveTag("ttt"); err != nil {
 		t.Errorf("RemoveTag: %v", err)
 	}
