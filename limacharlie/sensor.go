@@ -235,3 +235,13 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 
 	return m, nil
 }
+
+func (org *Organization) GetAllTags() ([]string, error) {
+	tags := struct {
+		Tags []string `json:"tags"`
+	}{}
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("tags/%s", org.client.options.OID), makeDefaultRequest(&tags)); err != nil {
+		return nil, err
+	}
+	return tags.Tags, nil
+}
