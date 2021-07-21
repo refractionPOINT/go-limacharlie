@@ -80,8 +80,6 @@ type MessageCommandAck struct {
 
 var CommsMessageTypes = struct {
 	Chat       string
-	Search     string
-	Task       string
 	Error      string
 	CommandAck string
 	Markdown   string
@@ -89,8 +87,6 @@ var CommsMessageTypes = struct {
 	Yaml       string
 }{
 	Chat:       "chat",
-	Search:     "search",
-	Task:       "task",
 	Error:      "error",
 	CommandAck: "cmdack",
 	Markdown:   "markdown",
