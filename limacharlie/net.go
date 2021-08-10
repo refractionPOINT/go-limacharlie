@@ -147,6 +147,7 @@ func (org Organization) NetPolicies() (NetPoliciesByName, error) {
 func (org Organization) NetPolicyAdd(policy NetPolicy) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withURLRoot("/").withFormData(policy)
+	policy.OID = org.client.options.OID
 	return org.client.reliableRequest(http.MethodPost, org.netPolicyUrl(), req)
 }
 
