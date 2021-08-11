@@ -1051,7 +1051,6 @@ net-policy:
 	yamlNetPolicies = fmt.Sprintf(`
 net-policy:
   sinkhole:
-    oid: %s
     type: dns
     policy:
       domain: evil.com
@@ -1064,7 +1063,7 @@ net-policy:
     policy:
       domain: google.local.com
       to_cname: www.google.com
-`, org.client.options.OID, org.client.options.OID)
+`, org.client.options.OID)
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlNetPolicies), &forceOrgConfig))
 

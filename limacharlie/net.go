@@ -35,6 +35,7 @@ func (n NetPolicy) jsonMarhsalContent() ([]byte, error) {
 	if len(n.Policy) == 0 {
 		n.Policy = Dict{}
 	}
+	n.OID = ""
 	return json.Marshal(n)
 }
 
