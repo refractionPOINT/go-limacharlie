@@ -28,6 +28,9 @@ func TestSyncPushResources(t *testing.T) {
 	a.NoError(err)
 	defer resetResource(org)
 
+	resetResource(org)
+	time.Sleep(5*time.Second)
+
 	resourcesConfig := `
 resources:
   api:
@@ -1051,7 +1054,6 @@ net-policy:
 	yamlNetPolicies = fmt.Sprintf(`
 net-policy:
   sinkhole:
-    oid: %s
     type: dns
     policy:
       domain: evil.com
@@ -1064,7 +1066,7 @@ net-policy:
     policy:
       domain: google.local.com
       to_cname: www.google.com
-`, org.client.options.OID, org.client.options.OID)
+`, org.client.options.OID)
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlNetPolicies), &forceOrgConfig))
 
