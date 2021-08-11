@@ -87,7 +87,7 @@ resources:
 	time.Sleep(5 * time.Second)
 	resources, err = org.Resources()
 	a.NoError(err)
-	a.Equal(resourcesBase, resources)
+	a.Equal(postForce, resources)
 
 }
 
