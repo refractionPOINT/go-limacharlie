@@ -70,11 +70,8 @@ resources:
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsRemoved: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
 	a.Equal(expectedResources, resources)
