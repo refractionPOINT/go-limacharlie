@@ -28,6 +28,9 @@ func TestSyncPushResources(t *testing.T) {
 	a.NoError(err)
 	defer resetResource(org)
 
+	resetResource(org)
+	time.Sleep(5*time.Second)
+
 	resourcesConfig := `
 resources:
   api:
