@@ -32,6 +32,9 @@ type NetPolicy struct {
 
 func (n NetPolicy) jsonMarhsalContent() ([]byte, error) {
 	n.CreatedBy = ""
+	if len(n.Policy) == 0 {
+		n.Policy = Dict{}
+	}
 	return json.Marshal(n)
 }
 

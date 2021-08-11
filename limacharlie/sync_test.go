@@ -65,16 +65,17 @@ resources:
 	expectedResources.AddToCategory(ResourceCategories.Replicant, "exfil")
 	a.Equal(expectedResources, resources)
 
+	// remove the vt element to test force
+	orgConfig.Resources["api"] = []string{"ip-geo"}
+	postForce := resources.duplicate()
+	postForce.RemoveFromCategory(ResourceCategories.API, "vt")
 	// force dry run
 	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncResources: true})
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt"},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsRemoved: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
 	a.Equal(expectedResources, resources)
@@ -86,7 +87,7 @@ resources:
 	time.Sleep(5 * time.Second)
 	resources, err = org.Resources()
 	a.NoError(err)
-	a.Equal(resourcesBase, resources)
+	a.Equal(postForce, resources)
 
 }
 

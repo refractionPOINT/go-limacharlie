@@ -59,6 +59,15 @@ func (r *ResourcesByCategory) GetForCategory(category ResourceCategory) map[Reso
 	return resourcesForCat
 }
 
+func (r *ResourcesByCategory) RemoveFromCategory(category ResourceCategory, name ResourceName) {
+	cat, found := (*r)[category]
+	if !found {
+		return
+	}
+	delete(cat, name)
+	(*r)[category] = cat
+}
+
 // Resources list available resources
 func (org Organization) Resources() (ResourcesByCategory, error) {
 	resp := resourceGetResponse{}

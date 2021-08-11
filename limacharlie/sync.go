@@ -1675,7 +1675,7 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 					break
 				}
 			}
-			if !found {
+			if found {
 				continue
 			}
 
