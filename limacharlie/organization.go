@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"fmt"
+	"net/http"
 )
 
 // Organization holds a connection to the LC cloud organization
@@ -118,4 +119,15 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 
 func (o *Organization) Comms() *Comms {
 	return &Comms{o: o}
+}
+
+func (o *Organization) GetURLs() (map[string]string, error) {
+	resp := struct {
+		URLs map[string]string `json:"url"`
+	}{}
+
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+		return nil, err
+	}
+	return resp.URLs, nil
 }

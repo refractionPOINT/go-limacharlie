@@ -29,7 +29,7 @@ func TestSyncPushResources(t *testing.T) {
 	defer resetResource(org)
 
 	resetResource(org)
-	time.Sleep(5*time.Second)
+	time.Sleep(5 * time.Second)
 
 	resourcesConfig := `
 resources:

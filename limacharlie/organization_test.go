@@ -25,3 +25,14 @@ func (s *OrgTestSuite) TestAuthorizeMissingPermission() {
 	_, _, err := org.Authorize([]string{"org.get", "foo.bar"})
 	s.EqualError(err, "unauthorized, missing permissions: '[\"foo.bar\"]'")
 }
+
+func (s *OrgTestSuite) TestOrgURLs() {
+	a := assert.New(s)
+	org := getTestOrgFromEnv(a)
+
+	urls, err := org.GetURLs()
+	a.NoError(err)
+	if len(urls) != 0 {
+		s.Errorf("not enough URLs found: %+v", urls)
+	}
+}
