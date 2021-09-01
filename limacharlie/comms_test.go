@@ -24,6 +24,10 @@ func TestComms(t *testing.T) {
 	a.NoError(err)
 	a.NotNil(room)
 
+	if room == nil {
+		return
+	}
+
 	if room.ID == "" {
 		t.Errorf("missing room id: %+v", room)
 	}

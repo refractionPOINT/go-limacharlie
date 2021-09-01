@@ -99,7 +99,7 @@ func (org Organization) Resources() (ResourcesByCategory, error) {
 // few seconds before a call to list resources shows up with the updated list.
 func (org Organization) ResourceSubscribe(name ResourceName, category ResourceCategory) error {
 	resp := Dict{}
-	req := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(Dict{
+	req := makeDefaultRequest(&resp).withTimeout(120 * time.Second).withFormData(Dict{
 		"res_cat":  category,
 		"res_name": name,
 	})
@@ -111,7 +111,7 @@ func (org Organization) ResourceSubscribe(name ResourceName, category ResourceCa
 // few seconds before a call to list resources shows up with the updated list.
 func (org Organization) ResourceUnsubscribe(name ResourceName, category ResourceCategory) error {
 	resp := Dict{}
-	req := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(Dict{
+	req := makeDefaultRequest(&resp).withTimeout(120 * time.Second).withFormData(Dict{
 		"res_cat":  category,
 		"res_name": name,
 	})
