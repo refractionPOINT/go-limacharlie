@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/stretchr/testify/assert"
 )
 
 type OrgTestSuite struct {
@@ -27,13 +26,13 @@ func (s *OrgTestSuite) TestAuthorizeMissingPermission() {
 	s.EqualError(err, "unauthorized, missing permissions: '[\"foo.bar\"]'")
 }
 
-func (s *OrgTestSuite) TestOrgURLs() {
-	a := assert.New(s)
+func TestOrgURLs(t *testing.T) {
+	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
 	urls, err := org.GetURLs()
 	a.NoError(err)
 	if len(urls) != 0 {
-		s.Errorf("not enough URLs found: %+v", urls)
+		t.Errorf("not enough URLs found: %+v", urls)
 	}
 }
