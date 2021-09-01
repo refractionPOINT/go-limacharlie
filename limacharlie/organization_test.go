@@ -33,7 +33,7 @@ func TestOrgURLs(t *testing.T) {
 
 	urls, err := org.GetURLs()
 	a.NoError(err)
-	if len(urls) != 0 {
+	if len(urls) <= 3 {
 		t.Errorf("not enough URLs found: %+v", urls)
 	}
 }

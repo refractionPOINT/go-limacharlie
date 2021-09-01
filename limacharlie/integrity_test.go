@@ -15,10 +15,10 @@ func findUnsubscribeCallback(org *Organization, category string, name string) (u
 	// and all subscriptions need to be undone after.
 	cb := func() {
 		org.ResourceUnsubscribe(name, category)
-		time.Sleep(6 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 	org.ResourceSubscribe(name, category)
-	time.Sleep(6 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	resources, err := org.Resources()
 	if err != nil {
