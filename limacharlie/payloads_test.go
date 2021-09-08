@@ -38,7 +38,7 @@ func TestPayloads(t *testing.T) {
 	a.Equal(string(data), string(testData))
 
 	// Delete the payload.
-	err = org.DeletrePayload(testName)
+	err = org.DeletePayload(testName)
 	a.NoError(err)
 
 	// Make sure it is deleted.
