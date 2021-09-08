@@ -25,7 +25,7 @@ func TestPayloads(t *testing.T) {
 	a.Equal(ok, true, "failed to find new payload in list: %+v", payloads)
 	a.Equal(entry.Name, testName)
 	a.Equal(entry.Oid, org.client.options.OID)
-	a.Equal(entry.Size, len(testData))
+	a.Equal(entry.Size, uint64(len(testData)))
 
 	// Try to re-create it to get an error.
 	err = org.CreatePayloadFromBytes(testName, testData)
