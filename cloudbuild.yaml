@@ -1,7 +1,7 @@
 steps:
 - name: 'golang'
   dir: limacharlie
-  args: ['go', 'test', '.', '-v']
+  args: ['go', 'test', '.', '-v', '--run', '^TestPayloads$']
   env:
     - '_KEY=${_KEY}'
     - '_OID=${_OID}'
