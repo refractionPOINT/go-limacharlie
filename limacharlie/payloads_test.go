@@ -22,7 +22,7 @@ func TestPayloads(t *testing.T) {
 	payloads, err := org.Payloads()
 	a.NoError(err)
 	entry, ok := payloads[testName]
-	a.Equal(ok, true)
+	a.Equal(ok, true, "failed to find new payload in list: %+v", payloads)
 	a.Equal(entry.Name, testName)
 	a.Equal(entry.Oid, org.client.options.OID)
 	a.Equal(entry.Size, len(testData))
