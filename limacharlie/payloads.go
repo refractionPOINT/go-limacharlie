@@ -14,6 +14,9 @@ type Payload struct {
 	By        string `json:"by"`
 	CreatedOn uint64 `json:"created"`
 }
+type payloadsList struct {
+	Payloads map[PayloadName]Payload `json:"payloads"`
+}
 type PayloadName = string
 type payloadGetPointer struct {
 	URL string `json:"get_url"`
@@ -24,12 +27,12 @@ type payloadPutPointer struct {
 
 // List all the Payloads in an LC organization.
 func (org Organization) Payloads() (map[PayloadName]Payload, error) {
-	resp := map[PayloadName]Payload{}
+	resp := payloadsList{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("payload/%s", org.client.options.OID), request); err != nil {
 		return nil, err
 	}
-	return resp, nil
+	return resp.Payloads, nil
 }
 
 // Download the content of a Payload in an LC organization.
