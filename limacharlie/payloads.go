@@ -55,7 +55,7 @@ func (org Organization) Payload(name PayloadName) ([]byte, error) {
 }
 
 // Delete a Payload from within an LC organization.
-func (org Organization) DeletrePayload(name PayloadName) error {
+func (org Organization) DeletePayload(name PayloadName) error {
 	resp := Dict{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("payload/%s/%s", org.client.options.OID, name), request); err != nil {
