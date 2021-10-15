@@ -1611,7 +1611,7 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 					continue
 				}
 				if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
-					return ops, nil
+					return ops, err
 				}
 				ops = append(ops, OrgSyncOperation{
 					ElementType: OrgSyncOperationElementType.Resource,
@@ -1641,7 +1641,7 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 				continue
 			}
 			if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
-				return ops, nil
+				return ops, err
 			}
 			ops = append(ops, OrgSyncOperation{
 				ElementType: OrgSyncOperationElementType.Resource,
