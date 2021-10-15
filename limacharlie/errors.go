@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type lcErrorCode = string
@@ -62,3 +63,7 @@ var ErrorResourceNotFound = errors.New("resource not found")
 
 // Returned for a feature that is not yet implemented to parity with the Python SDK.
 var ErrorNotImplemented = errors.New("not implemented")
+
+func IsServiceNotRegisteredError(err error) bool {
+	return strings.Contains(err.Error(), "org not registered to service")
+}

@@ -860,7 +860,7 @@ func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options 
 
 	ops := []OrgSyncOperation{}
 	orgNetPolicies, err := org.NetPolicies()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 
@@ -901,7 +901,7 @@ func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options 
 
 	// remove non existing in config
 	orgNetPolicies, err = org.NetPolicies()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 
@@ -1019,7 +1019,7 @@ func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOp
 
 	ops := []OrgSyncOperation{}
 	orgArtifacts, err := org.ArtifactsRules()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 
@@ -1059,7 +1059,7 @@ func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOp
 
 	// remove non existing in config
 	orgArtifacts, err = org.ArtifactsRules()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 
@@ -1097,7 +1097,7 @@ func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions)
 
 	ops := []OrgSyncOperation{}
 	orgRules, err := org.ExfilRules()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 	if exfil == nil {
@@ -1171,7 +1171,7 @@ func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions)
 
 	// remove rules not in config
 	orgRules, err = org.ExfilRules()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 
@@ -1234,7 +1234,7 @@ func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options S
 
 	ops := []OrgSyncOperation{}
 	orgIntRules, err := org.IntegrityRules()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 
@@ -1280,7 +1280,7 @@ func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options S
 
 	// refetch
 	orgIntRules, err = org.IntegrityRules()
-	if err != nil {
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
 		return ops, err
 	}
 	// list the existing rules and remove the ones not in our list
