@@ -12,7 +12,7 @@ type DetStats struct {
 	Totals map[string]map[string]int `json:"totals"`
 }
 
-func (org *Organization) OnlineStats(start string, end string) (Stats, error) {
+func (org *Organization) OnlineStats(start int64, end int64) (Stats, error) {
 	stats := Stats{}
 	q := makeDefaultRequest(&stats)
 	q = q.withQueryData(Dict{
