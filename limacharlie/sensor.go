@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -244,4 +245,13 @@ func (org *Organization) GetAllTags() ([]string, error) {
 		return nil, err
 	}
 	return tags.Tags, nil
+}
+
+func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
+	list := map[string]bool{}
+	q := makeDefaultRequest(&list)
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("/online/%s?sids=%s", org.client.options.OID, strings.Join(sids, "&sids=")), q); err != nil {
+		return nil, err
+	}
+	return list, nil
 }
