@@ -38,7 +38,7 @@ func (org *Organization) TrafficStats(start int64, end int64) (Stats, error) {
 	return stats, nil
 }
 
-func (org *Organization) DetectionStats(start string, end string) (DetStats, error) {
+func (org *Organization) DetectionStats(start int64, end int64) (DetStats, error) {
 	stats := DetStats{}
 	q := makeDefaultRequest(&stats)
 	q = q.withQueryData(Dict{
