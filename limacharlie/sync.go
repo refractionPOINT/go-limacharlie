@@ -1669,7 +1669,14 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 	for orgResCat, orgResNames := range orgResources {
 		resNames, found := resources[orgResCat]
 		if !found {
-			continue
+			// Check for the replicant -> service
+			// possible alias.
+			if orgResCat != "replicant" {
+				continue
+			}
+			if resNames, found = resources["service"]; !found {
+				continue
+			}
 		}
 		for orgResName := range orgResNames {
 
