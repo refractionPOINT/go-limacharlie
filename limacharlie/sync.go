@@ -1597,6 +1597,11 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 	}
 
 	for resCat, resNames := range resources {
+		// The service category is an alias of the
+		// legacy replicant category.
+		if resCat == "service" {
+			resCat = "replicant"
+		}
 		orgResCat, found := orgResources[resCat]
 		if !found {
 			// cat does not exist in org, subscribe to all
