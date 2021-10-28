@@ -1667,16 +1667,17 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 	// Only remove resources if it is present in the config.
 	// This avoids unexpected disabling of all configs.
 	for orgResCat, orgResNames := range orgResources {
-		resNames, found := resources[orgResCat]
+		var resNames []string
+		found := false
+		if orgResCat == "replicant" || orgResCat == "service" {
+			// Check for the replicant -> service possible alias.
+			resNames = mergeStringSets(resources["replicant"], resources["service"])
+			found = resNames != nil
+		} else {
+			resNames, found = resources[orgResCat]
+		}
 		if !found {
-			// Check for the replicant -> service
-			// possible alias.
-			if orgResCat != "replicant" {
-				continue
-			}
-			if resNames, found = resources["service"]; !found {
-				continue
-			}
+			continue
 		}
 		for orgResName := range orgResNames {
 
@@ -1712,4 +1713,22 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 	}
 
 	return ops, nil
+}
+
+func mergeStringSets(a []string, b []string) []string {
+	if a == nil && b == nil {
+		return nil
+	}
+	s := map[string]struct{}{}
+	for _, e := range a {
+		s[e] = struct{}{}
+	}
+	for _, e := range b {
+		s[e] = struct{}{}
+	}
+	out := []string{}
+	for e := range s {
+		out = append(out, e)
+	}
+	return out
 }
