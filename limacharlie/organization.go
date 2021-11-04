@@ -14,16 +14,15 @@ type Organization struct {
 
 // OrganizationInformation has the information about the organization
 type OrganizationInformation struct {
-	OID 			string 				`json:"oid,omitempty"`
-	SensorVersion 	string 				`json:"sensor_version,omitempty"`
-	LatestVersions  map[string]string 	`json:"latest_versions,omitempty"`
-	NumberOutputs  	int64 				`json:"n_outputs,omitempty"`
-	NumberInstKeys  int64 				`json:"n_installation_keys,omitempty"`
-	NumberRules  	int64 				`json:"n_rules,omitempty"`
-	Name  			string 				`json:"name,omitempty"`
-	SensorQuota  	int64 				`json:"sensor_quota,omitempty"`
+	OID            string            `json:"oid,omitempty"`
+	SensorVersion  string            `json:"sensor_version,omitempty"`
+	LatestVersions map[string]string `json:"latest_versions,omitempty"`
+	NumberOutputs  int64             `json:"n_outputs,omitempty"`
+	NumberInstKeys int64             `json:"n_installation_keys,omitempty"`
+	NumberRules    int64             `json:"n_rules,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	SensorQuota    int64             `json:"sensor_quota,omitempty"`
 }
-
 
 // NewOrganization initialize a link to an organization
 func NewOrganization(c *Client) (*Organization, error) {
