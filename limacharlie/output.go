@@ -176,6 +176,13 @@ func (md *OutputConfig) UnmarshalJSON(data []byte) error {
 	// Filter out all the empty strings
 	// which we want to go to the default empty value.
 	for k, v := range d {
+		if k == "for" {
+			// The API has a mismatch between storage
+			// and returned, so we have to swap.
+			d["type"] = v
+			delete(d, k)
+			continue
+		}
 		if v != "" {
 			continue
 		}
