@@ -164,6 +164,41 @@ func (o OutputConfig) MarshalYAML() (interface{}, error) {
 	return genericVersion, nil
 }
 
+type tempoutputResponse outputResponse
+
+func (md *outputResponse) UnmarshalJSON(data []byte) error {
+	// First get all the fields parsed in a dictionary.
+	d := map[string]interface{}{}
+	if err := json.Unmarshal(data, &d); err != nil {
+		return err
+	}
+
+	// Filter out all the empty strings
+	// which we want to go to the default empty value.
+	for k, v := range d {
+		if v != "" {
+			continue
+		}
+		delete(d, k)
+	}
+
+	// Re-marshal to JSON so that we can
+	// do another single-pass Unmarshal.
+	t, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+
+	// Finally extract to a temporary type
+	// (to bypass this custom Unmarshaler).
+	tmd := tempoutputResponse{}
+	if err := json.Unmarshal(t, &tmd); err != nil {
+		return err
+	}
+	*md = outputResponse(tmd)
+	return nil
+}
+
 // OutputsByName represents OutputConfig where the key is the name of the OutputConfig
 type OutputName = string
 type OutputsByName = map[OutputName]OutputConfig
@@ -190,12 +225,12 @@ type outputResponse struct {
 func (org Organization) Outputs() (OutputsByName, error) {
 	outputsByOrg := map[string]map[OutputName]outputResponse{}
 	if err := org.OutputsGeneric(&outputsByOrg); err != nil {
-		return OutputsByName{}, err
+		return nil, err
 	}
 
 	outByName, ok := outputsByOrg[org.client.options.OID]
 	if !ok {
-		return OutputsByName{}, ErrorResourceNotFound
+		return nil, ErrorResourceNotFound
 	}
 
 	cleanOutByName := OutputsByName{}
