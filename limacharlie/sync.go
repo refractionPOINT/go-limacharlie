@@ -1480,6 +1480,9 @@ func (org Organization) resolveAvailableNamespaces(who whoAmIJsonResponse) map[s
 	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
 		availableNamespaces["replicant"] = struct{}{}
 	}
+	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.service") {
+		availableNamespaces["service"] = struct{}{}
+	}
 	return availableNamespaces
 }
 
