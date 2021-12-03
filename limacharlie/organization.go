@@ -24,6 +24,15 @@ type OrganizationInformation struct {
 	SensorQuota    int64             `json:"sensor_quota,omitempty"`
 }
 
+type NewOrganizationResponse struct {
+	Data    NewOrganizationDataResponse `json:"data,omitempty"`
+	Success bool                        `json:"success,omitempty"`
+}
+
+type NewOrganizationDataResponse struct {
+	Oid string `json:"oid,omitempty"`
+}
+
 // NewOrganization initialize a link to an organization
 func NewOrganization(c *Client) (*Organization, error) {
 	return &Organization{
@@ -150,4 +159,30 @@ func (o *Organization) GetInfo() (OrganizationInformation, error) {
 		return OrganizationInformation{}, err
 	}
 	return resp, nil
+}
+
+func (o *Organization) CreateOrganization(location, name string) (NewOrganizationResponse, error) {
+	resp := NewOrganizationResponse{}
+	request := makeDefaultRequest(&resp).withQueryData(Dict{
+		"loc":  location,
+		"name": name,
+	})
+	if err := o.client.reliableRequest(http.MethodPost, fmt.Sprintf("orgs/new"), request); err != nil {
+		return NewOrganizationResponse{}, err
+	}
+	return resp, nil
+}
+
+func (o *Organization) SetQuota(quota int64) (bool, error) {
+	resp := map[string]bool{}
+	request := makeDefaultRequest(&resp).withQueryData(Dict{
+		"quota": quota,
+	})
+	if err := o.client.reliableRequest(http.MethodPost, fmt.Sprintf("orgs/%s/quota", o.client.options.OID), request); err != nil {
+		return false, err
+	}
+	if val, ok := resp["success"]; ok {
+		return val, nil
+	}
+	return false, nil
 }
