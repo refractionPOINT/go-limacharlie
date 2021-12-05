@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -254,4 +255,12 @@ func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 		return nil, err
 	}
 	return list, nil
+}
+
+func (org *Organization) GetSensorsWithTag(tag string) (map[string][]string, error) {
+	data := map[string][]string{}
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("tags/%s/%s", org.client.options.OID, url.QueryEscape(tag)), makeDefaultRequest(&data)); err != nil {
+		return nil, err
+	}
+	return data, nil
 }

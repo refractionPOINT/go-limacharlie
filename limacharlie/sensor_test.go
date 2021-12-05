@@ -197,3 +197,52 @@ func TestSensorTask(t *testing.T) {
 		t.Errorf("Task: %v", err)
 	}
 }
+
+func TestSearchByTag(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	sensors, err := org.ListSensors()
+	if err != nil {
+		t.Errorf("ListSensors: %v", err)
+	}
+	if len(sensors) == 0 {
+		t.Error("no sensors listed")
+		return
+	}
+	var sensor *Sensor
+	for _, s := range sensors {
+		sensor = s
+		break
+	}
+	if err := sensor.AddTag("test", 30*time.Second); err != nil {
+		t.Errorf("AddTag: %v", err)
+	}
+
+	defer func(){
+		if err := sensor.RemoveTag("test"); err != nil {
+			t.Errorf("RemoveTag: %v", err)
+		}
+	}()
+
+	// List all sensors.
+	sensorsWithTag, err := org.GetSensorsWithTag("test")
+	if err != nil {
+		t.Errorf("GetSensorsWithTag: %v", err)
+	}
+	if len(sensorsWithTag) == 0 {
+		t.Error("no sensors found")
+		return
+	}
+	for sid, tags := range sensorsWithTag {
+		if sid == "" {
+			t.Error("missing sid")
+		}
+		if len(tags) == 0 {
+			t.Error("missing tags")
+		}
+		if tags[0] != "test" {
+			t.Errorf("unexpected tag: %+v", tags)
+		}
+	}
+}
