@@ -219,6 +219,12 @@ func TestSearchByTag(t *testing.T) {
 		t.Errorf("AddTag: %v", err)
 	}
 
+	defer func(){
+		if err := sensor.RemoveTag("test"); err != nil {
+			t.Errorf("RemoveTag: %v", err)
+		}
+	}()
+
 	// List all sensors.
 	sensorsWithTag, err := org.GetSensorsWithTag("test")
 	if err != nil {
