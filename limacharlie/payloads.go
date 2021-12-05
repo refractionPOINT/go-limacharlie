@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 )
@@ -66,13 +67,17 @@ func (org Organization) DeletePayload(name PayloadName) error {
 
 // Create a Payload in an LC organization.
 func (org Organization) CreatePayloadFromBytes(name PayloadName, data []byte) error {
+	return org.CreatePayloadFromReader(name, bytes.NewBuffer(data))
+}
+
+func (org Organization) CreatePayloadFromReader(name PayloadName, data io.Reader) error {
 	resp := payloadPutPointer{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("payload/%s/%s", org.client.options.OID, name), request); err != nil {
 		return err
 	}
 	c := &http.Client{}
-	req, err := http.NewRequest(http.MethodPut, resp.URL, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPut, resp.URL, data)
 	if err != nil {
 		return err
 	}
