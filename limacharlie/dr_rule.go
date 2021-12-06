@@ -35,6 +35,7 @@ type CoreDRRule struct {
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Detect    Dict   `json:"detect" yaml:"detect"`
 	Response  List   `json:"respond" yaml:"respond"`
+	IsEnabled bool   `json:"is_enabled,string"`
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization

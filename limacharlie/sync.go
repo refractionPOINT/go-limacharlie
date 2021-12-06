@@ -1552,7 +1552,7 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules
 		if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
 			IsReplace: true,
 			Namespace: rule.Namespace,
-			IsEnabled: true,
+			IsEnabled: rule.IsEnabled,
 		}); err != nil {
 			return ops, fmt.Errorf("DRRuleAdd %s: %v", ruleName, err)
 		}
