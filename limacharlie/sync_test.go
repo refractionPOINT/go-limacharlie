@@ -1188,6 +1188,7 @@ rules:
     respond:
     - l11
     - l21
+	is_enabled: true
   r2:
     name: r2
     namespace: managed
@@ -1196,6 +1197,7 @@ rules:
     respond:
     - l1
     - l2
+	is_enabled: true
 `
 
 	out := o1.Merge(o2)
