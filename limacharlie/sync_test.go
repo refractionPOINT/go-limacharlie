@@ -116,7 +116,7 @@ rules:
       - action: report
         name: t1
   r2:
-  	is_enabled: true
+    is_enabled: true
     detect:
       op: is
       event: NEW_PROCESS
