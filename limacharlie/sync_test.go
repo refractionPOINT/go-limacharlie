@@ -106,7 +106,7 @@ func TestSyncPushDRRules(t *testing.T) {
 	yc := `
 rules:
   r1:
-	is_enabled: false
+    is_enabled: false
     detect:
       op: is
       event: NEW_PROCESS
