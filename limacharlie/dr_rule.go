@@ -114,7 +114,7 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 	if !d.IsInSameNamespace(dr) {
 		return false
 	}
-	if d.IsEnabled != dr.IsEnabled {
+	if *d.IsEnabled != *dr.IsEnabled {
 		return false
 	}
 	j1, err := json.Marshal(d.Detect)
