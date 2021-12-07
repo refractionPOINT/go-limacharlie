@@ -167,7 +167,7 @@ func (o *Organization) CreateOrganization(location, name string) (NewOrganizatio
 		"loc":  location,
 		"name": name,
 	})
-	if err := o.client.reliableRequest(http.MethodPost, fmt.Sprintf("orgs/new"), request); err != nil {
+	if err := o.client.reliableRequest(http.MethodPost, "orgs/new", request); err != nil {
 		return NewOrganizationResponse{}, err
 	}
 	return resp, nil
@@ -185,4 +185,8 @@ func (o *Organization) SetQuota(quota int64) (bool, error) {
 		return val, nil
 	}
 	return false, nil
+}
+
+func (o *Organization) ServiceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) error {
+	return o.client.serviceRequest(responseData, serviceName, serviceData, isAsync)
 }
