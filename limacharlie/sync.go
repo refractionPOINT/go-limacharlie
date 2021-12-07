@@ -1519,6 +1519,11 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules
 
 	// Start by adding missing rules.
 	for ruleName, rule := range rules {
+		// If is_enabled is not set, it defaults to true.
+		if rule.IsEnabled == nil {
+			isTrue := true
+			rule.IsEnabled = &isTrue
+		}
 		if existingRule, ok := existingRules[ruleName]; ok {
 			// A rule with that name is already there.
 			// Is it the exact same rule?
@@ -1548,11 +1553,6 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules
 		if options.IsDryRun {
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 			continue
-		}
-		// If is_enabled is not set, it defaults to true.
-		if rule.IsEnabled == nil {
-			isTrue := true
-			rule.IsEnabled = &isTrue
 		}
 		if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
 			IsReplace: true,
