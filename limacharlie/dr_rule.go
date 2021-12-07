@@ -62,7 +62,7 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 
 	request := makeDefaultRequest(&resp).withFormData(drAddRuleRequest{
 		Name:      name,
-		IsReplace: reqOpt.IsEnabled,
+		IsReplace: reqOpt.IsReplace,
 		Detection: string(serialDet),
 		Response:  string(serialResp),
 		IsEnabled: reqOpt.IsEnabled,
