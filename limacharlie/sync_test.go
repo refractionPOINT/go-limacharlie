@@ -257,7 +257,7 @@ rules:
 			nOld++
 		}
 	}
-	if nNew != 1 || nOld != 2 {
+	if nNew != 2 || nOld != 1 {
 		t.Errorf("unexpected ops: %v", ops)
 	}
 
