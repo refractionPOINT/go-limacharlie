@@ -170,12 +170,6 @@ rules:
 		t.Errorf("managed rules is not empty")
 	}
 
-	t.Errorf("RULES: %+v", rules)
-
-	if rules["r1"]["is_enabled"].(bool) {
-		t.Errorf("rule should be disabled: %+v", rules["r1"])
-	}
-
 	ops, err = org.SyncPush(c, SyncOptions{
 		SyncDRRules: true,
 	})
@@ -195,6 +189,13 @@ rules:
 	if len(rules) != 2 {
 		t.Errorf("general rules has: %+v", rules)
 	}
+
+	t.Errorf("RULES: %+v", rules)
+
+	if rules["r1"]["is_enabled"].(bool) {
+		t.Errorf("rule should be disabled: %+v", rules["r1"])
+	}
+
 	rules, err = org.DRRules(WithNamespace("managed"))
 	a.NoError(err)
 	if len(rules) != 1 {
