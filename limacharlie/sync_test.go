@@ -106,6 +106,7 @@ func TestSyncPushDRRules(t *testing.T) {
 	yc := `
 rules:
   r1:
+    is_enabled: false
     detect:
       op: is
       event: NEW_PROCESS
@@ -115,6 +116,7 @@ rules:
       - action: report
         name: t1
   r2:
+    is_enabled: true
     detect:
       op: is
       event: NEW_PROCESS
@@ -187,6 +189,14 @@ rules:
 	if len(rules) != 2 {
 		t.Errorf("general rules has: %+v", rules)
 	}
+
+	if rules["r1"]["is_enabled"].(bool) {
+		t.Errorf("rule should be disabled: %+v", rules["r1"])
+	}
+	if !rules["r2"]["is_enabled"].(bool) {
+		t.Errorf("rule should be enabled: %+v", rules["r2"])
+	}
+
 	rules, err = org.DRRules(WithNamespace("managed"))
 	a.NoError(err)
 	if len(rules) != 1 {
