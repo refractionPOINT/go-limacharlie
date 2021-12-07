@@ -1549,10 +1549,15 @@ func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 			continue
 		}
+		// If is_enabled is not set, it defaults to true.
+		if rule.IsEnabled == nil {
+			isTrue := true
+			rule.IsEnabled = &isTrue
+		}
 		if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
 			IsReplace: true,
 			Namespace: rule.Namespace,
-			IsEnabled: rule.IsEnabled,
+			IsEnabled: *rule.IsEnabled,
 		}); err != nil {
 			return ops, fmt.Errorf("DRRuleAdd %s: %v", ruleName, err)
 		}
