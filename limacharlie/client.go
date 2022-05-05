@@ -46,6 +46,7 @@ type ClientOptions struct {
 	UID           string
 	JWT           string
 	Environment   string
+	Permissions   []string
 	JWTExpiryTime time.Duration
 }
 
@@ -171,6 +172,9 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	}
 	if expiry != 0 {
 		authData.Set("expiry", fmt.Sprintf("%d", int64(expiry.Seconds())))
+	}
+	if c.options.Permissions != nil {
+		authData.Set("perms", strings.Join(c.options.Permissions, ","))
 	}
 
 	resp, err := http.PostForm(getJWTURL, authData)
