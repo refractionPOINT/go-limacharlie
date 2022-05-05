@@ -33,6 +33,11 @@ type NewOrganizationDataResponse struct {
 	Oid string `json:"oid,omitempty"`
 }
 
+//OnlineCount contains the amount of active sensors for an organization
+type OnlineCount struct {
+	Count int64 `json:"count,omitempty"`
+}
+
 // NewOrganization initialize a link to an organization
 func NewOrganization(c *Client) (*Organization, error) {
 	return &Organization{
@@ -161,6 +166,15 @@ func (o *Organization) GetInfo() (OrganizationInformation, error) {
 	return resp, nil
 }
 
+//GetOnlineCount Gets the amount of online sensor for the organization
+func (o *Organization) GetOnlineCount() (OnlineCount, error) {
+	resp := OnlineCount{}
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("online/%s", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+		return OnlineCount{}, err
+	}
+	return resp, nil
+}
+
 func (o *Organization) CreateOrganization(location, name string) (NewOrganizationResponse, error) {
 	resp := NewOrganizationResponse{}
 	request := makeDefaultRequest(&resp).withQueryData(Dict{
@@ -189,4 +203,19 @@ func (o *Organization) SetQuota(quota int64) (bool, error) {
 
 func (o *Organization) ServiceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) error {
 	return o.client.serviceRequest(responseData, serviceName, serviceData, isAsync)
+}
+
+//AddToGroup Adds this organization to a given group
+func (o *Organization) AddToGroup(gid string) (bool, error) {
+	resp := map[string]bool{}
+	request := makeDefaultRequest(&resp).withQueryData(Dict{
+		"oid": o.client.options.OID,
+	})
+	if err := o.client.reliableRequest(http.MethodPost, fmt.Sprintf("groups/%s/orgs", gid), request); err != nil {
+		return false, err
+	}
+	if val, ok := resp["success"]; ok {
+		return val, nil
+	}
+	return false, nil
 }
