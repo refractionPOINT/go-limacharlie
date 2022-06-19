@@ -14,6 +14,8 @@ type OutputModuleType = string
 var OutputTypes = struct {
 	S3          OutputModuleType
 	GCS         OutputModuleType
+	Pubsub      OutputModuleType
+	BigQuery    OutputModuleType
 	SCP         OutputModuleType
 	SFTP        OutputModuleType
 	Slack       OutputModuleType
@@ -23,9 +25,13 @@ var OutputTypes = struct {
 	SMTP        OutputModuleType
 	Humio       OutputModuleType
 	Kafka       OutputModuleType
+	Tines       OutputModuleType
+	Torq        OutputModuleType
 }{
 	S3:          "s3",
 	GCS:         "gcs",
+	Pubsub:      "pubsub",
+	BigQuery:    "bigquery",
 	SCP:         "scp",
 	SFTP:        "sftp",
 	Slack:       "slack",
@@ -35,6 +41,8 @@ var OutputTypes = struct {
 	SMTP:        "smtp",
 	Humio:       "humio",
 	Kafka:       "kafka",
+	Tines:       "tines",
+	Torq:        "torq",
 }
 
 // OutputDataType is the type of data
@@ -56,12 +64,14 @@ var OutputType = struct {
 	Audit      OutputDataType
 	Deployment OutputDataType
 	Artifact   OutputDataType
+	Tailored   OutputDataType
 }{
 	Event:      "event",
 	Detect:     "detect",
 	Audit:      "audit",
 	Deployment: "deployment",
 	Artifact:   "artifact",
+	Tailored:   "tailored",
 }
 
 // OutputConfig hold all the possible options used to configure an output
@@ -72,6 +82,9 @@ type OutputConfig struct {
 
 	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempt"`
 	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string" yaml:"is_delete_on_failure,omitempty"`
+	NoRouting         bool   `json:"is_no_routing,omitempty,string" yaml:"is_no_routing,omitempty"`
+	NoSharding        bool   `json:"is_no_sharding,omitempty,string" yaml:"is_no_sharding,omitempty"`
+	PayloadAsString   bool   `json:"is_payload_as_string,omitempty,string" yaml:"is_payload_as_string,omitempty"`
 	InvestigationID   string `json:"inv_id,omitempty" yaml:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty" yaml:"tag,omitempty"`
 	Category          string `json:"cat,omitempty" yaml:"cat,omitempty"`
@@ -92,6 +105,7 @@ type OutputConfig struct {
 	EventWhiteList    string `json:"event_white_list,omitempty" yaml:"event_white_list,omitempty"`
 	EventBlackList    string `json:"event_black_list,omitempty" yaml:"event_black_list,omitempty"`
 	SecondsPerFile    int    `json:"sec_per_file,omitempty,string" yaml:"sec_per_file,omitempty"`
+	SampleRate        int    `json:"sample_rate,omitempty,string" yaml:"sample_rate,omitempty"`
 	DestinationEmail  string `json:"dest_email,omitempty" yaml:"dest_email,omitempty"`
 	FromEmail         string `json:"from_email,omitempty" yaml:"from_email,omitempty"`
 	Readable          bool   `json:"is_readable,omitempty,string" yaml:"is_readable,omitempty"`
@@ -108,6 +122,10 @@ type OutputConfig struct {
 	AuthHeaderValue   string `json:"auth_header_value,omitempty" yaml:"auth_header_value,omitempty"`
 	RoutingTopic      string `json:"routing_topic,omitempty" yaml:"routing_topic,omitempty"`
 	LiteralTopic      string `json:"literal_topic,omitempty" yaml:"literal_topic,omitempty"`
+	Topic             string `json:"topic,omitempty" yaml:"topic,omitempty"`
+	Project           string `json:"project,omitempty" yaml:"project,omitempty"`
+	Dataset           string `json:"dataset,omitempty" yaml:"dataset,omitempty"`
+	Table             string `json:"table,omitempty" yaml:"table,omitempty"`
 	HumioRepo         string `json:"humio_repo,omitempty" yaml:"humio_repo,omitempty"`
 	HumioToken        string `json:"humio_api_token,omitempty" yaml:"humio_api_token,omitempty"`
 }
