@@ -135,14 +135,10 @@ func (n NetPolicy) WithDnsPolicyCNameRecord(domain string, tag string, cName str
 	return n
 }
 
-func (org Organization) netPolicyUrl() string {
-	return fmt.Sprintf("net/policy?oid=%s", org.client.options.OID)
-}
-
 func (org Organization) NetPolicies() (NetPoliciesByName, error) {
 	resp := netPoliciesResponse{}
 	req := makeDefaultRequest(&resp).withURLRoot("/")
-	if err := org.client.reliableRequest(http.MethodGet, org.netPolicyUrl(), req); err != nil {
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("net/policy?oid=%s", org.client.options.OID), req); err != nil {
 		return NetPoliciesByName{}, err
 	}
 	return resp.NetPolicies, nil
@@ -152,12 +148,12 @@ func (org Organization) NetPolicyAdd(policy NetPolicy) error {
 	resp := Dict{}
 	policy.OID = org.client.options.OID
 	req := makeDefaultRequest(&resp).withURLRoot("/").withFormData(policy)
-	return org.client.reliableRequest(http.MethodPost, org.netPolicyUrl(), req)
+	return org.client.reliableRequest(http.MethodPost, "net/policy", req)
 }
 
 func (org Organization) NetPolicyDelete(name NetPolicyName) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withURLRoot("/")
-	url := fmt.Sprintf("%s&name=%s", org.netPolicyUrl(), name)
+	url := fmt.Sprintf("net/policy?oid=%s&name=%s", org.client.options.OID, name)
 	return org.client.reliableRequest(http.MethodDelete, url, req)
 }
