@@ -3,6 +3,8 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
+
+	"gopkg.in/yaml.v2"
 )
 
 // Organization holds a connection to the LC cloud organization
@@ -175,12 +177,30 @@ func (o *Organization) GetOnlineCount() (OnlineCount, error) {
 	return resp, nil
 }
 
-func (o *Organization) CreateOrganization(location, name string) (NewOrganizationResponse, error) {
+func (o *Organization) CreateOrganization(location, name string, template ...interface{}) (NewOrganizationResponse, error) {
+	// If a template is specified, normalize it to a yaml string.
+	yamlTemplate := ""
+	if len(template) != 0 {
+		t := template[0]
+		if s, ok := t.(string); ok {
+			yamlTemplate = s
+		} else {
+			b, err := yaml.Marshal(t)
+			if err != nil {
+				return NewOrganizationResponse{}, err
+			}
+			yamlTemplate = string(b)
+		}
+	}
 	resp := NewOrganizationResponse{}
-	request := makeDefaultRequest(&resp).withQueryData(Dict{
+	req := Dict{
 		"loc":  location,
 		"name": name,
-	})
+	}
+	if yamlTemplate != "" {
+		req["template"] = yamlTemplate
+	}
+	request := makeDefaultRequest(&resp).withQueryData(req)
 	if err := o.client.reliableRequest(http.MethodPost, "orgs/new", request); err != nil {
 		return NewOrganizationResponse{}, err
 	}
