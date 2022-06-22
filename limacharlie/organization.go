@@ -200,7 +200,7 @@ func (o *Organization) CreateOrganization(location, name string, template ...int
 	if yamlTemplate != "" {
 		req["template"] = yamlTemplate
 	}
-	request := makeDefaultRequest(&resp).withQueryData(req)
+	request := makeDefaultRequest(&resp).withFormData(req)
 	if err := o.client.reliableRequest(http.MethodPost, "orgs/new", request); err != nil {
 		return NewOrganizationResponse{}, err
 	}
