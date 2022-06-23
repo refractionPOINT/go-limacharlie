@@ -150,6 +150,22 @@ func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&genericVersion); err != nil {
 		return err
 	}
+
+	// Some specific ",string" JSON fields expect to
+	// Unmarshal to integers, but we might get empty
+	// strings, so let's convert them.
+	for _, fn := range []string{"sec_per_file", "sample_rate"} {
+		e, ok := genericVersion[fn]
+		if !ok {
+			continue
+		}
+		s, ok := e.(string)
+		if !ok || s != "" {
+			continue
+		}
+		genericVersion[fn] = "0"
+	}
+
 	rawJSON, err := json.Marshal(genericVersion)
 	if err != nil {
 		return err
