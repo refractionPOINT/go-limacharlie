@@ -1623,7 +1623,7 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 					})
 					continue
 				}
-				if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
+				if err := org.ResourceSubscribe(resName, resCat); err != nil {
 					return ops, err
 				}
 				ops = append(ops, OrgSyncOperation{
@@ -1653,7 +1653,7 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 				})
 				continue
 			}
-			if err := org.Comms().o.ResourceSubscribe(resName, resCat); err != nil {
+			if err := org.ResourceSubscribe(resName, resCat); err != nil {
 				return ops, err
 			}
 			ops = append(ops, OrgSyncOperation{

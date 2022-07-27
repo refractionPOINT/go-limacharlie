@@ -145,10 +145,6 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 	return org
 }
 
-func (o *Organization) Comms() *Comms {
-	return &Comms{o: o}
-}
-
 func (o *Organization) GetURLs() (map[string]string, error) {
 	resp := struct {
 		URLs map[string]string `json:"url"`
