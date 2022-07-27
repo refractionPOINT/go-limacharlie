@@ -1365,7 +1365,6 @@ func TestSyncFullBidirectional(t *testing.T) {
 resources:
   api:
   - vt
-  - comms
   - insight
   replicant:
   - infrastructure-service
