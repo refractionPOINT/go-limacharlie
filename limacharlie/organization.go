@@ -212,7 +212,7 @@ func (o *Organization) GetDeleteConfirmationToken() (string, error) {
 		ConfirmationToken string `json:"confirmation,omitempty"`
 	}{}
 	request := makeDefaultRequest(&resp)
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/quota", o.client.options.OID), request); err != nil {
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
 		return "", err
 	}
 	return resp.ConfirmationToken, nil
