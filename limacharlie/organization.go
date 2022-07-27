@@ -203,6 +203,30 @@ func (o *Organization) CreateOrganization(location, name string, template ...int
 	return resp, nil
 }
 
+func (o *Organization) GetDeleteConfirmationToken() (string, error) {
+	resp := struct {
+		ConfirmationToken string `json:"confirmation,omitempty"`
+	}{}
+	request := makeDefaultRequest(&resp)
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
+		return "", err
+	}
+	return resp.ConfirmationToken, nil
+}
+
+func (o *Organization) DeleteOrganization(confirmationToken string) (bool, error) {
+	resp := struct {
+		Success bool `json:"success"`
+	}{}
+	req := Dict{
+		"confirmation": confirmationToken,
+	}
+	request := makeDefaultRequest(&resp).withQueryData(req)
+	if err := o.client.reliableRequest(http.MethodDelete, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
+		return false, err
+	}
+	return resp.Success, nil
+}
 func (o *Organization) SetQuota(quota int64) (bool, error) {
 	resp := map[string]bool{}
 	request := makeDefaultRequest(&resp).withQueryData(Dict{
