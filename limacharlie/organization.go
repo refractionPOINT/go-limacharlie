@@ -226,7 +226,7 @@ func (o *Organization) DeleteOrganization(confirmationToken string) (bool, error
 		"confirmation": confirmationToken,
 	}
 	request := makeDefaultRequest(&resp).withQueryData(req)
-	if err := o.client.reliableRequest(http.MethodDelete, fmt.Sprintf("orgs/%s/quota", o.client.options.OID), request); err != nil {
+	if err := o.client.reliableRequest(http.MethodDelete, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
 		return false, err
 	}
 	return resp.Success, nil
