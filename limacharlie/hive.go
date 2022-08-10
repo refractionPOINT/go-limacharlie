@@ -28,15 +28,15 @@ type HiveData struct {
 	UsrMtd UsrMtd                 `json:"usr_mtd"`
 }
 
-type hive struct {
+type HiveInfo struct {
 	Name      string `json:"name"`
 	Partition string `json:"partition"`
 }
 
 type HiveResp struct {
-	Guid string `json:"guid"`
-	Hive hive   `json:"hive"`
-	Name string `json:"name"`
+	Guid string   `json:"guid"`
+	Hive HiveInfo `json:"hive"`
+	Name string   `json:"name"`
 }
 
 type SysMtd struct {
@@ -181,14 +181,57 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 	return &hiveResp, nil
 }
 
-func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
+func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 
-	var delResp interface{}
-	if err := h.Organization.client.reliableRequest(http.MethodGet, fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&delResp)); err != nil {
+	if args.Key == "" {
+		return nil, errors.New("key required")
+	}
+
+	target := "mtd" // if no data set default to target type mtd
+	var existing *HiveData
+	var err error
+	if args.Data != nil {
+		target = "data"
+		existing, err = h.Get(args, false)
+		if err != nil {
+			return nil, err
+		}
+
+		var data map[string]interface{}
+		err = json.Unmarshal(args.Data, &data)
+		if err != nil {
+			return nil, err
+		}
+		existing.Data = data
+	} else {
+		existing, err = h.GetMTD(args, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if args.expiry != 0 {
+		existing.UsrMtd.Expiry = args.expiry
+	}
+	if args.Enabled != false {
+		existing.UsrMtd.Enabled = args.Enabled
+	}
+	if len(args.Tags) != 0 {
+		existing.UsrMtd.Tags = args.Tags
+	}
+
+	var updateResp interface{}
+	req := makeDefaultRequest(&updateResp).withQueryData(existing)
+	if err := h.Organization.client.reliableRequest(http.MethodGet,
+		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key, target), req); err != nil {
 		return nil, err
 	}
 
-	return delResp, nil
+	if isPrint {
+		h.printData(updateResp)
+	}
+
+	return updateResp, nil
 }
 
 func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
