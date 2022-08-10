@@ -16,13 +16,27 @@ type HiveArgs struct {
 	PartitionKey string
 	Key          string
 	Data         []byte
-	expiry       string
+	expiry       int64
+	Enabled      bool
+	Tags         []string
+	ETag         string
 }
 
 type HiveData struct {
 	Data   map[string]interface{} `json:"data"`
 	SysMtd SysMtd                 `json:"sys_mtd"`
 	UsrMtd UsrMtd                 `json:"usr_mtd"`
+}
+
+type hive struct {
+	Name      string `json:"name"`
+	Partition string `json:"partition"`
+}
+
+type HiveResp struct {
+	Guid string `json:"guid"`
+	Hive hive   `json:"hive"`
+	Name string `json:"name"`
 }
 
 type SysMtd struct {
@@ -36,7 +50,7 @@ type SysMtd struct {
 }
 type UsrMtd struct {
 	Enabled bool        `json:"enabled"`
-	Expiry  int         `json:"expiry"`
+	Expiry  int64       `json:"expiry"`
 	Tags    interface{} `json:"tags"`
 }
 
@@ -116,71 +130,80 @@ func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (*HiveData, error) {
 	return &hd, nil
 }
 
-func (h *HiveClient) Add(args HiveArgs) (interface{}, error) {
+func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 
 	if args.Key == "" {
-		fmt.Println("error: Key Required")
+		return nil, errors.New("key required")
 	}
 
-	target := "mtd"
+	target := "mtd" // if no data set default to target type mtd
 	var data map[string]interface{}
-	var jsonString []byte
 	if args.Data != nil {
 		// ensure passed data can unmarshal correctly
 		err := json.Unmarshal(args.Data, &data)
 		if err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 		target = "data"
-
-		jsonString, err = json.Marshal(data)
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
 	}
 
-	var userMtd interface{}
-	// additional logic goes here
+	var userMtd UsrMtd // set UsrMtd Data
+	if args.expiry != 0 {
+		userMtd.Expiry = args.expiry
+	}
+	if args.Enabled {
+		userMtd.Enabled = args.Enabled
+	}
+	if len(args.Tags) != 0 {
+		userMtd.Tags = args.Tags
+	}
 
-	req := makeDefaultRequest(h).withQueryData(Dict{
-		"data":   jsonString,
-		"usrMtd": userMtd,
-	})
+	reqDict := Dict{
+		"data":    data,
+		"usr_mtd": userMtd,
+	}
 
-	var hiveList interface{}
+	if args.ETag != "" {
+		reqDict["etag"] = args.ETag
+	}
+
+	var hiveResp HiveResp
+	req := makeDefaultRequest(&hiveResp).withQueryData(reqDict)
 	if err := h.Organization.client.reliableRequest(http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key, target), req); err != nil {
 		return nil, err
 	}
 
-	return hiveList, nil
+	if isPrint {
+		h.printData(hiveResp)
+	}
+
+	return &hiveResp, nil
 }
 
 func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 
-	var hiveList interface{}
-	if err := h.Organization.client.reliableRequest(http.MethodGet, fmt.Sprintf("hive/%s/%s", args.HiveName, args.Key), makeDefaultRequest(&hiveList)); err != nil {
+	var delResp interface{}
+	if err := h.Organization.client.reliableRequest(http.MethodGet, fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&delResp)); err != nil {
 		return nil, err
 	}
 
-	return hiveList, nil
+	return delResp, nil
 }
 
 func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 
-	var resp interface{}
+	var delResp interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodDelete,
-		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&resp)); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&delResp)); err != nil {
 		return nil, err
 	}
 
 	if isPrint {
-		fmt.Println(resp)
+		h.printData(delResp)
 	}
 
-	return resp, nil
+	return delResp, nil
 }
 
 func (h *HiveClient) printData(data interface{}) {
