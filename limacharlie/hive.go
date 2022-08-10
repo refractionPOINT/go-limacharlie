@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -14,7 +15,7 @@ type HiveArgs struct {
 	HiveName     string
 	PartitionKey string
 	Key          string
-	Data         interface{}
+	Data         []byte
 	expiry       string
 }
 
@@ -43,67 +44,76 @@ func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}
 }
 
-func (h *HiveClient) List(args HiveArgs, isPrint bool) (interface{}, error) {
-	hiveList := map[string]HiveData{}
+func (h *HiveClient) List(args HiveArgs, isPrint bool) (map[string]HiveData, error) {
+	var hiveSet map[string]HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveList)); err != nil {
+		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
 
 	if isPrint {
-		h.printData(hiveList)
+		h.printData(hiveSet)
 	}
 
-	return hiveList, nil
+	return hiveSet, nil
 }
 
-func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (interface{}, error) {
-	hiveList := map[string]HiveData{}
+func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (map[string]HiveData, error) {
+	hiveSet := map[string]HiveData{}
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveList)); err != nil {
+		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
 
 	// remove data field from return set
-	for k, v := range hiveList {
-		hiveList[k] = HiveData{SysMtd: v.SysMtd, UsrMtd: v.UsrMtd}
+	for k, v := range hiveSet {
+		hiveSet[k] = HiveData{SysMtd: v.SysMtd, UsrMtd: v.UsrMtd}
 	}
 
 	if isPrint {
-		h.printData(hiveList)
+		h.printData(hiveSet)
 	}
 
-	return hiveList, nil
+	return hiveSet, nil
 }
 
-func (h *HiveClient) Get(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) Get(args HiveArgs, isPrint bool) (*HiveData, error) {
 
-	var hiveList interface{}
+	if args.Key == "" {
+		return nil, errors.New("key is required")
+	}
+
+	var hiveSet HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive/%s/%s", args.HiveName, args.Key), makeDefaultRequest(&hiveList)); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s/data", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
 
 	if isPrint {
-		fmt.Printf("%+v \n", hiveList)
+		h.printData(hiveSet)
 	}
 
-	return hiveList, nil
+	return &hiveSet, nil
 }
 
-func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (*HiveData, error) {
 
-	var hiveList interface{}
+	if args.Key == "" {
+		return nil, errors.New("key is required")
+	}
+
+	var hd HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive/%s/%s/%s/mtd", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&hiveList)); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s/mtd", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&hd)); err != nil {
 		return nil, err
 	}
+	hd.Data = nil
 
 	if isPrint {
-		fmt.Printf("%+v \n", hiveList)
+		h.printData(hd)
 	}
 
-	return hiveList, nil
+	return &hd, nil
 }
 
 func (h *HiveClient) Add(args HiveArgs) (interface{}, error) {
@@ -113,16 +123,29 @@ func (h *HiveClient) Add(args HiveArgs) (interface{}, error) {
 	}
 
 	target := "mtd"
+	var data map[string]interface{}
+	var jsonString []byte
 	if args.Data != nil {
-		// additonal logic here
+		// ensure passed data can unmarshal correctly
+		err := json.Unmarshal(args.Data, &data)
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
 		target = "data"
+
+		jsonString, err = json.Marshal(data)
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
 	}
 
 	var userMtd interface{}
 	// additional logic goes here
 
 	req := makeDefaultRequest(h).withQueryData(Dict{
-		"data":   args.Data,
+		"data":   jsonString,
 		"usrMtd": userMtd,
 	})
 
