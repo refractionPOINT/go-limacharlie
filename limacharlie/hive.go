@@ -1,11 +1,12 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
 
-type Hive struct {
+type HiveClient struct {
 	Organization *Organization
 }
 
@@ -17,44 +18,65 @@ type HiveArgs struct {
 	expiry       string
 }
 
-func (h *Hive) List(args HiveArgs, isPrint bool) (interface{}, error) {
-	var hiveList interface{}
+type HiveData struct {
+	Data   map[string]interface{} `json:"data"`
+	SysMtd SysMtd                 `json:"sys_mtd"`
+	UsrMtd UsrMtd                 `json:"usr_mtd"`
+}
+
+type SysMtd struct {
+	CreatedBy   string `json:"created_by"`
+	Etag        string `json:"etag"`
+	GUID        string `json:"guid"`
+	LastAuthor  string `json:"last_author"`
+	LastError   string `json:"last_error"`
+	LastErrorTs int64  `json:"last_error_ts"`
+	LastMod     int64  `json:"last_mod"`
+}
+type UsrMtd struct {
+	Enabled bool        `json:"enabled"`
+	Expiry  int         `json:"expiry"`
+	Tags    interface{} `json:"tags"`
+}
+
+func NewHiveClient(org *Organization) *HiveClient {
+	return &HiveClient{Organization: org}
+}
+
+func (h *HiveClient) List(args HiveArgs, isPrint bool) (interface{}, error) {
+	hiveList := map[string]HiveData{}
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveList)); err != nil {
 		return nil, err
 	}
 
 	if isPrint {
-		fmt.Printf("%+v \n", hiveList)
+		h.printData(hiveList)
 	}
 
 	return hiveList, nil
 }
 
-func (h *Hive) ListMtd(args HiveArgs, isPrint bool) (interface{}, error) {
-	var hiveList map[string]interface{}
+func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (interface{}, error) {
+	hiveList := map[string]HiveData{}
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveList)); err != nil {
 		return nil, err
 	}
 
-	if isPrint {
-		// todo figure out response value from call
-		//for _, r := range hiveList {
-		//	//r["data"] = nil
-		//	//
-		//}
-		fmt.Printf("%+v ", hiveList)
+	// remove data field from return set
+	for k, v := range hiveList {
+		hiveList[k] = HiveData{SysMtd: v.SysMtd, UsrMtd: v.UsrMtd}
 	}
 
 	if isPrint {
-		fmt.Printf("%+v \n", hiveList)
+		h.printData(hiveList)
 	}
 
 	return hiveList, nil
 }
 
-func (h *Hive) Get(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) Get(args HiveArgs, isPrint bool) (interface{}, error) {
 
 	var hiveList interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
@@ -69,7 +91,7 @@ func (h *Hive) Get(args HiveArgs, isPrint bool) (interface{}, error) {
 	return hiveList, nil
 }
 
-func (h *Hive) GetMTD(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (interface{}, error) {
 
 	var hiveList interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
@@ -84,7 +106,7 @@ func (h *Hive) GetMTD(args HiveArgs, isPrint bool) (interface{}, error) {
 	return hiveList, nil
 }
 
-func (h *Hive) Add(args HiveArgs) (interface{}, error) {
+func (h *HiveClient) Add(args HiveArgs) (interface{}, error) {
 
 	if args.Key == "" {
 		fmt.Println("error: Key Required")
@@ -113,7 +135,7 @@ func (h *Hive) Add(args HiveArgs) (interface{}, error) {
 	return hiveList, nil
 }
 
-func (h *Hive) Update(args HiveArgs) (interface{}, error) {
+func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 
 	var hiveList interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodGet, fmt.Sprintf("hive/%s/%s", args.HiveName, args.Key), makeDefaultRequest(&hiveList)); err != nil {
@@ -123,7 +145,7 @@ func (h *Hive) Update(args HiveArgs) (interface{}, error) {
 	return hiveList, nil
 }
 
-func (h *Hive) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 
 	var resp interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodDelete,
@@ -136,4 +158,13 @@ func (h *Hive) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 	}
 
 	return resp, nil
+}
+
+func (h *HiveClient) printData(data interface{}) {
+	dataJson, err := json.MarshalIndent(data, "", " ")
+	if err != nil {
+		fmt.Printf("%+v ", data)
+	}
+
+	fmt.Printf("%s\n", string(dataJson))
 }
