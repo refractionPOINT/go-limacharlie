@@ -1,18 +1,17 @@
 {
-  "s3": {
-    "access_key": "access key",
-    "bucket_name": "bucket_name",
+  "pubsub": {
     "client_options": {
-      "hostname": "syslog-test",
+      "hostname": "gcpTest",
       "identity": {
         "installation_key": "5f074feb-1127-41b0-920f-cb50dc1f1437",
         "oid": "8cbe27f4-bfa1-4afb-ba19-138cd51389cd"
       },
-      "platform": "text",
-      "sensor_seed_key": "syslog-test"
+      "platform": "gcp",
+      "sensor_seed_key": "gcpTest"
     },
-    "prefix": "prefix",
-    "secret_key": "secret key"
+    "project_name": "adf",
+    "service_account_creds": "{ gcp }",
+    "sub_name": "asdf"
   },
-  "sensor_type": "s3"
+  "sensor_type": "pubsub"
 }
