@@ -16,7 +16,7 @@ type HiveArgs struct {
 	PartitionKey string
 	Key          string
 	Data         []byte
-	expiry       int64
+	Expiry       int64
 	Enabled      bool
 	Tags         []string
 	ETag         string
@@ -148,8 +148,8 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 	}
 
 	var userMtd UsrMtd // set UsrMtd Data
-	if args.expiry != 0 {
-		userMtd.Expiry = args.expiry
+	if args.Expiry != 0 {
+		userMtd.Expiry = args.Expiry
 	}
 	if args.Enabled {
 		userMtd.Enabled = args.Enabled
@@ -191,14 +191,14 @@ func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 	var existing *HiveData
 	var err error
 	if args.Data != nil {
-		target = "data"
-		existing, err = h.Get(args, false)
+		var data map[string]interface{}
+		err = json.Unmarshal(args.Data, &data)
 		if err != nil {
 			return nil, err
 		}
+		target = "data"
 
-		var data map[string]interface{}
-		err = json.Unmarshal(args.Data, &data)
+		existing, err = h.Get(args, false)
 		if err != nil {
 			return nil, err
 		}
@@ -210,8 +210,9 @@ func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 		}
 	}
 
-	if args.expiry != 0 {
-		existing.UsrMtd.Expiry = args.expiry
+	// set usr mtd data
+	if args.Expiry != 0 {
+		existing.UsrMtd.Expiry = args.Expiry
 	}
 	if args.Enabled != false {
 		existing.UsrMtd.Enabled = args.Enabled
@@ -220,9 +221,20 @@ func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 		existing.UsrMtd.Tags = args.Tags
 	}
 
-	var updateResp interface{}
-	req := makeDefaultRequest(&updateResp).withQueryData(existing)
-	if err := h.Organization.client.reliableRequest(http.MethodGet,
+	// empty data request only update with usr_mtd and etag
+	reqData := Dict{}
+	if target == "data" {
+		reqData["data"] = existing.Data
+		reqData["usr_mtd"] = existing.UsrMtd
+		reqData["sys_mtd"] = existing.SysMtd
+	} else {
+		reqData["usr_mtd"] = existing.UsrMtd
+		reqData["etag"] = existing.SysMtd.Etag
+	}
+
+	var updateResp HiveResp
+	req := makeDefaultRequest(&updateResp).withQueryData(reqData)
+	if err := h.Organization.client.reliableRequest(http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key, target), req); err != nil {
 		return nil, err
 	}
@@ -252,7 +264,8 @@ func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 func (h *HiveClient) printData(data interface{}) {
 	dataJson, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
-		fmt.Printf("%+v ", data)
+		fmt.Println("failed jason format print err: ", err)
+		fmt.Printf("%+v \n", data)
 	}
 
 	fmt.Printf("%s\n", string(dataJson))
