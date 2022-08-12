@@ -65,7 +65,7 @@ func hiveAddTest(t *testing.T) {
 		return
 	}
 
-	if hiveResp.Hive.Name != "cloud-sensor" {
+	if hiveResp.Hive.Name != "cloud_sensor" {
 		t.Errorf("hive add failed to correct hive name invalidName: %s", hiveResp.Hive.Name)
 		return
 	}
