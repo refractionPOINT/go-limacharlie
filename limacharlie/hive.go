@@ -73,7 +73,7 @@ func (h *HiveClient) List(args HiveArgs, isPrint bool) (map[string]HiveData, err
 }
 
 func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (map[string]HiveData, error) {
-	hiveSet := map[string]HiveData{}
+	var hiveSet map[string]HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
@@ -92,7 +92,6 @@ func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (map[string]HiveData, 
 }
 
 func (h *HiveClient) Get(args HiveArgs, isPrint bool) (*HiveData, error) {
-
 	if args.Key == "" {
 		return nil, errors.New("key is required")
 	}
@@ -111,7 +110,6 @@ func (h *HiveClient) Get(args HiveArgs, isPrint bool) (*HiveData, error) {
 }
 
 func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (*HiveData, error) {
-
 	if args.Key == "" {
 		return nil, errors.New("key is required")
 	}
@@ -131,7 +129,6 @@ func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (*HiveData, error) {
 }
 
 func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
-
 	if args.Key == "" {
 		return nil, errors.New("key required")
 	}
@@ -182,7 +179,6 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 }
 
 func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
-
 	if args.Key == "" {
 		return nil, errors.New("key required")
 	}
@@ -247,7 +243,6 @@ func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 }
 
 func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
-
 	var delResp interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodDelete,
 		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&delResp)); err != nil {
