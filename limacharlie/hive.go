@@ -259,8 +259,9 @@ func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 func (h *HiveClient) printData(data interface{}) {
 	dataJson, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
-		fmt.Println("failed jason format print err: ", err)
+		fmt.Println("jason format print err: ", err)
 		fmt.Printf("%+v \n", data)
+		return
 	}
 
 	fmt.Printf("%s\n", string(dataJson))

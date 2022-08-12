@@ -72,7 +72,7 @@ func hiveAddTest(t *testing.T) {
 	}
 
 	if hiveResp.Name != testKey {
-		t.Errorf("hive add call faileds invalidKey:%s", hiveResp.Name)
+		t.Errorf("hive add call failed invalidKey:%s", hiveResp.Name)
 		return
 	}
 }
