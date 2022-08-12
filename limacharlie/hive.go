@@ -49,9 +49,9 @@ type SysMtd struct {
 	LastMod     int64  `json:"last_mod"`
 }
 type UsrMtd struct {
-	Enabled bool        `json:"enabled"`
-	Expiry  int64       `json:"expiry"`
-	Tags    interface{} `json:"tags"`
+	Enabled bool     `json:"enabled"`
+	Expiry  int64    `json:"expiry"`
+	Tags    []string `json:"tags"`
 }
 
 func NewHiveClient(org *Organization) *HiveClient {

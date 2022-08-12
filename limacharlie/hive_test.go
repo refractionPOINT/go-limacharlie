@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 var testHiveClient *HiveClient
@@ -66,12 +67,12 @@ func hiveAddTest(t *testing.T) {
 	}
 
 	if hiveResp.Hive.Name != "cloud_sensor" {
-		t.Errorf("hive add failed to correct hive name invalidName: %s", hiveResp.Hive.Name)
+		t.Errorf("hive add failed incorrect hive name invalidName: %s", hiveResp.Hive.Name)
 		return
 	}
 
 	if hiveResp.Name != testKey {
-		t.Errorf("hive add call failed to set correct invalidKey:%s", hiveResp.Name)
+		t.Errorf("hive add call faileds invalidKey:%s", hiveResp.Name)
 		return
 	}
 }
@@ -204,6 +205,7 @@ func hiveUpdate(t *testing.T) {
 		return
 	}
 
+	// get newly created data to ensure update processed correctly
 	updateData, err := testHiveClient.Get(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
@@ -215,9 +217,18 @@ func hiveUpdate(t *testing.T) {
 	}
 
 	if _, ok := updateData.Data["s3"]; !ok {
-		t.Error("hive update failed could not find s3 key data field ")
+		t.Error("hive update failed missing s3 key data field ")
+		return
 	}
 
+	if updateData.UsrMtd.Tags == nil {
+		t.Errorf("hive update failed tags not set, tags:%s ", []string{"test1", "test2"})
+		return
+	}
+
+	if len(updateData.UsrMtd.Tags) != 2 {
+		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
+	}
 }
 
 func hiveRemove(t *testing.T) {
@@ -234,6 +245,7 @@ func hiveRemove(t *testing.T) {
 }
 
 func randSeq(n int) string {
+	rand.Seed(time.Now().Unix())
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	b := make([]rune, n)
 	for i := range b {
