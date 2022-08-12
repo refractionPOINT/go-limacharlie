@@ -3,19 +3,19 @@ package limacharlie
 import (
 	"github.com/stretchr/testify/assert"
 	"math/rand"
+	"os"
+	"strings"
 	"testing"
 )
 
-var testHiveData *HiveData
 var testHiveClient *HiveClient
 var testKey string
 
-func TestHiveSdk(t *testing.T) {
+func TestHiveClient(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 	testHiveClient = NewHiveClient(org)
 
-	// ensure test execute in proper order
 	tests := map[string]func(t *testing.T){
 		"add":     hiveAddTest,
 		"get":     hiveGetTest,
@@ -26,49 +26,60 @@ func TestHiveSdk(t *testing.T) {
 		"remove":  hiveRemove,
 	}
 
-	for name, function := range tests {
-		t.Run(name, function)
+	// ensure test execute in proper order
+	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "remove"}
+	for _, name := range testArray {
+		t.Run(name, tests[name])
 	}
 }
 
 func hiveAddTest(t *testing.T) {
-
 	jsonString := `{
-				  "pubsub": {
-					"client_options": {
-					  "hostname": "gcpTest",
-					  "identity": {
-						"installation_key": "fake key",
-						"oid": "oid to input"
+					  "pubsub": {
+						"client_options": {
+						  "hostname": "gcpTest",
+						  "identity": {
+							"installation_key": "test install key",
+							"oid": "oid-input"
+						  },
+						  "platform": "gcp",
+						  "sensor_seed_key": "gcpTest"
+						},
+						"project_name": "adf",
+						"service_account_creds": "{ gcp }",
+						"sub_name": "asdf"
 					  },
-					  "platform": "gcp",
-					  "sensor_seed_key": "gcpTest"
-					},
-					"project_name": "adf",
-					"service_account_creds": "{ gcp }",
-					"sub_name": "asdf"
-				  },
-				  "sensor_type": "pubsub"
+					  "sensor_type": "pubsub"
 				}`
+	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
 
-	testKey = randSeq(8)
-	_, err := testHiveClient.Add(HiveArgs{
+	testKey = "hive-test-" + randSeq(8) // ran key to keep track of newly created hive data record
+	hiveResp, err := testHiveClient.Add(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "partition key to add",
-		Key:          testKey, Data: []byte(jsonString)}, false)
+		PartitionKey: os.Getenv("_OID"),
+		Key:          testKey,
+		Data:         []byte(jsonString)}, false)
 
-	// validate test ran correctly
 	if err != nil {
-		t.Errorf("hive client failed: %+v \n", err)
+		t.Errorf("hive client failed add: %+v \n", err)
+		return
+	}
+
+	if hiveResp.Hive.Name != "cloud-sensor" {
+		t.Errorf("hive add failed to correct hive name invalidName: %s", hiveResp.Hive.Name)
+		return
+	}
+
+	if hiveResp.Name != testKey {
+		t.Errorf("hive add call failed to set correct invalidKey:%s", hiveResp.Name)
 		return
 	}
 }
 
 func hiveGetTest(t *testing.T) {
-
-	_, err := testHiveClient.Get(HiveArgs{
+	hiveData, err := testHiveClient.Get(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "partition key to add",
+		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey}, false)
 
 	// validate test ran correctly
@@ -76,27 +87,48 @@ func hiveGetTest(t *testing.T) {
 		t.Errorf("hive Get failed: %+v \n", err)
 		return
 	}
+
+	if hiveData.Data == nil {
+		t.Errorf("hive get failed missing data info")
+		return
+	}
+
+	if hiveData.UsrMtd.Enabled {
+		t.Error("hive get failed UsrMtd enabled should be false")
+		return
+	}
+
+	if hiveData.UsrMtd.Expiry != 0 {
+		t.Errorf("hive get failed UsrMtd expiry should be zero invalidExpiry: %d ", hiveData.UsrMtd.Expiry)
+		return
+	}
+
+	if hiveData.UsrMtd.Tags != nil {
+		t.Errorf("hive get failed UsrMtd tags should be null invalidTags: %s ", hiveData.UsrMtd.Tags)
+	}
 }
 
 func hiveGetMtdTest(t *testing.T) {
-
-	_, err := testHiveClient.GetMTD(HiveArgs{
+	hiveData, err := testHiveClient.GetMTD(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "partition key to add",
+		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey}, false)
 
 	// validate test ran correctly
 	if err != nil {
-		t.Errorf("hive GetMtd failed: %+v \n", err)
+		t.Errorf("hive GetMtd failed err: %+v \n", err)
 		return
+	}
+
+	if hiveData.Data != nil {
+		t.Error("hive getMtdFailed data is not nil ")
 	}
 }
 
 func hiveListTest(t *testing.T) {
-
-	_, err := testHiveClient.List(HiveArgs{
+	hiveSet, err := testHiveClient.List(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "partition key to add",
+		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey}, false)
 
 	// validate test ran correctly
@@ -104,13 +136,21 @@ func hiveListTest(t *testing.T) {
 		t.Errorf("hive List failed: %+v \n", err)
 		return
 	}
+
+	if _, ok := hiveSet[testKey]; !ok {
+		t.Errorf("hive list failed key not found, key: %s ", testKey)
+		return
+	}
+
+	if hiveSet[testKey].Data == nil {
+		t.Errorf("hive list failed test key data nil, key: %s", testKey)
+	}
 }
 
 func hiveListMtdTest(t *testing.T) {
-
-	_, err := testHiveClient.ListMtd(HiveArgs{
+	hiveSet, err := testHiveClient.ListMtd(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "partition key to add",
+		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey}, false)
 
 	// validate test ran correctly
@@ -118,55 +158,79 @@ func hiveListMtdTest(t *testing.T) {
 		t.Errorf("hive ListMtd failed: %+v \n", err)
 		return
 	}
+
+	if _, ok := hiveSet[testKey]; !ok {
+		t.Errorf("hive listMtd failed test key not found, key: %s ", testKey)
+		return
+	}
+
+	if hiveSet[testKey].Data != nil {
+		t.Error("hive list failed data field not nil")
+	}
 }
 
 func hiveUpdate(t *testing.T) {
-
 	jsonString := `{
-					  "s3": {
-						"access_key": "access key",
-						"bucket_name": "bucket_name",
-						"client_options": {
-						  "hostname": "syslog-test",
-						  "identity": {
-							"installation_key": "fake-key",
-							"oid": "oid to input"
-						  },
-						  "platform": "text",
-						  "sensor_seed_key": "syslog-test"
-						},
-						"prefix": "prefix",
-						"secret_key": "secret key"
+				  "s3": {
+					"access_key": "access key",
+					"bucket_name": "bucket_name",
+					"client_options": {
+					  "hostname": "syslog-test",
+					  "identity": {
+						"installation_key": "test install key",
+						"oid": "oid-input"
 					  },
-					  "sensor_type": "s3"
+					  "platform": "text",
+					  "sensor_seed_key": "syslog-test"
+					},
+					"prefix": "prefix",
+					"secret_key": "secret key"
+				  },
+				  "sensor_type": "s3"
 				}`
+	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
 
 	_, err := testHiveClient.Update(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "8cbe27f4-bfa1-4afb-ba19-138cd51389cd",
-		Key:          testKey, Data: []byte(jsonString)}, false)
+		PartitionKey: os.Getenv("_OID"),
+		Key:          testKey,
+		Data:         []byte(jsonString),
+		Tags:         []string{"test1", "test2"},
+	}, false)
 
 	// validate test ran correctly
 	if err != nil {
-		t.Errorf("hive client failed: %+v \n", err)
+		t.Errorf("hive update failed, error: %+v \n", err)
 		return
+	}
+
+	updateData, err := testHiveClient.Get(HiveArgs{
+		HiveName:     "cloud_sensor",
+		PartitionKey: os.Getenv("_OID"),
+		Key:          testKey}, false)
+
+	if err != nil {
+		t.Errorf("hive update failiure check, error %+v ", err)
+		return
+	}
+
+	if _, ok := updateData.Data["s3"]; !ok {
+		t.Error("hive update failed could not find s3 key data field ")
 	}
 
 }
 
 func hiveRemove(t *testing.T) {
-
-	_, err := testHiveClient.List(HiveArgs{
+	// test remove and clean up test data
+	_, err := testHiveClient.Remove(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: "partition key to add",
+		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey}, false)
 
 	// validate test ran correctly
 	if err != nil {
-		t.Errorf("hive Remove failed: %+v \n", err)
-		return
+		t.Errorf("hive Remove failed, error: %+v", err)
 	}
-
 }
 
 func randSeq(n int) string {
