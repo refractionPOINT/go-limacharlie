@@ -55,11 +55,12 @@ func hiveAddTest(t *testing.T) {
 	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
 
 	testKey = "hive-test-" + randSeq(8) // ran key to keep track of newly created hive data record
+	data := []byte(jsonString)
 	hiveResp, err := testHiveClient.Add(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
-		Data:         []byte(jsonString)}, false)
+		Data:         &data})
 
 	if err != nil {
 		t.Errorf("hive client failed add: %+v \n", err)
@@ -81,7 +82,7 @@ func hiveGetTest(t *testing.T) {
 	hiveData, err := testHiveClient.Get(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	// validate test ran correctly
 	if err != nil {
@@ -113,7 +114,7 @@ func hiveGetMtdTest(t *testing.T) {
 	hiveData, err := testHiveClient.GetMTD(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	// validate test ran correctly
 	if err != nil {
@@ -130,7 +131,7 @@ func hiveListTest(t *testing.T) {
 	hiveSet, err := testHiveClient.List(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	// validate test ran correctly
 	if err != nil {
@@ -152,7 +153,7 @@ func hiveListMtdTest(t *testing.T) {
 	hiveSet, err := testHiveClient.ListMtd(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	// validate test ran correctly
 	if err != nil {
@@ -191,13 +192,14 @@ func hiveUpdate(t *testing.T) {
 				}`
 	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
 
+	data := []byte(jsonString)
 	_, err := testHiveClient.Update(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
-		Data:         []byte(jsonString),
-		Tags:         []string{"test1", "test2"},
-	}, false)
+		Data:         &data,
+		Tags:         &[]string{"test1", "test2"},
+	})
 
 	// validate test ran correctly
 	if err != nil {
@@ -209,7 +211,7 @@ func hiveUpdate(t *testing.T) {
 	updateData, err := testHiveClient.Get(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	if err != nil {
 		t.Errorf("hive update failiure check, error %+v ", err)

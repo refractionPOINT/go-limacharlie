@@ -15,11 +15,11 @@ type HiveArgs struct {
 	HiveName     string
 	PartitionKey string
 	Key          string
-	Data         []byte
-	Expiry       int64
-	Enabled      bool
-	Tags         []string
-	ETag         string
+	Data         *[]byte
+	Expiry       *int64
+	Enabled      *bool
+	Tags         *[]string
+	ETag         *string
 }
 
 type HiveData struct {
@@ -58,21 +58,17 @@ func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}
 }
 
-func (h *HiveClient) List(args HiveArgs, isPrint bool) (map[string]HiveData, error) {
+func (h *HiveClient) List(args HiveArgs) (map[string]HiveData, error) {
 	var hiveSet map[string]HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
 
-	if isPrint {
-		h.printData(hiveSet)
-	}
-
 	return hiveSet, nil
 }
 
-func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (map[string]HiveData, error) {
+func (h *HiveClient) ListMtd(args HiveArgs) (map[string]HiveData, error) {
 	var hiveSet map[string]HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
@@ -84,14 +80,10 @@ func (h *HiveClient) ListMtd(args HiveArgs, isPrint bool) (map[string]HiveData, 
 		hiveSet[k] = HiveData{SysMtd: v.SysMtd, UsrMtd: v.UsrMtd}
 	}
 
-	if isPrint {
-		h.printData(hiveSet)
-	}
-
 	return hiveSet, nil
 }
 
-func (h *HiveClient) Get(args HiveArgs, isPrint bool) (*HiveData, error) {
+func (h *HiveClient) Get(args HiveArgs) (*HiveData, error) {
 	if args.Key == "" {
 		return nil, errors.New("key is required")
 	}
@@ -102,14 +94,10 @@ func (h *HiveClient) Get(args HiveArgs, isPrint bool) (*HiveData, error) {
 		return nil, err
 	}
 
-	if isPrint {
-		h.printData(hiveSet)
-	}
-
 	return &hiveSet, nil
 }
 
-func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (*HiveData, error) {
+func (h *HiveClient) GetMTD(args HiveArgs) (*HiveData, error) {
 	if args.Key == "" {
 		return nil, errors.New("key is required")
 	}
@@ -121,14 +109,10 @@ func (h *HiveClient) GetMTD(args HiveArgs, isPrint bool) (*HiveData, error) {
 	}
 	hd.Data = nil
 
-	if isPrint {
-		h.printData(hd)
-	}
-
 	return &hd, nil
 }
 
-func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
+func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	if args.Key == "" {
 		return nil, errors.New("key required")
 	}
@@ -137,7 +121,7 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 	var data map[string]interface{}
 	if args.Data != nil {
 		// ensure passed data can unmarshal correctly
-		err := json.Unmarshal(args.Data, &data)
+		err := json.Unmarshal(*args.Data, &data)
 		if err != nil {
 			return nil, err
 		}
@@ -145,14 +129,14 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 	}
 
 	var userMtd UsrMtd // set UsrMtd Data
-	if args.Expiry != 0 {
-		userMtd.Expiry = args.Expiry
+	if args.Expiry != nil {
+		userMtd.Expiry = *args.Expiry
 	}
-	if args.Enabled {
-		userMtd.Enabled = args.Enabled
+	if args.Enabled != nil {
+		userMtd.Enabled = *args.Enabled
 	}
-	if len(args.Tags) != 0 {
-		userMtd.Tags = args.Tags
+	if args.Tags != nil {
+		userMtd.Tags = *args.Tags
 	}
 
 	reqDict := Dict{
@@ -160,7 +144,7 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 		"usr_mtd": userMtd,
 	}
 
-	if args.ETag != "" {
+	if args.ETag != nil {
 		reqDict["etag"] = args.ETag
 	}
 
@@ -171,14 +155,10 @@ func (h *HiveClient) Add(args HiveArgs, isPrint bool) (*HiveResp, error) {
 		return nil, err
 	}
 
-	if isPrint {
-		h.printData(hiveResp)
-	}
-
 	return &hiveResp, nil
 }
 
-func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	if args.Key == "" {
 		return nil, errors.New("key required")
 	}
@@ -188,33 +168,33 @@ func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 	var err error
 	if args.Data != nil {
 		var data map[string]interface{}
-		err = json.Unmarshal(args.Data, &data)
+		err = json.Unmarshal(*args.Data, &data)
 		if err != nil {
 			return nil, err
 		}
 		target = "data"
 
-		existing, err = h.Get(args, false)
+		existing, err = h.Get(args)
 		if err != nil {
 			return nil, err
 		}
 		existing.Data = data
 	} else {
-		existing, err = h.GetMTD(args, false)
+		existing, err = h.GetMTD(args)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// set usr mtd data
-	if args.Expiry != 0 {
-		existing.UsrMtd.Expiry = args.Expiry
+	if args.Expiry != nil {
+		existing.UsrMtd.Expiry = *args.Expiry
 	}
-	if args.Enabled != false {
-		existing.UsrMtd.Enabled = args.Enabled
+	if args.Enabled != nil {
+		existing.UsrMtd.Enabled = *args.Enabled
 	}
-	if len(args.Tags) != 0 {
-		existing.UsrMtd.Tags = args.Tags
+	if args.Tags != nil {
+		existing.UsrMtd.Tags = *args.Tags
 	}
 
 	// empty data request only update with usr_mtd and etag
@@ -235,10 +215,6 @@ func (h *HiveClient) Update(args HiveArgs, isPrint bool) (interface{}, error) {
 		return nil, err
 	}
 
-	if isPrint {
-		h.printData(updateResp)
-	}
-
 	return updateResp, nil
 }
 
@@ -249,20 +225,5 @@ func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 		return nil, err
 	}
 
-	if isPrint {
-		h.printData(delResp)
-	}
-
 	return delResp, nil
-}
-
-func (h *HiveClient) printData(data interface{}) {
-	dataJson, err := json.MarshalIndent(data, "", " ")
-	if err != nil {
-		fmt.Println("jason format print err: ", err)
-		fmt.Printf("%+v \n", data)
-		return
-	}
-
-	fmt.Printf("%s\n", string(dataJson))
 }
