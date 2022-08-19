@@ -11,6 +11,12 @@ type HiveConfig struct {
 	Data    HiveConfigData `json:"data,omitempty" yaml:"data,omitempty"`
 }
 
+var OrgSyncOpsHiveType = struct {
+	Data string
+}{
+	Data: "data",
+}
+
 //type HiveSyncData struct {
 //	Data   map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
 //	UsrMtd UsrMtdConfig           `json:"usr_mtd,omitempty" yaml:"usr_mtd,omitempty"`
@@ -66,12 +72,11 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			args.Enabled = newConfigData[k].UsrMtd.Enabled
 			args.Expiry = newConfigData[k].UsrMtd.Expiry
 			args.Tags = newConfigData[k].UsrMtd.Tags
-			fmt.Println("I would be adding data key ", k)
-			fmt.Printf("this is args %+v \n", args)
-			//err = org.addHiveConfigData(args)
-			//if err != nil {
-			//	return orgOps, err
-			//}
+
+			err = org.addHiveConfigData(args, isDryRun, &orgOps)
+			if err != nil {
+				return orgOps, err
+			}
 			continue
 		}
 
@@ -83,7 +88,14 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			return orgOps, nil
 		}
 
-		if !equals { // not equal run hive data update
+		if equals {
+			orgOps = append(orgOps, OrgSyncOperation{
+				ElementType: OrgSyncOpsHiveType.Data,
+				ElementName: k,
+				IsAdded:     false,
+				IsRemoved:   false,
+			})
+		} else { // not equal run hive data update
 			data, err := json.Marshal(newConfigData[k].Data)
 			if err != nil {
 				return orgOps, err
@@ -93,18 +105,11 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			args.Enabled = newConfigData[k].UsrMtd.Enabled
 			args.Expiry = newConfigData[k].UsrMtd.Expiry
 			args.Tags = newConfigData[k].UsrMtd.Tags
-			fmt.Println("I would be updating key here key ", k)
-			fmt.Printf("this is args in update %+v \n ", args)
-			//err = org.updateHiveConfigData(args)
-			//if err != nil {
-			//	return orgOps, err
-			//}
 		}
 	}
 
+	// now that keys have been added or updated
 	// identify what keys should be removed
-	// if key from current config not present in
-	// new config data remove that key
 	removeKeys := make([]string, 0)
 	for k, _ := range currentConfigData {
 		if _, ok := newConfigData[k]; !ok {
@@ -112,10 +117,14 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 		}
 	}
 
-	for _, key := range removeKeys { // perform actual remove
+	// perform actual remove
+	for _, key := range removeKeys {
 		args.Key = key
-		fmt.Println("I would be removing key here ", key)
-		//org.removeHiveConfigData(args)
+
+		err := org.removeHiveConfigData(args, isDryRun, &orgOps)
+		if err != nil {
+			return orgOps, err
+		}
 	}
 
 	return orgOps, nil
@@ -144,36 +153,77 @@ func (org *Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, err
 	return currentHiveDataConfig, nil
 }
 
-func (org *Organization) updateHiveConfigData(args HiveArgs) error {
+func (org *Organization) updateHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
 	hiveClient := NewHiveClient(org)
 
-	_, err := hiveClient.Update(args)
+	fmt.Println("I would be updating key here key ", args.Key)
+	fmt.Printf("this is args in update %+v \n ", args)
+	op := OrgSyncOperation{
+		ElementType: OrgSyncOpsHiveType.Data,
+		ElementName: args.Key,
+		IsAdded:     true,
+		IsRemoved:   false,
+	}
+	if isDryRun {
+		*orgOps = append(*orgOps, op)
+		return nil
+	}
+
+	_, err := hiveClient.Update(args) // run actual update call
 	if err != nil {
 		return err
 	}
 
+	*orgOps = append(*orgOps, op)
 	return nil
 }
 
-func (org *Organization) addHiveConfigData(args HiveArgs) error {
+func (org *Organization) addHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
 	hiveClient := NewHiveClient(org)
+
+	fmt.Println("I would be adding data key ", args.Key)
+	fmt.Printf("this is args %+v \n", args)
+	op := OrgSyncOperation{
+		ElementType: OrgSyncOpsHiveType.Data,
+		ElementName: args.Key,
+		IsAdded:     true,
+		IsRemoved:   false,
+	}
+	if isDryRun {
+		*orgOps = append(*orgOps, op)
+		return nil // ensure you return dry run
+	}
 
 	_, err := hiveClient.Add(args)
 	if err != nil {
 		return err
 	}
 
+	*orgOps = append(*orgOps, op)
 	return nil
 }
 
-func (org *Organization) removeHiveConfigData(args HiveArgs) error {
+func (org *Organization) removeHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
 	hiveClient := NewHiveClient(org)
+
+	fmt.Println("I would be removing key here ", args.Key)
+	op := OrgSyncOperation{
+		ElementType: OrgSyncOpsHiveType.Data,
+		ElementName: args.Key,
+		IsAdded:     false,
+		IsRemoved:   true,
+	}
+	if isDryRun {
+		*orgOps = append(*orgOps, op)
+		return nil
+	}
 
 	_, err := hiveClient.Remove(args, false)
 	if err != nil {
 		return err
 	}
 
+	*orgOps = append(*orgOps, op)
 	return nil
 }
 
