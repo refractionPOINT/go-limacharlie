@@ -95,12 +95,12 @@ func hiveGetTest(t *testing.T) {
 		return
 	}
 
-	if hiveData.UsrMtd.Enabled {
+	if *hiveData.UsrMtd.Enabled {
 		t.Error("hive get failed UsrMtd enabled should be false")
 		return
 	}
 
-	if hiveData.UsrMtd.Expiry != 0 {
+	if *hiveData.UsrMtd.Expiry != 0 {
 		t.Errorf("hive get failed UsrMtd expiry should be zero invalidExpiry: %d ", hiveData.UsrMtd.Expiry)
 		return
 	}
@@ -130,8 +130,7 @@ func hiveGetMtdTest(t *testing.T) {
 func hiveListTest(t *testing.T) {
 	hiveSet, err := testHiveClient.List(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey})
+		PartitionKey: os.Getenv("_OID")})
 
 	// validate test ran correctly
 	if err != nil {
@@ -152,8 +151,7 @@ func hiveListTest(t *testing.T) {
 func hiveListMtdTest(t *testing.T) {
 	hiveSet, err := testHiveClient.ListMtd(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey})
+		PartitionKey: os.Getenv("_OID")})
 
 	// validate test ran correctly
 	if err != nil {
@@ -228,8 +226,8 @@ func hiveUpdate(t *testing.T) {
 		return
 	}
 
-	if len(updateData.UsrMtd.Tags) != 2 {
-		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
+	if len(*updateData.UsrMtd.Tags) != 2 {
+		t.Errorf("hive update failed invalid tag length of %d", len(*updateData.UsrMtd.Tags))
 	}
 }
 

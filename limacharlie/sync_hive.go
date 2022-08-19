@@ -11,18 +11,16 @@ type HiveConfig struct {
 	Data    HiveConfigData `json:"data,omitempty" yaml:"data,omitempty"`
 }
 
-type HiveConfigData map[string]HiveSyncData
+//type HiveSyncData struct {
+//	Data   map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
+//	UsrMtd UsrMtdConfig           `json:"usr_mtd,omitempty" yaml:"usr_mtd,omitempty"`
+//}
 
-type HiveSyncData struct {
-	Data   map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
-	UsrMtd UsrMtdConfig           `json:"usr_mtd,omitempty" yaml:"usr_mtd,omitempty"`
-}
-
-type UsrMtdConfig struct {
-	Enabled *bool     `json:"enabled" yaml:"enabled"`
-	Expiry  *int64    `json:"expiry" yaml:"expiry"`
-	Tags    *[]string `json:"tags" yaml:"tags"`
-}
+//type UsrMtdConfig struct {
+//	Enabled *bool     `json:"enabled" yaml:"enabled"`
+//	Expiry  *int64    `json:"expiry" yaml:"expiry"`
+//	Tags    *[]string `json:"tags" yaml:"tags"`
+//}
 
 func (org Organization) HiveSyncPush(newConfig HiveConfig, args HiveArgs, isDryRun bool) ([]OrgSyncOperation, error) {
 	curConfig, err := org.fetchHiveConfigData(args)
@@ -70,10 +68,10 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			args.Tags = newConfigData[k].UsrMtd.Tags
 			fmt.Println("I would be adding data key ", k)
 			fmt.Printf("this is args %+v \n", args)
-			err = org.addHiveConfigData(args)
-			if err != nil {
-				return orgOps, err
-			}
+			//err = org.addHiveConfigData(args)
+			//if err != nil {
+			//	return orgOps, err
+			//}
 			continue
 		}
 
@@ -82,7 +80,7 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 		curData := currentConfigData[k]
 		equals, err := ncd.Equals(curData)
 		if err != nil {
-			return nil, nil
+			return orgOps, nil
 		}
 
 		if !equals { // not equal run hive data update
@@ -97,15 +95,16 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			args.Tags = newConfigData[k].UsrMtd.Tags
 			fmt.Println("I would be updating key here key ", k)
 			fmt.Printf("this is args in update %+v \n ", args)
-			err = org.updateHiveConfigData(args)
-			if err != nil {
-				return orgOps, err
-			}
+			//err = org.updateHiveConfigData(args)
+			//if err != nil {
+			//	return orgOps, err
+			//}
 		}
 	}
 
 	// identify what keys should be removed
-	// as keys do not prior data does not exists in current
+	// if key from current config not present in
+	// new config data remove that key
 	removeKeys := make([]string, 0)
 	for k, _ := range currentConfigData {
 		if _, ok := newConfigData[k]; !ok {
@@ -116,7 +115,7 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 	for _, key := range removeKeys { // perform actual remove
 		args.Key = key
 		fmt.Println("I would be removing key here ", key)
-		org.removeHiveConfigData(args)
+		//org.removeHiveConfigData(args)
 	}
 
 	return orgOps, nil
@@ -127,18 +126,17 @@ func (org *Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, err
 
 	dataSet, err := hiveClient.List(args)
 	if err != nil {
-		fmt.Println("error inside of hiveClient list ", err)
 		return nil, err
 	}
 
-	currentHiveDataConfig := map[string]HiveSyncData{}
+	currentHiveDataConfig := map[string]HiveData{}
 	for k, v := range dataSet {
-		currentHiveDataConfig[k] = HiveSyncData{
+		currentHiveDataConfig[k] = HiveData{
 			Data: v.Data,
-			UsrMtd: UsrMtdConfig{
-				Enabled: &v.UsrMtd.Enabled,
-				Expiry:  &v.UsrMtd.Expiry,
-				Tags:    &v.UsrMtd.Tags,
+			UsrMtd: UsrMtd{
+				Enabled: v.UsrMtd.Enabled,
+				Expiry:  v.UsrMtd.Expiry,
+				Tags:    v.UsrMtd.Tags,
 			},
 		}
 	}
@@ -179,7 +177,7 @@ func (org *Organization) removeHiveConfigData(args HiveArgs) error {
 	return nil
 }
 
-func (hsd *HiveSyncData) Equals(cData HiveSyncData) (bool, error) {
+func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	currentData, err := json.Marshal(hsd.Data)
 	if err != nil {
 		return false, err

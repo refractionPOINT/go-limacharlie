@@ -22,10 +22,12 @@ type HiveArgs struct {
 	ETag         *string
 }
 
+type HiveConfigData map[string]HiveData
+
 type HiveData struct {
-	Data   map[string]interface{} `json:"data"`
-	SysMtd SysMtd                 `json:"sys_mtd"`
-	UsrMtd UsrMtd                 `json:"usr_mtd"`
+	Data   map[string]interface{} `json:"data" yaml:"data"`
+	SysMtd SysMtd                 `json:"sys_mtd" yaml:"sys_mtd"`
+	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
 
 type HiveInfo struct {
@@ -40,26 +42,26 @@ type HiveResp struct {
 }
 
 type SysMtd struct {
-	CreatedBy   string `json:"created_by"`
-	Etag        string `json:"etag"`
-	GUID        string `json:"guid"`
-	LastAuthor  string `json:"last_author"`
-	LastError   string `json:"last_error"`
-	LastErrorTs int64  `json:"last_error_ts"`
-	LastMod     int64  `json:"last_mod"`
+	CreatedBy   string `json:"created_by" yaml:"created_by"`
+	Etag        string `json:"etag" yaml:"etag"`
+	GUID        string `json:"guid" yaml:"guid"`
+	LastAuthor  string `json:"last_author" yaml:"last_author"`
+	LastError   string `json:"last_error" yaml:"last_error"`
+	LastErrorTs int64  `json:"last_error_ts" yaml:"last_error_ts"`
+	LastMod     int64  `json:"last_mod" yaml:"last_mod"`
 }
 type UsrMtd struct {
-	Enabled bool     `json:"enabled"`
-	Expiry  int64    `json:"expiry"`
-	Tags    []string `json:"tags"`
+	Enabled *bool     `json:"enabled" yaml:"enabled"`
+	Expiry  *int64    `json:"expiry" yaml:"expiry"`
+	Tags    *[]string `json:"tags" yaml:"tags"`
 }
 
 func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}
 }
 
-func (h *HiveClient) List(args HiveArgs) (map[string]HiveData, error) {
-	var hiveSet map[string]HiveData
+func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
+	var hiveSet HiveConfigData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
@@ -68,8 +70,8 @@ func (h *HiveClient) List(args HiveArgs) (map[string]HiveData, error) {
 	return hiveSet, nil
 }
 
-func (h *HiveClient) ListMtd(args HiveArgs) (map[string]HiveData, error) {
-	var hiveSet map[string]HiveData
+func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
+	var hiveSet HiveConfigData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
@@ -130,13 +132,13 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 
 	var userMtd UsrMtd // set UsrMtd Data
 	if args.Expiry != nil {
-		userMtd.Expiry = *args.Expiry
+		userMtd.Expiry = args.Expiry
 	}
 	if args.Enabled != nil {
-		userMtd.Enabled = *args.Enabled
+		userMtd.Enabled = args.Enabled
 	}
 	if args.Tags != nil {
-		userMtd.Tags = *args.Tags
+		userMtd.Tags = args.Tags
 	}
 
 	reqDict := Dict{
@@ -188,13 +190,13 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 
 	// set usr mtd data
 	if args.Expiry != nil {
-		existing.UsrMtd.Expiry = *args.Expiry
+		existing.UsrMtd.Expiry = args.Expiry
 	}
 	if args.Enabled != nil {
-		existing.UsrMtd.Enabled = *args.Enabled
+		existing.UsrMtd.Enabled = args.Enabled
 	}
 	if args.Tags != nil {
-		existing.UsrMtd.Tags = *args.Tags
+		existing.UsrMtd.Tags = args.Tags
 	}
 
 	// empty data request only update with usr_mtd and etag
