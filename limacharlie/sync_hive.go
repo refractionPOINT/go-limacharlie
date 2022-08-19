@@ -48,6 +48,7 @@ func (org Organization) HiveSyncPushFromFiles(config string, args HiveArgs, isDr
 	err := yaml.Unmarshal([]byte(config), &hiveConfig)
 	if err != nil {
 		fmt.Println("failed to parse yaml ", err)
+		return nil, err
 	}
 
 	return org.HiveSyncPush(hiveConfig, args, isDryRun)
@@ -77,53 +78,46 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			if err != nil {
 				return orgOps, err
 			}
-			continue
-		}
 
-		// if new config data exists in current config
-		// then check to see if data is equal if not update
-		curData := currentConfigData[k]
-		equals, err := ncd.Equals(curData)
-		if err != nil {
-			return orgOps, nil
-		}
-
-		if equals {
-			orgOps = append(orgOps, OrgSyncOperation{
-				ElementType: OrgSyncOpsHiveType.Data,
-				ElementName: k,
-				IsAdded:     false,
-				IsRemoved:   false,
-			})
-		} else { // not equal run hive data update
-			data, err := json.Marshal(newConfigData[k].Data)
+		} else {
+			// if new config data exists in current config
+			// check to see if data is equal if not update
+			curData := currentConfigData[k]
+			equals, err := ncd.Equals(curData)
 			if err != nil {
-				return orgOps, err
+				return orgOps, nil
 			}
-			args.Key = k
-			args.Data = &data
-			args.Enabled = newConfigData[k].UsrMtd.Enabled
-			args.Expiry = newConfigData[k].UsrMtd.Expiry
-			args.Tags = newConfigData[k].UsrMtd.Tags
+
+			if equals {
+				orgOps = append(orgOps, OrgSyncOperation{
+					ElementType: OrgSyncOpsHiveType.Data,
+					ElementName: k,
+					IsAdded:     false,
+					IsRemoved:   false,
+				})
+			} else { // not equal run hive update
+				data, err := json.Marshal(newConfigData[k].Data)
+				if err != nil {
+					return orgOps, err
+				}
+				args.Key = k
+				args.Data = &data
+				args.Enabled = newConfigData[k].UsrMtd.Enabled
+				args.Expiry = newConfigData[k].UsrMtd.Expiry
+				args.Tags = newConfigData[k].UsrMtd.Tags
+			}
 		}
 	}
 
 	// now that keys have been added or updated
 	// identify what keys should be removed
-	removeKeys := make([]string, 0)
 	for k, _ := range currentConfigData {
 		if _, ok := newConfigData[k]; !ok {
-			removeKeys = append(removeKeys, k)
-		}
-	}
-
-	// perform actual remove
-	for _, key := range removeKeys {
-		args.Key = key
-
-		err := org.removeHiveConfigData(args, isDryRun, &orgOps)
-		if err != nil {
-			return orgOps, err
+			args.Key = k
+			err := org.removeHiveConfigData(args, isDryRun, &orgOps)
+			if err != nil {
+				return orgOps, err
+			}
 		}
 	}
 
