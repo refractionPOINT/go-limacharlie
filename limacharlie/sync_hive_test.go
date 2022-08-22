@@ -59,20 +59,20 @@ func TestAddData(t *testing.T) {
 		hiveData[k] = value
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, true)
+	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: true,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push add dry run err: %+v ", err)
 		return
 	}
 
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, false)
+	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: false,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push add err %+v ", err)
@@ -131,20 +131,20 @@ func TestDataUpdate(t *testing.T) {
 		hiveData[k] = value
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, true)
+	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: true,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push update dry run err: %+v ", err)
 		return
 	}
 
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, false)
+	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: false,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push update err: %+v ", err)
@@ -203,20 +203,20 @@ func TestNoUpdate(t *testing.T) {
 		hiveData[k] = value
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, true)
+	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: true,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push no update dry run err: %+v ", err)
 		return
 	}
 
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, false)
+	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: false,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push no update err: %+v ", err)
@@ -274,20 +274,20 @@ func TestUsrMtdUpdate(t *testing.T) {
 		hiveData[k] = value
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, true)
+	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: true,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push usr mtd update dry run err: %+v ", err)
 		return
 	}
 
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	}, false)
+	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+		HiveName: "cloud_sensor",
+		IsDryRun: false,
+	})
 
 	if err != nil {
 		t.Errorf("failed sync push usr mtd update err: %+v ", err)

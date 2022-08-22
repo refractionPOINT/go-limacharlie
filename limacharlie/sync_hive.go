@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 )
@@ -9,6 +10,13 @@ import (
 type HiveConfig struct {
 	Version int            `json:"version" yaml:"version"`
 	Data    HiveConfigData `json:"data,omitempty" yaml:"data,omitempty"`
+}
+
+type HiveSyncOptions struct {
+	IsDryRun      bool            `json:"is_dry_run"`
+	HiveName      string          `json:"hive_name"`
+	OID           string          `json:"oid"`
+	IncludeLoader IncludeLoaderCB `json:"-"`
 }
 
 var OrgSyncOpsHiveType = struct {
@@ -28,33 +36,52 @@ var OrgSyncOpsHiveType = struct {
 //	Tags    *[]string `json:"tags" yaml:"tags"`
 //}
 
-func (org Organization) HiveSyncPush(newConfig HiveConfig, args HiveArgs, isDryRun bool) ([]OrgSyncOperation, error) {
-	curConfig, err := org.fetchHiveConfigData(args)
+func (org Organization) HiveSyncPush(newConfig HiveConfig, opts HiveSyncOptions) ([]OrgSyncOperation, error) {
+
+	if opts.HiveName == "" {
+		return nil, errors.New("missing hive name")
+	}
+
+	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	return org.hiveSyncData(newConfig.Data, curConfig, args, isDryRun)
+	opts.OID = orgInfo.OID // lets ensure correct oid is passed
+	curConfig, err := org.fetchHiveConfigData(opts)
+	if err != nil {
+		return nil, err
+	}
+	return org.hiveSyncData(newConfig.Data, curConfig, opts)
 }
 
-func (org Organization) HiveSyncPushFromFiles(config string, args HiveArgs, isDryRun bool, cb IncludeLoaderCB, includes []string) ([]OrgSyncOperation, error) {
+func (org Organization) HiveSyncPushFromFiles(config string, opts HiveSyncOptions, includes []string) ([]OrgSyncOperation, error) {
 
-	if cb == nil {
-		cb = localFileIncludeLoader
+	if opts.HiveName == "" {
+		return nil, errors.New("missing hive name")
+	}
+
+	orgInfo, err := org.GetInfo()
+	if err != nil {
+		return nil, err
+	}
+	opts.OID = orgInfo.OID // lets ensure we are always using correct OID
+
+	if opts.IncludeLoader == nil {
+		opts.IncludeLoader = localFileIncludeLoader
 	}
 
 	// Start with the base unmarshal.
 	hiveConfig := HiveConfig{}
-	err := yaml.Unmarshal([]byte(config), &hiveConfig)
+	err = yaml.Unmarshal([]byte(config), &hiveConfig)
 	if err != nil {
-		fmt.Println("failed to parse yaml ", err)
 		return nil, err
 	}
 
-	return org.HiveSyncPush(hiveConfig, args, isDryRun)
+	return org.HiveSyncPush(hiveConfig, opts)
 }
 
-func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfigData, args HiveArgs, isDryRun bool) ([]OrgSyncOperation, error) {
+func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfigData, opts HiveSyncOptions) ([]OrgSyncOperation, error) {
 
 	var orgOps []OrgSyncOperation
 
@@ -63,18 +90,21 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 		// if key does not exist in current config data
 		// new data needs to be added
 		if _, ok := currentConfigData[k]; !ok {
-			args.Key = k
 			data, err := json.Marshal(newConfigData[k].Data)
 			if err != nil {
 				return orgOps, err
 			}
-			args.Key = k
-			args.Data = &data
-			args.Enabled = newConfigData[k].UsrMtd.Enabled
-			args.Expiry = newConfigData[k].UsrMtd.Expiry
-			args.Tags = newConfigData[k].UsrMtd.Tags
+			args := HiveArgs{
+				Key:          k,
+				PartitionKey: opts.OID,
+				HiveName:     opts.HiveName,
+				Data:         &data,
+				Enabled:      newConfigData[k].UsrMtd.Enabled,
+				Expiry:       newConfigData[k].UsrMtd.Expiry,
+				Tags:         newConfigData[k].UsrMtd.Tags,
+			}
 
-			err = org.addHiveConfigData(args, isDryRun, &orgOps)
+			err = org.addHiveConfigData(args, opts.IsDryRun, &orgOps)
 			if err != nil {
 				return orgOps, err
 			}
@@ -85,7 +115,7 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			curData := currentConfigData[k]
 			equals, err := ncd.Equals(curData)
 			if err != nil {
-				return orgOps, nil
+				return orgOps, err
 			}
 
 			if equals {
@@ -100,11 +130,19 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 				if err != nil {
 					return orgOps, err
 				}
-				args.Key = k
-				args.Data = &data
-				args.Enabled = newConfigData[k].UsrMtd.Enabled
-				args.Expiry = newConfigData[k].UsrMtd.Expiry
-				args.Tags = newConfigData[k].UsrMtd.Tags
+				args := HiveArgs{
+					Key:          k,
+					PartitionKey: opts.OID,
+					HiveName:     opts.HiveName,
+					Data:         &data,
+					Enabled:      newConfigData[k].UsrMtd.Enabled,
+					Expiry:       newConfigData[k].UsrMtd.Expiry,
+					Tags:         newConfigData[k].UsrMtd.Tags,
+				}
+				err = org.updateHiveConfigData(args, opts.IsDryRun, &orgOps)
+				if err != nil {
+					return orgOps, err
+				}
 			}
 		}
 	}
@@ -113,8 +151,8 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 	// identify what keys should be removed
 	for k, _ := range currentConfigData {
 		if _, ok := newConfigData[k]; !ok {
-			args.Key = k
-			err := org.removeHiveConfigData(args, isDryRun, &orgOps)
+			args := HiveArgs{Key: k, PartitionKey: opts.OID, HiveName: opts.HiveName}
+			err := org.removeHiveConfigData(args, opts.IsDryRun, &orgOps)
 			if err != nil {
 				return orgOps, err
 			}
@@ -124,9 +162,10 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 	return orgOps, nil
 }
 
-func (org *Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, error) {
+func (org *Organization) fetchHiveConfigData(opts HiveSyncOptions) (HiveConfigData, error) {
 	hiveClient := NewHiveClient(org)
 
+	args := HiveArgs{HiveName: opts.HiveName, PartitionKey: opts.OID}
 	dataSet, err := hiveClient.List(args)
 	if err != nil {
 		return nil, err
