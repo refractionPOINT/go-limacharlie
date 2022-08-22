@@ -82,7 +82,6 @@ func (org Organization) HiveSyncPushFromFiles(config string, opts HiveSyncOption
 }
 
 func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfigData, opts HiveSyncOptions) ([]OrgSyncOperation, error) {
-
 	var orgOps []OrgSyncOperation
 
 	// now check if we need to update or add new data
@@ -103,12 +102,10 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 				Expiry:       newConfigData[k].UsrMtd.Expiry,
 				Tags:         newConfigData[k].UsrMtd.Tags,
 			}
-
 			err = org.addHiveConfigData(args, opts.IsDryRun, &orgOps)
 			if err != nil {
 				return orgOps, err
 			}
-
 		} else {
 			// if new config data exists in current config
 			// check to see if data is equal if not update
@@ -117,7 +114,6 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			if err != nil {
 				return orgOps, err
 			}
-
 			if equals {
 				orgOps = append(orgOps, OrgSyncOperation{
 					ElementType: OrgSyncOpsHiveType.Data,
@@ -162,8 +158,8 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 	return orgOps, nil
 }
 
-func (org *Organization) fetchHiveConfigData(opts HiveSyncOptions) (HiveConfigData, error) {
-	hiveClient := NewHiveClient(org)
+func (org Organization) fetchHiveConfigData(opts HiveSyncOptions) (HiveConfigData, error) {
+	hiveClient := NewHiveClient(&org)
 
 	args := HiveArgs{HiveName: opts.HiveName, PartitionKey: opts.OID}
 	dataSet, err := hiveClient.List(args)
@@ -186,8 +182,8 @@ func (org *Organization) fetchHiveConfigData(opts HiveSyncOptions) (HiveConfigDa
 	return currentHiveDataConfig, nil
 }
 
-func (org *Organization) updateHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
-	hiveClient := NewHiveClient(org)
+func (org Organization) updateHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
+	hiveClient := NewHiveClient(&org)
 
 	fmt.Println("I would be updating key here key ", args.Key)
 	fmt.Printf("this is args in update %+v \n ", args)
@@ -211,8 +207,8 @@ func (org *Organization) updateHiveConfigData(args HiveArgs, isDryRun bool, orgO
 	return nil
 }
 
-func (org *Organization) addHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
-	hiveClient := NewHiveClient(org)
+func (org Organization) addHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
+	hiveClient := NewHiveClient(&org)
 
 	fmt.Println("I would be adding data key ", args.Key)
 	fmt.Printf("this is args %+v \n", args)
@@ -236,8 +232,8 @@ func (org *Organization) addHiveConfigData(args HiveArgs, isDryRun bool, orgOps 
 	return nil
 }
 
-func (org *Organization) removeHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
-	hiveClient := NewHiveClient(org)
+func (org Organization) removeHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
+	hiveClient := NewHiveClient(&org)
 
 	fmt.Println("I would be removing key here ", args.Key)
 	op := OrgSyncOperation{
