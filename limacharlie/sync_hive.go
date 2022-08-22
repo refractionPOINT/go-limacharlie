@@ -14,6 +14,7 @@ type HiveConfig struct {
 
 type HiveSyncOptions struct {
 	IsDryRun      bool            `json:"is_dry_run"`
+	IsForce       bool            `json:"is_force"`
 	HiveName      string          `json:"hive_name"`
 	OID           string          `json:"oid"`
 	IncludeLoader IncludeLoaderCB `json:"-"`
@@ -47,7 +48,7 @@ func (org Organization) HiveSyncPush(newConfig HiveConfig, opts HiveSyncOptions)
 		return nil, err
 	}
 
-	opts.OID = orgInfo.OID // lets ensure correct oid is passed
+	opts.OID = orgInfo.OID // let set oid
 	curConfig, err := org.fetchHiveConfigData(opts)
 	if err != nil {
 		return nil, err
@@ -143,6 +144,11 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 		}
 	}
 
+	// only remove values from org if IsForce is set
+	if !opts.IsForce {
+		return orgOps, nil
+	}
+
 	// now that keys have been added or updated
 	// identify what keys should be removed
 	for k, _ := range currentConfigData {
@@ -178,7 +184,6 @@ func (org Organization) fetchHiveConfigData(opts HiveSyncOptions) (HiveConfigDat
 			},
 		}
 	}
-
 	return currentHiveDataConfig, nil
 }
 
