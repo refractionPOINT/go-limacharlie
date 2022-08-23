@@ -51,9 +51,9 @@ type SysMtd struct {
 	LastMod     int64  `json:"last_mod" yaml:"last_mod"`
 }
 type UsrMtd struct {
-	Enabled *bool     `json:"enabled" yaml:"enabled"`
-	Expiry  *int64    `json:"expiry" yaml:"expiry"`
-	Tags    *[]string `json:"tags" yaml:"tags"`
+	Enabled bool     `json:"enabled" yaml:"enabled"`
+	Expiry  int64    `json:"expiry" yaml:"expiry"`
+	Tags    []string `json:"tags" yaml:"tags"`
 }
 
 func NewHiveClient(org *Organization) *HiveClient {
@@ -132,13 +132,13 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 
 	var userMtd UsrMtd // set UsrMtd Data
 	if args.Expiry != nil {
-		userMtd.Expiry = args.Expiry
+		userMtd.Expiry = *args.Expiry
 	}
 	if args.Enabled != nil {
-		userMtd.Enabled = args.Enabled
+		userMtd.Enabled = *args.Enabled
 	}
 	if args.Tags != nil {
-		userMtd.Tags = args.Tags
+		userMtd.Tags = *args.Tags
 	}
 
 	reqDict := Dict{
@@ -190,13 +190,13 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 
 	// set usr mtd data
 	if args.Expiry != nil {
-		existing.UsrMtd.Expiry = args.Expiry
+		existing.UsrMtd.Expiry = *args.Expiry
 	}
 	if args.Enabled != nil {
-		existing.UsrMtd.Enabled = args.Enabled
+		existing.UsrMtd.Enabled = *args.Enabled
 	}
 	if args.Tags != nil {
-		existing.UsrMtd.Tags = args.Tags
+		existing.UsrMtd.Tags = *args.Tags
 	}
 
 	// empty data request only update with usr_mtd and etag

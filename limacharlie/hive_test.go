@@ -95,12 +95,12 @@ func hiveGetTest(t *testing.T) {
 		return
 	}
 
-	if *hiveData.UsrMtd.Enabled {
+	if hiveData.UsrMtd.Enabled {
 		t.Error("hive get failed UsrMtd enabled should be false")
 		return
 	}
 
-	if *hiveData.UsrMtd.Expiry != 0 {
+	if hiveData.UsrMtd.Expiry != 0 {
 		t.Errorf("hive get failed UsrMtd expiry should be zero invalidExpiry: %d ", hiveData.UsrMtd.Expiry)
 		return
 	}
@@ -226,8 +226,8 @@ func hiveUpdate(t *testing.T) {
 		return
 	}
 
-	if len(*updateData.UsrMtd.Tags) != 2 {
-		t.Errorf("hive update failed invalid tag length of %d", len(*updateData.UsrMtd.Tags))
+	if len(updateData.UsrMtd.Tags) != 2 {
+		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
 	}
 }
 

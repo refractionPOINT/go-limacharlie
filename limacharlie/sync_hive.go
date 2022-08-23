@@ -94,14 +94,17 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 			if err != nil {
 				return orgOps, err
 			}
+			enabled := newConfigData[k].UsrMtd.Enabled
+			expiry := newConfigData[k].UsrMtd.Expiry
+			Tags := newConfigData[k].UsrMtd.Tags
 			args := HiveArgs{
 				Key:          k,
 				PartitionKey: opts.OID,
 				HiveName:     opts.HiveName,
 				Data:         &data,
-				Enabled:      newConfigData[k].UsrMtd.Enabled,
-				Expiry:       newConfigData[k].UsrMtd.Expiry,
-				Tags:         newConfigData[k].UsrMtd.Tags,
+				Enabled:      &enabled,
+				Expiry:       &expiry,
+				Tags:         &Tags,
 			}
 			err = org.addHiveConfigData(args, opts.IsDryRun, &orgOps)
 			if err != nil {
@@ -127,14 +130,17 @@ func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfig
 				if err != nil {
 					return orgOps, err
 				}
+				enabled := newConfigData[k].UsrMtd.Enabled
+				expiry := newConfigData[k].UsrMtd.Expiry
+				Tags := newConfigData[k].UsrMtd.Tags
 				args := HiveArgs{
 					Key:          k,
 					PartitionKey: opts.OID,
 					HiveName:     opts.HiveName,
 					Data:         &data,
-					Enabled:      newConfigData[k].UsrMtd.Enabled,
-					Expiry:       newConfigData[k].UsrMtd.Expiry,
-					Tags:         newConfigData[k].UsrMtd.Tags,
+					Enabled:      &enabled,
+					Expiry:       &expiry,
+					Tags:         &Tags,
 				}
 				err = org.updateHiveConfigData(args, opts.IsDryRun, &orgOps)
 				if err != nil {
