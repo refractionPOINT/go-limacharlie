@@ -86,7 +86,7 @@ test-office-365-key:
 		hiveData[k] = value
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
@@ -132,7 +132,7 @@ test-office-365-key:
 	}
 
 	// run actual push dry run is valid
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
@@ -229,7 +229,7 @@ func TestDataUpdate(t *testing.T) {
 		hiveData[k] = value
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
@@ -256,7 +256,7 @@ func TestDataUpdate(t *testing.T) {
 		}
 	}
 
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
@@ -302,7 +302,7 @@ func TestNoUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
@@ -347,7 +347,7 @@ func TestNoUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
@@ -428,7 +428,7 @@ func TestUsrMtdUpdate(t *testing.T) {
 		log.Fatalf("error: %v", err)
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
@@ -464,7 +464,7 @@ func TestUsrMtdUpdate(t *testing.T) {
 	}
 
 	// actual run
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
@@ -558,7 +558,7 @@ test-office-365-key:
 	}
 
 	// run sync as dry run first
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
@@ -606,7 +606,7 @@ test-office-365-key:
 	}
 
 	// lets run actual sync
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
@@ -710,7 +710,7 @@ test-office-365-key:
 		log.Fatalf("error: %v", err)
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
@@ -755,7 +755,7 @@ test-office-365-key:
 	}
 
 	// run actual update
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
@@ -825,7 +825,7 @@ func TestRemove(t *testing.T) {
 		}
 	}
 
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 		IsForce:  true,
@@ -873,7 +873,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// run actual operation
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Version: 1, Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 		IsForce:  true,

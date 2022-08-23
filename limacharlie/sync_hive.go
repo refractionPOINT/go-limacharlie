@@ -3,12 +3,19 @@ package limacharlie
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"gopkg.in/yaml.v2"
+	"path/filepath"
+)
+
+const (
+	HiveConfigLatestVersion = 1
 )
 
 type HiveConfig struct {
-	Version int            `json:"version" yaml:"version"`
-	Data    HiveConfigData `json:"data,omitempty" yaml:"data,omitempty"`
+	Version  int            `json:"version" yaml:"version"`
+	Data     HiveConfigData `json:"data,omitempty" yaml:"data,omitempty"`
+	Includes []string       `json:"-" yaml:"-"`
 }
 
 type HiveSyncOptions struct {
@@ -44,30 +51,18 @@ func (org Organization) HiveSyncPush(newConfig HiveConfig, opts HiveSyncOptions)
 	return org.hiveSyncData(newConfig.Data, curConfig, opts)
 }
 
-func (org Organization) HiveSyncPushFromFiles(config string, opts HiveSyncOptions, includes []string) ([]OrgSyncOperation, error) {
-
-	if opts.HiveName == "" {
-		return nil, errors.New("missing hive name")
-	}
-
-	orgInfo, err := org.GetInfo()
-	if err != nil {
-		return nil, err
-	}
-	opts.OID = orgInfo.OID // lets ensure we are always using correct OID
+func (org Organization) HiveSyncPushFromFiles(rootConfigFile string, opts HiveSyncOptions, includes []string) ([]OrgSyncOperation, error) {
 
 	if opts.IncludeLoader == nil {
 		opts.IncludeLoader = localFileIncludeLoader
 	}
 
-	// Start with the base unmarshal.
-	hiveConfig := HiveConfig{}
-	err = yaml.Unmarshal([]byte(config), &hiveConfig)
+	conf, err := loadHiveEffectiveConfig("", rootConfigFile, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return org.HiveSyncPush(hiveConfig, opts)
+	return org.HiveSyncPush(conf, opts)
 }
 
 func (org Organization) hiveSyncData(newConfigData, currentConfigData HiveConfigData, opts HiveSyncOptions) ([]OrgSyncOperation, error) {
@@ -250,6 +245,22 @@ func (org Organization) removeHiveConfigData(args HiveArgs, isDryRun bool, orgOp
 	return nil
 }
 
+func (hc HiveConfig) Merge(config HiveConfig) HiveConfig {
+	if hc.Data == nil && config.Data == nil {
+		return HiveConfig{}
+	}
+
+	n := map[string]interface{}{}
+	for k, v := range hc.Data {
+		n[k] = v
+	}
+	for k, v := range config.Data {
+		n[k] = v
+	}
+
+	return HiveConfig{}
+}
+
 func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	currentData, err := json.Marshal(hsd.Data)
 	if err != nil {
@@ -279,4 +290,41 @@ func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func loadHiveConfWithOptions(parent string, configFile string, options HiveSyncOptions) (HiveConfig, error) {
+	conf, err := options.IncludeLoader(parent, configFile)
+	if err != nil {
+		return HiveConfig{}, err
+	}
+
+	hiveConfig := HiveConfig{}
+	if err := yaml.Unmarshal(conf, &hiveConfig); err != nil {
+		return HiveConfig{}, err
+	}
+
+	if hiveConfig.Version <= 0 {
+		return HiveConfig{}, fmt.Errorf("invalid version found (%s): %v", configFile, hiveConfig.Version)
+	}
+	if hiveConfig.Version > HiveConfigLatestVersion {
+		return HiveConfig{}, fmt.Errorf("version not supported (%s): %v", configFile, hiveConfig.Version)
+	}
+	return hiveConfig, nil
+}
+
+func loadHiveEffectiveConfig(parent string, configFile string, opts HiveSyncOptions) (HiveConfig, error) {
+	thisConfig, err := loadHiveConfWithOptions(parent, configFile, opts)
+	if err != nil {
+		return HiveConfig{}, err
+	}
+
+	includePath := filepath.Join(filepath.Dir(parent), configFile)
+	for _, toInclude := range thisConfig.Includes {
+		incConf, err := loadHiveEffectiveConfig(includePath, toInclude, opts)
+		if err != nil {
+			return HiveConfig{}, err
+		}
+		thisConfig = thisConfig.Merge(incConf)
+	}
+	return thisConfig, nil
 }
