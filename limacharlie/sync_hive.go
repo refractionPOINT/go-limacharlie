@@ -3,8 +3,7 @@ package limacharlie
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 )
 
 type HiveConfig struct {
@@ -185,8 +184,6 @@ func (org Organization) fetchHiveConfigData(opts HiveSyncOptions) (HiveConfigDat
 func (org Organization) updateHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
 	hiveClient := NewHiveClient(&org)
 
-	fmt.Println("I would be updating key here key ", args.Key)
-	fmt.Printf("this is args in update %+v \n ", args)
 	op := OrgSyncOperation{
 		ElementType: OrgSyncOpsHiveType.Data,
 		ElementName: args.Key,
@@ -210,8 +207,6 @@ func (org Organization) updateHiveConfigData(args HiveArgs, isDryRun bool, orgOp
 func (org Organization) addHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
 	hiveClient := NewHiveClient(&org)
 
-	fmt.Println("I would be adding data key ", args.Key)
-	fmt.Printf("this is args %+v \n", args)
 	op := OrgSyncOperation{
 		ElementType: OrgSyncOpsHiveType.Data,
 		ElementName: args.Key,
@@ -235,7 +230,6 @@ func (org Organization) addHiveConfigData(args HiveArgs, isDryRun bool, orgOps *
 func (org Organization) removeHiveConfigData(args HiveArgs, isDryRun bool, orgOps *[]OrgSyncOperation) error {
 	hiveClient := NewHiveClient(&org)
 
-	fmt.Println("I would be removing key here ", args.Key)
 	op := OrgSyncOperation{
 		ElementType: OrgSyncOpsHiveType.Data,
 		ElementName: args.Key,
