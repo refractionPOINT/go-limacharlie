@@ -30,7 +30,7 @@ func TestAddData(t *testing.T) {
 	}
 
 	// yaml config value to add
-	yamlAdd := `test-unique-key:
+	yamlAdd := `test-s3-unique-key:
     data:
       s3:
         access_key: "test-access-key"
@@ -70,10 +70,10 @@ test-office-365-key:
       enabled: false
       expiry: 0
       tags: null`
-	s3TestHiveKey = "hive-sdk-test-" + randSeq(8)                  // ran
+	s3TestHiveKey = "hive-sdk-s3-test-" + randSeq(8)               // ran
 	office365TestHiveKey = "hive-sdk-office365-test-" + randSeq(8) // ran
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
-	yamlAdd = strings.ReplaceAll(yamlAdd, "test-unique-key", s3TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", s3TestHiveKey)
 
 	var hcd HiveConfigData
@@ -109,23 +109,29 @@ test-office-365-key:
 			}
 
 			if syncOp.ElementType != OrgSyncOpsHiveType.Data {
-				t.Errorf("syncOp element type is invalid:%s", syncOp.ElementName)
+				t.Errorf("syncOp element type for %s is invalid:%s", syncOp.ElementName, syncOp.ElementName)
 				return
 			}
 			if !syncOp.IsAdded {
-				t.Errorf("syncOp added is invalid:%t", syncOp.IsAdded)
+				t.Errorf("syncOp added for %s is invalid:%t", syncOp.ElementName, syncOp.IsAdded)
 				return
 			}
 			if syncOp.IsRemoved {
-				t.Errorf("syncOp removed is invalid:%t", syncOp.IsRemoved)
+				t.Errorf("syncOp removed for %s is invalid:%t", syncOp.ElementName, syncOp.IsRemoved)
 				return
 			}
 		}
 	}
-	if !syncOpS3 || !syncOpOffice {
-		t.Errorf("synnOp add failed no add operation found for key %s ", s3TestHiveKey)
+	if !syncOpS3 {
+		t.Errorf("syncOp add failed no add operation found for key %s ", s3TestHiveKey)
+		return
+	}
+	if !syncOpOffice {
+		t.Errorf("syncOp add failed no add operation found for key %s ", office365TestHiveKey)
+		return
 	}
 
+	// run actual push dry run is valid
 	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
@@ -148,7 +154,6 @@ test-office-365-key:
 			if syncOp.ElementName == s3TestHiveKey {
 				syncOpS3 = true
 			}
-
 			if syncOp.ElementName == office365TestHiveKey {
 				syncOpOffice = true
 			}
@@ -167,8 +172,13 @@ test-office-365-key:
 			}
 		}
 	}
-	if !syncOpS3 || !syncOpOffice {
-		t.Errorf("synnOp add failed no add operation found for key %s ", s3TestHiveKey)
+	if !syncOpS3 {
+		t.Errorf("syncOp add failed no add operation found for key %s ", s3TestHiveKey)
+		return
+	}
+	if !syncOpOffice {
+		t.Errorf("syncOp add failed no add operation found for key %s ", office365TestHiveKey)
+		return
 	}
 }
 
@@ -187,7 +197,7 @@ func TestDataUpdate(t *testing.T) {
 		return
 	}
 
-	yamlAdd := `test-unique-key:
+	yamlAdd := `test-s3-unique-key:
     data:
       s3:
         access_key: "test-access-key-update"
@@ -206,7 +216,7 @@ func TestDataUpdate(t *testing.T) {
       expiry: 0
       tags: null`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
-	yamlAdd = strings.ReplaceAll(yamlAdd, "test-unique-key", s3TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 
 	var hcd HiveConfigData
 	err = yaml.Unmarshal([]byte(yamlAdd), &hcd)
@@ -223,6 +233,10 @@ func TestDataUpdate(t *testing.T) {
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
+	if err != nil {
+		t.Errorf("failed sync push update dry run err: %+v ", err)
+		return
+	}
 
 	syncOpS3 := false
 	for _, syncOp := range orgOps {
@@ -242,23 +256,12 @@ func TestDataUpdate(t *testing.T) {
 		}
 	}
 
-	if err != nil {
-		t.Errorf("failed sync push update dry run err: %+v ", err)
-		return
-	}
-
 	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
-
 	if err != nil {
 		t.Errorf("failed sync push update err: %+v ", err)
-		return
-	}
-
-	if orgOps == nil {
-		t.Errorf("failed update org ops is nil ")
 		return
 	}
 
@@ -294,20 +297,33 @@ func TestNoUpdate(t *testing.T) {
 		PartitionKey: os.Getenv("_OID"),
 		HiveName:     "cloud_sensor",
 	})
+	if err != nil {
+		t.Errorf("failed test no update failed to get hive data err: %+v", err)
+		return
+	}
 
 	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
-
 	if err != nil {
 		t.Errorf("failed sync push no update dry run err: %+v ", err)
 		return
+	}
+	if orgOps == nil {
+		t.Error("failed sync push no update orgOps is nil")
 	}
 
 	syncOpS3, syncOpOffice := false, false
 	for _, syncOp := range orgOps {
 		if syncOp.ElementName == s3TestHiveKey || syncOp.ElementName == office365TestHiveKey {
+			if syncOp.ElementName == s3TestHiveKey {
+				syncOpS3 = true
+			}
+			if syncOp.ElementName == office365TestHiveKey {
+				syncOpOffice = true
+			}
+
 			if syncOp.ElementType != OrgSyncOpsHiveType.Data {
 				t.Errorf("syncOp element type is invalid:%s", syncOp.ElementName)
 				return
@@ -322,8 +338,13 @@ func TestNoUpdate(t *testing.T) {
 			}
 		}
 	}
-	if !syncOpS3 || !syncOpOffice {
-		t.Errorf("synnOp update failed no add operation found for key %s ", s3TestHiveKey)
+	if !syncOpS3 {
+		t.Errorf("syncOp add failed no add operation found for key %s ", s3TestHiveKey)
+		return
+	}
+	if !syncOpOffice {
+		t.Errorf("syncOp add failed no add operation found for key %s ", office365TestHiveKey)
+		return
 	}
 
 	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
@@ -338,11 +359,19 @@ func TestNoUpdate(t *testing.T) {
 
 	if orgOps == nil {
 		t.Error("failed sync push no update orgOps is nil")
+		return
 	}
 
 	syncOpS3, syncOpOffice = false, false
 	for _, syncOp := range orgOps {
 		if syncOp.ElementName == s3TestHiveKey || syncOp.ElementName == office365TestHiveKey {
+			if syncOp.ElementName == s3TestHiveKey {
+				syncOpS3 = true
+			}
+			if syncOp.ElementName == office365TestHiveKey {
+				syncOpOffice = true
+			}
+
 			if syncOp.ElementType != OrgSyncOpsHiveType.Data {
 				t.Errorf("syncOp element type is invalid:%s", syncOp.ElementName)
 				return
@@ -357,8 +386,13 @@ func TestNoUpdate(t *testing.T) {
 			}
 		}
 	}
-	if !syncOpS3 || !syncOpOffice {
-		t.Errorf("synnOp update failed no add operation found for key %s ", s3TestHiveKey)
+	if !syncOpS3 {
+		t.Errorf("syncOp add failed no add operation found for key %s ", s3TestHiveKey)
+		return
+	}
+	if !syncOpOffice {
+		t.Errorf("syncOp add failed no add operation found for key %s ", office365TestHiveKey)
+		return
 	}
 }
 
@@ -367,17 +401,7 @@ func TestUsrMtdUpdate(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	testHiveClient = NewHiveClient(org)
 
-	hiveData, err := testHiveClient.List(HiveArgs{
-		PartitionKey: os.Getenv("_OID"),
-		HiveName:     "cloud_sensor",
-	})
-
-	if err != nil {
-		t.Errorf("add data failed to get data %+v \n ", err)
-		return
-	}
-
-	yamlAdd := `test-unique-key:
+	yamlAdd := `test-s3-unique-key:
     data:
       s3:
         access_key: "test-access-key-update"
@@ -396,31 +420,30 @@ func TestUsrMtdUpdate(t *testing.T) {
       expiry: 1663563600000
       tags: ["test1", "test2", "test3", "test4"]`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
-	yamlAdd = strings.ReplaceAll(yamlAdd, "test-unique-key", s3TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 
 	var hcd HiveConfigData
-	err = yaml.Unmarshal([]byte(yamlAdd), &hcd)
+	err := yaml.Unmarshal([]byte(yamlAdd), &hcd)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
-	for k, value := range hcd {
-		hiveData[k] = value
-	}
-
-	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err := org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: true,
 	})
-
 	if err != nil {
 		t.Errorf("failed sync usr mtd update dry run err: %+v ", err)
 		return
+	}
+	if orgOps == nil {
+		t.Errorf("failed sync push usrt mtd update org ops is nil ")
 	}
 
 	syncOpS3 := false
 	for _, syncOp := range orgOps {
 		if syncOp.ElementName == s3TestHiveKey {
+			syncOpS3 = true
 			if syncOp.ElementType != OrgSyncOpsHiveType.Data {
 				t.Errorf("syncOp usrMtd update element type is invalid:%s", syncOp.ElementName)
 				return
@@ -441,16 +464,14 @@ func TestUsrMtdUpdate(t *testing.T) {
 	}
 
 	// actual run
-	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hiveData}, HiveSyncOptions{
+	orgOps, err = org.HiveSyncPush(HiveConfig{Data: hcd}, HiveSyncOptions{
 		HiveName: "cloud_sensor",
 		IsDryRun: false,
 	})
-
 	if err != nil {
 		t.Errorf("failed sync push usr mtd update err: %+v ", err)
 		return
 	}
-
 	if orgOps == nil {
 		t.Errorf("failed sync push usrt mtd update org ops is nil ")
 	}
@@ -458,6 +479,7 @@ func TestUsrMtdUpdate(t *testing.T) {
 	syncOpS3 = false
 	for _, syncOp := range orgOps {
 		if syncOp.ElementName == s3TestHiveKey {
+			syncOpS3 = true
 			if syncOp.ElementType != OrgSyncOpsHiveType.Data {
 				t.Errorf("syncOp usrMtd update element type is invalid:%s", syncOp.ElementName)
 				return
@@ -496,7 +518,7 @@ func TestMultipleDataUpdates(t *testing.T) {
 	}
 
 	// yaml config value convert s3 to original state and update office 365
-	yamlAdd := `test-unique-key:
+	yamlAdd := `test-s3-unique-key:
     data:
       s3:
         access_key: "test-access-key"
@@ -539,7 +561,7 @@ test-office-365-key:
 	s3TestHiveKey = "hive-sdk-test-" + randSeq(8)                  // ran
 	office365TestHiveKey = "hive-sdk-office365-test-" + randSeq(8) // ran
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
-	yamlAdd = strings.ReplaceAll(yamlAdd, "test-unique-key", s3TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
 
 	var hcd HiveConfigData
@@ -655,7 +677,7 @@ func TestMultipleUsrMtdUpdate(t *testing.T) {
 	}
 
 	// leave config as is but only update usr_mtd
-	yamlAdd := `test-unique-key:
+	yamlAdd := `test-s3-unique-key:
     data:
       s3:
         access_key: "test-access-key"
@@ -698,7 +720,7 @@ test-office-365-key:
 	s3TestHiveKey = "hive-sdk-test-" + randSeq(8)                  // ran
 	office365TestHiveKey = "hive-sdk-office365-test-" + randSeq(8) // ran
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
-	yamlAdd = strings.ReplaceAll(yamlAdd, "test-unique-key", s3TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
 
 	var hcd HiveConfigData
