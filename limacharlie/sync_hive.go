@@ -26,17 +26,6 @@ var OrgSyncOpsHiveType = struct {
 	Data: "data",
 }
 
-//type HiveSyncData struct {
-//	Data   map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
-//	UsrMtd UsrMtdConfig           `json:"usr_mtd,omitempty" yaml:"usr_mtd,omitempty"`
-//}
-
-//type UsrMtdConfig struct {
-//	Enabled *bool     `json:"enabled" yaml:"enabled"`
-//	Expiry  *int64    `json:"expiry" yaml:"expiry"`
-//	Tags    *[]string `json:"tags" yaml:"tags"`
-//}
-
 func (org Organization) HiveSyncPush(newConfig HiveConfig, opts HiveSyncOptions) ([]OrgSyncOperation, error) {
 
 	if opts.HiveName == "" {
