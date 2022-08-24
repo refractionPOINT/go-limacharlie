@@ -257,6 +257,7 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.Artifacts = o.mergeArtifacts(conf.Artifacts)
 	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
+	o.Hive = o.mergeHive(conf.Hive)
 	return o
 }
 
@@ -340,13 +341,13 @@ func (a OrgConfig) mergeIntegrity(b orgSyncIntegrityRules) orgSyncIntegrityRules
 	return n
 }
 
-func (osh orgSyncHive) Merge(hiveConfig orgSyncHive) orgSyncHive {
-	if osh == nil && hiveConfig == nil {
+func (a OrgConfig) mergeHive(hiveConfig orgSyncHive) orgSyncHive {
+	if a.Hive == nil && hiveConfig == nil {
 		return orgSyncHive{}
 	}
 
 	n := orgSyncHive{}
-	for k, v := range osh {
+	for k, v := range a.Hive {
 		n[k] = v
 	}
 
