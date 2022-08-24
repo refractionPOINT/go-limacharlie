@@ -41,6 +41,7 @@ type SyncOptions struct {
 	SyncArtifacts   bool `json:"sync_artifacts"`
 	SyncNetPolicies bool `json:"sync_net_policies"`
 	SyncOrgValues   bool `json:"sync_org_values"`
+	SyncHive        bool `json:"sync_hive"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
@@ -191,6 +192,7 @@ type orgSyncExfilRules = ExfilRulesType
 type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
 type orgSyncOrgValues = map[OrgValueName]OrgValue
+type orgSyncHive = map[HiveName]map[HiveKey]HiveData
 
 type OrgConfig struct {
 	Version     int                   `json:"version" yaml:"version"`
@@ -204,6 +206,7 @@ type OrgConfig struct {
 	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
 	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
 	OrgValues   orgSyncOrgValues      `json:"org-value,omitempty" yaml:"org-value,omitempty"`
+	Hive        orgSyncHive           `json:"hive,omitempty" yaml:"hive,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -337,6 +340,23 @@ func (a OrgConfig) mergeIntegrity(b orgSyncIntegrityRules) orgSyncIntegrityRules
 	return n
 }
 
+func (osh orgSyncHive) Merge(hiveConfig orgSyncHive) orgSyncHive {
+	if osh == nil && hiveConfig == nil {
+		return orgSyncHive{}
+	}
+
+	n := orgSyncHive{}
+	for k, v := range osh {
+		n[k] = v
+	}
+
+	for k, v := range hiveConfig {
+		n[k] = v
+	}
+
+	return n
+}
+
 func IsInterfaceNil(v interface{}) bool {
 	return v == nil || reflect.ValueOf(v).Kind() == reflect.Ptr && reflect.ValueOf(v).IsNil()
 }
@@ -435,6 +455,7 @@ var OrgSyncOperationElementType = struct {
 	Artifact   string
 	NetPolicy  string
 	OrgValue   string
+	Hive       string
 }{
 	DRRule:     "dr-rule",
 	FPRule:     "fp-rule",
@@ -446,6 +467,7 @@ var OrgSyncOperationElementType = struct {
 	Artifact:   "artifact",
 	NetPolicy:  "net-policy",
 	OrgValue:   "org-value",
+	Hive:       "hive",
 }
 
 type OrgSyncOperation struct {
@@ -524,6 +546,10 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("org-value: %v", err)
 		}
 	}
+	//if options.SyncHive {
+	//	orgConfig.Hive, err = org.syncFetchHive()
+	//}
+
 	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
 }
@@ -850,6 +876,14 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 			return ops, fmt.Errorf("net-policy: %v", err)
 		}
 	}
+	if options.SyncHive {
+		newOps, err := org.syncHive(conf.Hive, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("hive: %+v ", err)
+		}
+	}
+
 	return ops, nil
 }
 

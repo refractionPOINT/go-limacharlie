@@ -56,6 +56,18 @@ type UsrMtd struct {
 	Tags    []string `json:"tags" yaml:"tags"`
 }
 
+type HiveName string
+
+func (h HiveName) String() string {
+	return fmt.Sprintf("%#v", h)
+}
+
+type HiveKey string
+
+func (h HiveKey) String() string {
+	return fmt.Sprintf("%#v", h)
+}
+
 func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}
 }
@@ -228,4 +240,35 @@ func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
 	}
 
 	return delResp, nil
+}
+
+func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
+	currentData, err := json.Marshal(hsd.Data)
+	if err != nil {
+		return false, err
+	}
+
+	newData, err := json.Marshal(cData.Data)
+	if err != nil {
+		return false, err
+	}
+	if string(currentData) != string(newData) {
+		return false, nil
+	}
+
+	curUsrMtd, err := json.Marshal(hsd.UsrMtd)
+	if err != nil {
+		return false, err
+	}
+
+	newUsrMTd, err := json.Marshal(cData.UsrMtd)
+	if err != nil {
+		return false, err
+	}
+
+	if string(curUsrMtd) != string(newUsrMTd) {
+		return false, nil
+	}
+
+	return true, nil
 }
