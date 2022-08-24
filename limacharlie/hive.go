@@ -56,17 +56,9 @@ type UsrMtd struct {
 	Tags    []string `json:"tags" yaml:"tags"`
 }
 
-type HiveName string
+type HiveName = string
 
-func (h HiveName) String() string {
-	return fmt.Sprintf("%#v", h)
-}
-
-type HiveKey string
-
-func (h HiveKey) String() string {
-	return fmt.Sprintf("%#v", h)
-}
+type HiveKey = string
 
 func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}

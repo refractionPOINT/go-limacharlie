@@ -3,13 +3,12 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -206,7 +205,7 @@ type OrgConfig struct {
 	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
 	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
 	OrgValues   orgSyncOrgValues      `json:"org-value,omitempty" yaml:"org-value,omitempty"`
-	Hive        orgSyncHive           `json:"hive,omitempty" yaml:"hive,omitempty"`
+	Hives       orgSyncHive           `json:"hives,omitempty" yaml:"hives,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -257,7 +256,7 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.Artifacts = o.mergeArtifacts(conf.Artifacts)
 	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
-	o.Hive = o.mergeHive(conf.Hive)
+	o.Hives = o.mergeHive(conf.Hives)
 	return o
 }
 
@@ -342,12 +341,12 @@ func (a OrgConfig) mergeIntegrity(b orgSyncIntegrityRules) orgSyncIntegrityRules
 }
 
 func (a OrgConfig) mergeHive(hiveConfig orgSyncHive) orgSyncHive {
-	if a.Hive == nil && hiveConfig == nil {
+	if a.Hives == nil && hiveConfig == nil {
 		return orgSyncHive{}
 	}
 
 	n := orgSyncHive{}
-	for k, v := range a.Hive {
+	for k, v := range a.Hives {
 		n[k] = v
 	}
 
@@ -456,7 +455,7 @@ var OrgSyncOperationElementType = struct {
 	Artifact   string
 	NetPolicy  string
 	OrgValue   string
-	Hive       string
+	Hives      string
 }{
 	DRRule:     "dr-rule",
 	FPRule:     "fp-rule",
@@ -468,7 +467,7 @@ var OrgSyncOperationElementType = struct {
 	Artifact:   "artifact",
 	NetPolicy:  "net-policy",
 	OrgValue:   "org-value",
-	Hive:       "hive",
+	Hives:      "hives",
 }
 
 type OrgSyncOperation struct {
@@ -878,7 +877,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 	if options.SyncHive {
-		newOps, err := org.syncHive(conf.Hive, options)
+		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("hive: %+v ", err)

@@ -17,21 +17,22 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 	for hiveName, newConfigData := range hiveConfigData {
 		// grab current config data as to determine if update or add needs to be processed
 		currentConfigData, err := org.fetchHiveConfigData(HiveArgs{
-			HiveName:     hiveName.String(),
+			HiveName:     hiveName,
 			PartitionKey: orgInfo.OID,
 		})
 		if err != nil {
 			return orgOps, err
 		}
 
-		// now check if we need to update or add new data for this particular hive resource
+		// now check if we need to update or add new data for this particular hive
 		for hiveKey, ncd := range newConfigData {
 			// if key does not exist in current config data
 			// new data needs to be added
-			if _, ok := currentConfigData[hiveKey.String()]; !ok {
+
+			if _, ok := currentConfigData[hiveKey]; !ok {
 				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hive,
-					ElementName: hiveKey.String(),
+					ElementType: OrgSyncOperationElementType.Hives,
+					ElementName: hiveName + "/" + hiveKey,
 					IsAdded:     true,
 					IsRemoved:   false,
 				}
@@ -40,10 +41,10 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 					continue
 				}
 				err = org.addHiveConfigData(HiveArgs{
-					Key:          hiveKey.String(),
-					HiveName:     hiveName.String(),
+					Key:          hiveKey,
+					HiveName:     hiveName,
 					PartitionKey: orgInfo.OID},
-					ncd)
+					newConfigData[hiveKey])
 				if err != nil {
 					return orgOps, err
 				}
@@ -51,28 +52,34 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 			} else {
 				// if new config data exists in current config
 				// check to see if data is equal if not update
-				curData := currentConfigData[hiveKey.String()]
+				curData := currentConfigData[hiveKey]
 				equals, err := ncd.Equals(curData)
 				if err != nil {
 					return orgOps, err
 				}
 				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hive,
-					ElementName: hiveKey.String(),
+					ElementType: OrgSyncOperationElementType.Hives,
+					ElementName: hiveName + "/" + hiveKey,
 					IsAdded:     false,
 					IsRemoved:   false,
 				}
-				if equals || opts.IsDryRun {
+				if equals {
 					orgOps = append(orgOps, op)
 				} else { // not equal run hive update
+					if opts.IsDryRun {
+						op.IsAdded = true
+						orgOps = append(orgOps, op)
+						continue
+					}
 					err = org.updateHiveConfigData(HiveArgs{
-						Key:          hiveKey.String(),
-						HiveName:     hiveName.String(),
+						Key:          hiveKey,
+						HiveName:     hiveName,
 						PartitionKey: orgInfo.OID},
 						ncd)
 					if err != nil {
 						return orgOps, err
 					}
+					op.IsAdded = true
 					orgOps = append(orgOps, op)
 				}
 			}
@@ -86,11 +93,10 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 		// now that keys have been added or updated for this particular
 		// identify what keys should be removed
 		for k, _ := range currentConfigData {
-			if _, ok := newConfigData[HiveKey(k)]; !ok {
-
+			if _, ok := newConfigData[k]; !ok {
 				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hive,
-					ElementName: k,
+					ElementType: OrgSyncOperationElementType.Hives,
+					ElementName: hiveName + "/" + k,
 					IsAdded:     false,
 					IsRemoved:   true,
 				}
@@ -98,8 +104,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 					orgOps = append(orgOps, op)
 					continue
 				}
-
-				err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: orgInfo.OID, HiveName: hiveName.String()})
+				err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: orgInfo.OID, HiveName: hiveName})
 				if err != nil {
 					return orgOps, err
 				}
@@ -163,10 +168,11 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd HiveData) error {
 func (org Organization) addHiveConfigData(ha HiveArgs, hd HiveData) error {
 	hiveClient := NewHiveClient(&org)
 
-	data, err := json.Marshal(hd.Data)
+	mData, err := json.Marshal(hd.Data)
 	if err != nil {
 		return err
 	}
+
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	Tags := hd.UsrMtd.Tags
@@ -174,7 +180,7 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd HiveData) error {
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
 		HiveName:     ha.HiveName,
-		Data:         &data,
+		Data:         &mData,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
 		Tags:         &Tags,
