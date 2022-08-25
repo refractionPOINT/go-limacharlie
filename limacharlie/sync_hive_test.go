@@ -637,8 +637,8 @@ func TestMultipleUsrMtdUpdate(t *testing.T) {
           sensor_type: s3
         usr_mtd:
           enabled: false
-          expiry: 0
-          tags: null
+          expiry: 1663563600000
+          tags: ["test1", "test2", "test3"]
     test-office-365-key:
       data:
         office365:
@@ -659,8 +659,8 @@ func TestMultipleUsrMtdUpdate(t *testing.T) {
         sensor_type: office365
       usr_mtd:
         enabled: false
-        expiry: 0
-        tags: null`
+        expiry: 1663563600000
+        tags: ["test1", "test2", "test3"]`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
