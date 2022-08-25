@@ -871,3 +871,153 @@ func TestRemove(t *testing.T) {
 		return
 	}
 }
+
+func TestMergeHive(t *testing.T) {
+
+	yamlOne := `hives:
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 0
+          tags: null
+    test-office-365-key:
+      data:
+        office365:
+          client_id: test-client-id
+          client_options:
+            hostname: Office 365 test host name update
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: office365
+            sensor_seed_key: Office 365 test update
+          client_secret: test-secret
+          content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+          domain: SecurityInfrastructure.onmicrosoft.com
+          endpoint: enterprise
+          publisher_id: test-publisher-id
+          tenant_id: test-tenant-id
+        sensor_type: office365
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags: null`
+	yamlOne = strings.ReplaceAll(yamlOne, "oid-input", os.Getenv("_OID"))
+	yamlOne = strings.ReplaceAll(yamlOne, "test-s3-unique-key", s3TestHiveKey)
+	yamlOne = strings.ReplaceAll(yamlOne, "test-office-365-key", office365TestHiveKey)
+
+	orgConfigOne := OrgConfig{}
+	err := yaml.Unmarshal([]byte(yamlOne), &orgConfigOne)
+	if err != nil {
+		t.Errorf("testMergeHive unmarshal error: %v", err)
+		return
+	}
+
+	yaml2 := `hives:
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 1663563600000
+          tags: ["test1", "test2", "test3"]
+    test-office-365-key:
+      data:
+        office365:
+          client_id: test-client-id
+          client_options:
+            hostname: Office 365 test host name update
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: office365
+            sensor_seed_key: Office 365 test update
+          client_secret: test-secret
+          content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+          domain: SecurityInfrastructure.onmicrosoft.com
+          endpoint: enterprise
+          publisher_id: test-publisher-id
+          tenant_id: test-tenant-id
+        sensor_type: office365
+      usr_mtd:
+        enabled: false
+        expiry: 1663563600000
+        tags: ["test1", "test2", "test3"]
+    test-gcpTest-key:
+      data:
+        pubsub:
+          client_options:
+            hostname: gcpTest
+            identity:
+              installation_key: test-intsll-key
+              oid: test-oin
+            platform: gcp
+            sensor_seed_key: gcpTest
+          project_name: adf
+          service_account_creds: "{ gcp }"
+          sub_name: asdf
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags:`
+	yaml2 = strings.ReplaceAll(yaml2, "oid-input", os.Getenv("_OID"))
+	yaml2 = strings.ReplaceAll(yaml2, "test-s3-unique-key", s3TestHiveKey)
+	yaml2 = strings.ReplaceAll(yaml2, "test-office-365-key", office365TestHiveKey)
+
+	orgConfigTwo := OrgConfig{}
+	err = yaml.Unmarshal([]byte(yaml2), &orgConfigTwo)
+	if err != nil {
+		t.Errorf("testMergeHive unmarshal error: %v", err)
+		return
+	}
+
+	// process merge
+	newOrgConfig := orgConfigOne.Merge(orgConfigTwo)
+	for n, _ := range newOrgConfig.Hives {
+		for k, data := range newOrgConfig.Hives[n] {
+			if k == s3TestHiveKey || k == office365TestHiveKey {
+				equal, err := data.Equals(orgConfigTwo.Hives[n][k])
+				if err != nil {
+					t.Errorf("error during equals in testMergeHive %+v", err)
+					return
+				}
+				if !equal {
+					t.Errorf("error testMergeHive config data not equal for key %s", k)
+					return
+				}
+			}
+		}
+	}
+
+	// validate newOrgConfig also contains new data
+	gcpTest := newOrgConfig.Hives["cloud_sensor"]["test-gcpTest-key"]
+	if gcpTest.Data == nil {
+		t.Error("testMergeHive new data was not added for key test-gcpTest-key")
+	}
+}

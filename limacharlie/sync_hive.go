@@ -5,6 +5,7 @@ import (
 )
 
 // not possible at the moment
+//todo
 func (org Organization) syncFetchHive() {}
 
 func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) ([]OrgSyncOperation, error) {
@@ -28,7 +29,6 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 		for hiveKey, ncd := range newConfigData {
 			// if key does not exist in current config data
 			// new data needs to be added
-
 			if _, ok := currentConfigData[hiveKey]; !ok {
 				op := OrgSyncOperation{
 					ElementType: OrgSyncOperationElementType.Hives,

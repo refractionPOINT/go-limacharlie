@@ -349,11 +349,9 @@ func (a OrgConfig) mergeHive(hiveConfig orgSyncHive) orgSyncHive {
 	for k, v := range a.Hives {
 		n[k] = v
 	}
-
 	for k, v := range hiveConfig {
 		n[k] = v
 	}
-
 	return n
 }
 
