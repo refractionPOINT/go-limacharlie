@@ -77,6 +77,10 @@ func TestAddData(t *testing.T) {
 		t.Errorf("hive sync push failure TestAddData err: %+v", err)
 		return
 	}
+	if orgOps == nil || len(orgOps) == 0 {
+		t.Errorf("error no orgOps testAddData")
+		return
+	}
 
 	syncOpS3, syncOpOffice := false, false
 	for _, syncOp := range orgOps {
@@ -188,7 +192,8 @@ func TestDataUpdate(t *testing.T) {
 		return
 	}
 	if orgOps == nil || len(orgOps) == 0 {
-		t.Errorf("error no orgOps for update ")
+		t.Errorf("error no orgOps testDataUpdate ")
+		return
 	}
 
 	syncOpS3 := false
@@ -223,7 +228,7 @@ func TestDataUpdate(t *testing.T) {
 
 	syncOpS3 = false
 	for _, syncOp := range orgOps {
-		if syncOp.ElementName == s3TestHiveKey {
+		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey {
 			syncOpS3 = true
 			if syncOp.ElementType != OrgSyncOperationElementType.Hives {
 				t.Errorf("syncOp s3 update element type is invalid:%s", syncOp.ElementName)
