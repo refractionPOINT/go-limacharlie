@@ -104,6 +104,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 					orgOps = append(orgOps, op)
 					continue
 				}
+
 				err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: orgInfo.OID, HiveName: hiveName})
 				if err != nil {
 					return orgOps, err
@@ -112,7 +113,6 @@ func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) (
 			}
 		}
 	}
-
 	return orgOps, nil
 }
 
