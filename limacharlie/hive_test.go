@@ -236,7 +236,7 @@ func hiveRemove(t *testing.T) {
 	_, err := testHiveClient.Remove(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	// validate test ran correctly
 	if err != nil {
