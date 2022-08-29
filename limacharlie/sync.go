@@ -31,16 +31,16 @@ type SyncOptions struct {
 	// Only simulate changes to the Org.
 	IsDryRun bool `json:"is_dry_run"`
 
-	SyncDRRules     bool `json:"sync_dr"`
-	SyncOutputs     bool `json:"sync_outputs"`
-	SyncResources   bool `json:"sync_resources"`
-	SyncIntegrity   bool `json:"sync_integrity"`
-	SyncFPRules     bool `json:"sync_fp"`
-	SyncExfil       bool `json:"sync_exfil"`
-	SyncArtifacts   bool `json:"sync_artifacts"`
-	SyncNetPolicies bool `json:"sync_net_policies"`
-	SyncOrgValues   bool `json:"sync_org_values"`
-	SyncHive        bool `json:"sync_hive"`
+	SyncDRRules     bool            `json:"sync_dr"`
+	SyncOutputs     bool            `json:"sync_outputs"`
+	SyncResources   bool            `json:"sync_resources"`
+	SyncIntegrity   bool            `json:"sync_integrity"`
+	SyncFPRules     bool            `json:"sync_fp"`
+	SyncExfil       bool            `json:"sync_exfil"`
+	SyncArtifacts   bool            `json:"sync_artifacts"`
+	SyncNetPolicies bool            `json:"sync_net_policies"`
+	SyncOrgValues   bool            `json:"sync_org_values"`
+	SyncHive        map[string]bool `json:"sync_hive"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
@@ -544,9 +544,9 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("org-value: %v", err)
 		}
 	}
-	//if options.SyncHive {
-	//	orgConfig.Hive, err = org.syncFetchHive()
-	//}
+	if options.SyncHive != nil || len(options.SyncHive) != 0 {
+		orgConfig.Hives, err = org.syncFetchHive(options.SyncHive)
+	}
 
 	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
@@ -874,7 +874,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 			return ops, fmt.Errorf("net-policy: %v", err)
 		}
 	}
-	if options.SyncHive {
+	if options.SyncHive != nil || len(options.SyncHive) != 0 {
 		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
 		if err != nil {

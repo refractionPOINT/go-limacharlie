@@ -72,7 +72,7 @@ func TestAddData(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("hive sync push failure TestAddData err: %+v", err)
 		return
@@ -113,7 +113,7 @@ func TestAddData(t *testing.T) {
 		return
 	}
 
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -186,7 +186,7 @@ func TestDataUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -220,7 +220,7 @@ func TestDataUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -272,7 +272,7 @@ func TestNoUpdate(t *testing.T) {
 	}
 	orgConfig.Hives = configHive
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("hive sync push testNoUpdate err: %+v", err)
 		return
@@ -316,7 +316,7 @@ func TestNoUpdate(t *testing.T) {
 	}
 
 	// actual run of sync
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -395,7 +395,7 @@ func TestUsrMtdUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("hive sync push testUsrMtdUpdate err: %+v", err)
 		return
@@ -430,7 +430,7 @@ func TestUsrMtdUpdate(t *testing.T) {
 	}
 
 	// run actual push
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -524,7 +524,7 @@ func TestMultipleDataUpdates(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push testMultipleDataUpdates %+v", err)
 		return
@@ -569,7 +569,7 @@ func TestMultipleDataUpdates(t *testing.T) {
 	}
 
 	// process actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -672,7 +672,7 @@ func TestMultipleUsrMtdUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error  testMultipleUsrMtdUpdate hive sync push %+v ", err)
 		return
@@ -717,7 +717,7 @@ func TestMultipleUsrMtdUpdate(t *testing.T) {
 	}
 
 	// process actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error testMultipleUsrMtdUpdate hive sync push %+v", err)
 		return
@@ -786,7 +786,7 @@ func TestRemove(t *testing.T) {
 	orgConfig.Hives = map[HiveName]map[HiveKey]HiveData{
 		"cloud_sensor": hiveData,
 	}
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, IsForce: true, SyncHive: true})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, IsForce: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error TestRemove hive sync push %+v", err)
 		return
@@ -829,7 +829,7 @@ func TestRemove(t *testing.T) {
 		return
 	}
 
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, IsForce: true, SyncHive: true})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, IsForce: true, SyncHive: map[string]bool{"cloud_sensor": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return

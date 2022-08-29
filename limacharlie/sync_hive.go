@@ -2,11 +2,51 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"sync"
 )
 
-// not possible at the moment
-//todo
-func (org Organization) syncFetchHive() {}
+func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive, error) {
+	orgInfo, err := org.GetInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	m := sync.Mutex{}
+	var wg sync.WaitGroup
+	waitCh := make(chan struct{})
+	errCh := make(chan error)
+	hiveSync := orgSyncHive{}
+	go func() {
+		for hiveName, _ := range syncHiveOpts {
+			if syncHiveOpts[hiveName] {
+				wg.Add(1)
+				go func(hive string) {
+					defer wg.Done()
+					hiveConfigData, err := org.fetchHiveConfigData(HiveArgs{HiveName: hive, PartitionKey: orgInfo.OID})
+					if err != nil {
+						errCh <- err
+					}
+
+					m.Lock()
+					defer m.Unlock()
+					hiveSync[hive] = hiveConfigData
+				}(hiveName)
+			}
+		}
+
+		wg.Wait()
+		close(waitCh)
+	}()
+
+	// if all calls are successful then return sync data
+	// if a sync op fails return right away
+	select {
+	case <-waitCh:
+		return hiveSync, nil
+	case err := <-errCh:
+		return nil, err
+	}
+}
 
 func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) ([]OrgSyncOperation, error) {
 	orgInfo, err := org.GetInfo()
