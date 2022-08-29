@@ -224,7 +224,7 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	return updateResp, nil
 }
 
-func (h *HiveClient) Remove(args HiveArgs, isPrint bool) (interface{}, error) {
+func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 	var delResp interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodDelete,
 		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key), makeDefaultRequest(&delResp)); err != nil {

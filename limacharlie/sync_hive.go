@@ -237,7 +237,7 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd HiveData) error {
 func (org Organization) removeHiveConfigData(args HiveArgs) error {
 	hiveClient := NewHiveClient(&org)
 
-	_, err := hiveClient.Remove(args, false)
+	_, err := hiveClient.Remove(args)
 	if err != nil {
 		return err
 	}
