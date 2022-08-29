@@ -56,6 +56,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 
 	var orgOps []OrgSyncOperation
 	for hiveName, newConfigData := range hiveConfigData {
+
 		// grab current config data as to determine if update or add needs to be processed
 		currentConfigData, err := org.fetchHiveConfigData(HiveArgs{
 			HiveName:     hiveName,
@@ -127,10 +128,10 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 
 		// only remove values from org if IsForce is set
 		if !opts.IsForce {
-			return orgOps, nil
+			continue
 		}
 
-		// now that keys have been added or updated for this particular
+		// now that keys have been added or updated for this hive
 		// identify what keys should be removed
 		for k, _ := range currentConfigData {
 			if _, ok := newConfigData[k]; !ok {
