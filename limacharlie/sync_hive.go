@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive, error) {
+func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
@@ -15,7 +15,7 @@ func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive
 	var wg sync.WaitGroup
 	waitCh := make(chan struct{})
 	errCh := make(chan error)
-	hiveSync := orgSyncHive{}
+	hiveSync := orgSyncHives{}
 	go func() {
 		for hiveName, _ := range syncHiveOpts {
 			if syncHiveOpts[hiveName] {
@@ -48,7 +48,7 @@ func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive
 	}
 }
 
-func (org Organization) syncHive(hiveConfigData orgSyncHive, opts SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) ([]OrgSyncOperation, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
