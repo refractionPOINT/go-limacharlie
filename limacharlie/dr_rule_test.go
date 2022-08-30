@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,6 +58,8 @@ func TestDRRuleAddDelete(t *testing.T) {
 
 	rules, err = org.DRRules()
 	a.NoError(err)
+	fmt.Println("this is rules")
+	fmt.Println(rules)
 	if len(rules) != 0 {
 		t.Errorf("rules is not empty")
 	}
