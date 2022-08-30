@@ -10,6 +10,7 @@ import (
 
 var s3TestHiveKey string
 var office365TestHiveKey string
+var fpTestHiveKey string
 
 func TestHiveAddData(t *testing.T) {
 
@@ -58,12 +59,30 @@ func TestHiveAddData(t *testing.T) {
         usr_mtd:
           enabled: false
           expiry: 0
-          tags: null`
-	s3TestHiveKey = "hive-sdk-s3-test-" + randSeq(8)               // ran
-	office365TestHiveKey = "hive-sdk-office365-test-" + randSeq(8) // ran
+          tags: null
+  fp: 
+    'test-sdk-FP':
+      data:
+        op: and
+        rules:
+        - op: is
+          path: cat
+          value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
+        - case sensitive: false
+          op: is
+          path: detect/event/FILE_PATH
+          value: C:\Windows\System32\svchost.exe
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags:`
+	s3TestHiveKey = "hive-sdk-s3-test-" + randSeq(8)
+	office365TestHiveKey = "hive-sdk-office365-test-" + randSeq(8)
+	fpTestHiveKey = "hive-sdk-fp-test-" + randSeq(8)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-sdk-FP", fpTestHiveKey)
 
 	var orgConfig OrgConfig
 	err := yaml.Unmarshal([]byte(yamlAdd), &orgConfig)
@@ -73,7 +92,7 @@ func TestHiveAddData(t *testing.T) {
 	}
 
 	// start of dry run
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("hive sync push failure TestAddData err: %+v", err)
 		return
@@ -83,10 +102,11 @@ func TestHiveAddData(t *testing.T) {
 		return
 	}
 	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "fp/" + fpTestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(expectedOps, sortSyncOps(orgOps))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// start of actual run
 	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "dr-general": true}})
@@ -100,10 +120,11 @@ func TestHiveAddData(t *testing.T) {
 	}
 
 	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "fp/" + fpTestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(expectedOps, sortSyncOps(orgOps))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 }
 
 func TestHiveDataUpdate(t *testing.T) {
@@ -148,7 +169,7 @@ func TestHiveDataUpdate(t *testing.T) {
 		return
 	}
 	if orgOps == nil || len(orgOps) == 0 {
-		t.Errorf("error no orgOps testDataUpdate ")
+		t.Errorf("error no orgOps testDataUpdate")
 		return
 	}
 	expectedOps := sortSyncOps([]OrgSyncOperation{
@@ -177,7 +198,7 @@ func TestHiveNoUpdate(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	testHiveClient = NewHiveClient(org)
 
-	hiveData, err := testHiveClient.List(HiveArgs{
+	hiveSensorData, err := testHiveClient.List(HiveArgs{
 		PartitionKey: os.Getenv("_OID"),
 		HiveName:     "cloud_sensor",
 	})
@@ -185,13 +206,24 @@ func TestHiveNoUpdate(t *testing.T) {
 		t.Errorf("failed testNoUpdate failed to get hive data err: %+v", err)
 		return
 	}
+
+	hiveFpData, err := testHiveClient.List(HiveArgs{
+		PartitionKey: os.Getenv("_OID"),
+		HiveName:     "fp",
+	})
+	if err != nil {
+		t.Errorf("failed testNoUpdate failed to get hive data err: %+v", err)
+		return
+	}
+
 	orgConfig := OrgConfig{}
 	configHive := map[HiveName]map[HiveKey]HiveData{
-		"cloud_sensor": hiveData,
+		"cloud_sensor": hiveSensorData,
+		"fp":           hiveFpData,
 	}
 	orgConfig.Hives = configHive
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("hive sync push testNoUpdate err: %+v", err)
 		return
@@ -201,14 +233,17 @@ func TestHiveNoUpdate(t *testing.T) {
 		return
 	}
 
-	syncOpS3, syncOpOffice := false, false
+	syncOpS3, syncOpOffice, syncOpFp := false, false, false
 	for _, syncOp := range orgOps {
-		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
+		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey || syncOp.ElementName == "fp/"+fpTestHiveKey {
 			if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey {
 				syncOpS3 = true
 			}
 			if syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
 				syncOpOffice = true
+			}
+			if syncOp.ElementName == "fp/"+fpTestHiveKey {
+				syncOpFp = true
 			}
 
 			if syncOp.ElementType != OrgSyncOperationElementType.Hives {
@@ -226,16 +261,20 @@ func TestHiveNoUpdate(t *testing.T) {
 		}
 	}
 	if !syncOpS3 {
-		t.Errorf("syncOp add failed testNoUpdate no add operation found for key %s ", s3TestHiveKey)
+		t.Errorf("syncOp failed testNoUpdate no operation found for key %s ", s3TestHiveKey)
 		return
 	}
 	if !syncOpOffice {
-		t.Errorf("syncOp add failed testNoUpdate no add operation found for key %s ", office365TestHiveKey)
+		t.Errorf("syncOp  testNoUpdate no operation found for key %s ", office365TestHiveKey)
+		return
+	}
+	if !syncOpFp {
+		t.Errorf("syncOp failed testNoUpdate no operation found for key %s ", fpTestHiveKey)
 		return
 	}
 
 	// actual run of sync
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -245,14 +284,17 @@ func TestHiveNoUpdate(t *testing.T) {
 		return
 	}
 
-	syncOpS3, syncOpOffice = false, false
+	syncOpS3, syncOpOffice, syncOpFp = false, false, false
 	for _, syncOp := range orgOps {
-		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
+		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey || syncOp.ElementName == "fp/"+fpTestHiveKey {
 			if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey {
 				syncOpS3 = true
 			}
 			if syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
 				syncOpOffice = true
+			}
+			if syncOp.ElementName == "fp/"+fpTestHiveKey {
+				syncOpFp = true
 			}
 
 			if syncOp.ElementType != OrgSyncOperationElementType.Hives {
@@ -270,11 +312,15 @@ func TestHiveNoUpdate(t *testing.T) {
 		}
 	}
 	if !syncOpS3 {
-		t.Errorf("syncOp add failed testNoUpdate no add operation found for key %s ", s3TestHiveKey)
+		t.Errorf("syncOp failed testNoUpdate no operation found for key %s ", s3TestHiveKey)
 		return
 	}
 	if !syncOpOffice {
-		t.Errorf("syncOp add failed testNoUpdate no add operation found for key %s ", office365TestHiveKey)
+		t.Errorf("syncOp failed testNoUpdate no operation found for key %s ", office365TestHiveKey)
+		return
+	}
+	if !syncOpFp {
+		t.Errorf("syncOp failed testNoUpdate no operation found for key %s ", fpTestHiveKey)
 		return
 	}
 }
@@ -392,10 +438,27 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
       usr_mtd:
         enabled: false
         expiry: 0
-        tags: null`
+        tags: null
+  fp: 
+    'test-sdk-FP':
+      data:
+        op: and
+        rules:
+        - op: is
+          path: cat
+          value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
+        - case sensitive: true
+          op: is
+          path: detect/event/FILE_PATH
+          value: C:\Windows\System32\svch.exe
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags:`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-sdk-FP", fpTestHiveKey)
 
 	orgConfig := OrgConfig{}
 	err := yaml.Unmarshal([]byte(yamlAdd), &orgConfig)
@@ -414,10 +477,11 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 		return
 	}
 	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "fp/" + fpTestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(expectedOps, sortSyncOps(orgOps))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// process actual run
 	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true}})
@@ -429,10 +493,11 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 		t.Errorf("fith test failed no org opts present ")
 	}
 	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "fp/" + fpTestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(expectedOps, sortSyncOps(orgOps))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 }
 
 func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
@@ -440,6 +505,7 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	testHiveClient = NewHiveClient(org)
 
+	// yaml data is exactly the same except for changes in mtd data
 	yamlAdd := `hives:
   cloud_sensor:
     test-s3-unique-key:
@@ -458,7 +524,7 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
           sensor_type: s3
         usr_mtd:
           enabled: false
-          expiry: 1663563600000
+          expiry: 0
           tags: ["test1", "test2", "test3"]
     test-office-365-key:
       data:
@@ -480,11 +546,28 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
         sensor_type: office365
       usr_mtd:
         enabled: false
-        expiry: 1663563600000
+        expiry: 0
+        tags: ["test1", "test2", "test3"]
+  fp: 
+    'test-sdk-FP':
+      data:
+        op: and
+        rules:
+        - op: is
+          path: cat
+          value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
+        - case sensitive: true
+          op: is
+          path: detect/event/FILE_PATH
+          value: C:\Windows\System32\svch.exe
+      usr_mtd:
+        enabled: false
+        expiry: 0
         tags: ["test1", "test2", "test3"]`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
+	yamlAdd = strings.ReplaceAll(yamlAdd, "test-sdk-FP", fpTestHiveKey)
 
 	orgConfig := OrgConfig{}
 	err := yaml.Unmarshal([]byte(yamlAdd), &orgConfig)
@@ -493,7 +576,7 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error  testMultipleUsrMtdUpdate hive sync push %+v ", err)
 		return
@@ -503,13 +586,14 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 		return
 	}
 	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "fp/" + fpTestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(expectedOps, sortSyncOps(orgOps))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// process actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error testMultipleUsrMtdUpdate hive sync push %+v", err)
 		return
@@ -519,10 +603,11 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 		return
 	}
 	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "fp/" + fpTestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(expectedOps, sortSyncOps(orgOps))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 }
 
 func TestHiveRemove(t *testing.T) {
@@ -530,7 +615,7 @@ func TestHiveRemove(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	testHiveClient = NewHiveClient(org)
 
-	hiveData, err := testHiveClient.List(HiveArgs{
+	hiveSensorData, err := testHiveClient.List(HiveArgs{
 		PartitionKey: os.Getenv("_OID"),
 		HiveName:     "cloud_sensor",
 	})
@@ -539,17 +624,33 @@ func TestHiveRemove(t *testing.T) {
 		return
 	}
 
-	for k, _ := range hiveData {
+	hiveFpData, err := testHiveClient.List(HiveArgs{
+		PartitionKey: os.Getenv("_OID"),
+		HiveName:     "fp",
+	})
+	if err != nil {
+		t.Errorf("testRemove hive list fp err: %+v", err)
+		return
+	}
+
+	for k, _ := range hiveSensorData {
 		if k == s3TestHiveKey || k == office365TestHiveKey {
-			delete(hiveData, k)
+			delete(hiveSensorData, k)
+		}
+	}
+
+	for k, _ := range hiveFpData {
+		if k == fpTestHiveKey {
+			delete(hiveFpData, k)
 		}
 	}
 
 	orgConfig := OrgConfig{}
 	orgConfig.Hives = map[HiveName]map[HiveKey]HiveData{
-		"cloud_sensor": hiveData,
+		"cloud_sensor": hiveSensorData,
+		"fp":           hiveFpData,
 	}
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, IsForce: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, IsForce: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error TestRemove hive sync push %+v", err)
 		return
@@ -559,14 +660,17 @@ func TestHiveRemove(t *testing.T) {
 		return
 	}
 
-	syncOpS3, syncOpOffice := false, false
+	syncOpS3, syncOpOffice, syncOpFp := false, false, false
 	for _, syncOp := range orgOps { // lets validate actual run
-		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
+		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey || syncOp.ElementName == "fp/"+fpTestHiveKey {
 			if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey {
 				syncOpS3 = true
 			}
 			if syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
 				syncOpOffice = true
+			}
+			if syncOp.ElementName == "fp/"+fpTestHiveKey {
+				syncOpFp = true
 			}
 
 			if syncOp.ElementType != OrgSyncOperationElementType.Hives {
@@ -584,15 +688,19 @@ func TestHiveRemove(t *testing.T) {
 		}
 	}
 	if !syncOpS3 {
-		t.Errorf("syncOp remove failed no add operation found for key %s ", s3TestHiveKey)
+		t.Errorf("syncOp remove operation failed for key %s", s3TestHiveKey)
 		return
 	}
 	if !syncOpOffice {
-		t.Errorf("syncOp remove failed no add operation found for key %s ", office365TestHiveKey)
+		t.Errorf("syncOp remove operation failed for key %s ", office365TestHiveKey)
+		return
+	}
+	if !syncOpFp {
+		t.Errorf("syncOp remove operation failed for key %s ", fpTestHiveKey)
 		return
 	}
 
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, IsForce: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, IsForce: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -601,14 +709,17 @@ func TestHiveRemove(t *testing.T) {
 		t.Errorf("seventh test failed no org opts present ")
 	}
 
-	syncOpS3, syncOpOffice = false, false
+	syncOpS3, syncOpOffice, syncOpFp = false, false, false
 	for _, syncOp := range orgOps { // lets validate actual run
-		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
+		if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey || syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey || syncOp.ElementName == "fp/"+fpTestHiveKey {
 			if syncOp.ElementName == "cloud_sensor/"+s3TestHiveKey {
 				syncOpS3 = true
 			}
 			if syncOp.ElementName == "cloud_sensor/"+office365TestHiveKey {
 				syncOpOffice = true
+			}
+			if syncOp.ElementName == "fp/"+fpTestHiveKey {
+				syncOpFp = true
 			}
 
 			if syncOp.ElementType != OrgSyncOperationElementType.Hives {
@@ -626,11 +737,15 @@ func TestHiveRemove(t *testing.T) {
 		}
 	}
 	if !syncOpS3 {
-		t.Errorf("syncOp remove failed no add operation found for key %s ", s3TestHiveKey)
+		t.Errorf("syncOp remove operation failed for key %s", s3TestHiveKey)
 		return
 	}
 	if !syncOpOffice {
-		t.Errorf("syncOp remove failed no add operation found for key %s ", office365TestHiveKey)
+		t.Errorf("syncOp remove operation failed for key %s ", office365TestHiveKey)
+		return
+	}
+	if !syncOpFp {
+		t.Errorf("syncOp remove operation failed for key %s ", fpTestHiveKey)
 		return
 	}
 }
