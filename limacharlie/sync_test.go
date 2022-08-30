@@ -2,13 +2,14 @@ package limacharlie
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
 	"path/filepath"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 )
 
 func resetResource(org *Organization) {
@@ -32,11 +33,11 @@ func TestSyncPushResources(t *testing.T) {
 
 	resourcesConfig := `
 resources:
-api:
-  - ip-geo
-  - vt
-replicant:
-  - exfil
+  api:
+    - ip-geo
+    - vt
+  replicant:
+    - exfil
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(resourcesConfig), &orgConfig))
@@ -98,43 +99,42 @@ func TestSyncPushDRRules(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	rules, err := org.DRRules()
 	a.NoError(err)
-
 	if len(rules) != 0 {
 		t.Errorf("unexpected preexisting rules in add/delete: %+v", rules)
 	}
 
 	yc := `
 rules:
-r1:
-  is_enabled: false
-  detect:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope1
-  respond:
-    - action: report
-      name: t1
-r2:
-  is_enabled: true
-  detect:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope2
-  respond:
-    - action: report
-      name: t2
-r3:
-  namespace: managed
-  detect:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope3
-  respond:
-    - action: report
-      name: t3
+  r1:
+    is_enabled: false
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope1
+    respond:
+      - action: report
+        name: t1
+  r2:
+    is_enabled: true
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope2
+    respond:
+      - action: report
+        name: t2
+  r3:
+    namespace: managed
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope3
+    respond:
+      - action: report
+        name: t3
 `
 	c := OrgConfig{}
 	err = yaml.Unmarshal([]byte(yc), &c)
@@ -205,34 +205,34 @@ r3:
 
 	nc := `
 rules:
-r1:
-  detect:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope1
-  respond:
-    - action: report
-      name: t1
-r2:
-  detect:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope2
-  respond:
-    - action: report
-      name: t2
-r3:
-  namespace: general
-  detect:
-    op: is
-    event: NEW_PROCESS
-    path: event/FILE_PATH
-    value: nope3
-  respond:
-    - action: report
-      name: t3
+  r1:
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope1
+    respond:
+      - action: report
+        name: t1
+  r2:
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope2
+    respond:
+      - action: report
+        name: t2
+  r3:
+    namespace: general
+    detect:
+      op: is
+      event: NEW_PROCESS
+      path: event/FILE_PATH
+      value: nope3
+    respond:
+      - action: report
+        name: t3
 `
 
 	c = OrgConfig{}
@@ -314,21 +314,21 @@ func TestSyncPushFPRules(t *testing.T) {
 	// sync rules in dry run
 	orgRules := `
 fps:
-fp0:
-  data:
-    op: ends with
-    path: detect/event/FILE_PATH
-    value: fp.exe
-fp1:
-  data:
-    op: is
-    path: routing/hostname
-    value: google.com
-fp2:
-  data:
-    op: is
-    path: DOMAIN_NAME
-    value: 8.8.8.8
+  fp0:
+    data:
+      op: ends with
+      path: detect/event/FILE_PATH
+      value: fp.exe
+  fp1:
+    data:
+      op: is
+      path: routing/hostname
+      value: google.com
+  fp2:
+    data:
+      op: is
+      path: DOMAIN_NAME
+      value: 8.8.8.8
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(orgRules), &orgConfig))
@@ -361,21 +361,21 @@ fp2:
 	// force sync in dry run
 	orgRulesForce := `
 fps:
-fp0:
-  data:
-    op: ends with
-    path: detect/event/FILE_PATH
-    value: fp.exe
-fp11:
-  data:
-    op: is
-    path: routing/hostname
-    value: google.somethingelse
-fp12:
-  data:
-    op: is
-    path: DOMAIN_NAME
-    value: 8.8.4.4
+  fp0:
+    data:
+      op: ends with
+      path: detect/event/FILE_PATH
+      value: fp.exe
+  fp11:
+    data:
+      op: is
+      path: routing/hostname
+      value: google.somethingelse
+  fp12:
+    data:
+      op: is
+      path: DOMAIN_NAME
+      value: 8.8.4.4
 `
 	orgConfigForce := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(orgRulesForce), &orgConfigForce))
@@ -430,26 +430,26 @@ func TestSyncPushOutputs(t *testing.T) {
 
 	yamlOutputs := `
 outputs:
-output0:
-  module: s3
-  type: detect
-  bucket: aws-bucket-name
-  key_id: 105c750e-8d6f-4ee5-9815-5975fda15e5b
-  secret_key: 403aabff-d7a8-4602-ab9c-815a638a8a30
-  is_indexing: "true"
-  is_compression: "true"
-output1:
-  module: scp
-  type: artifact
-  dest_host: storage.corp.com
-  dir: /uploads/
-  username: root
-  password: 9a7448cb-df59-423d-b879-d3a83d6ced50
-output2:
-  module: slack
-  type: detect
-  slack_api_token: e8ef2263-baeb-4459-87d3-c7d0cff8aba1
-  slack_channe: #detections
+  output0:
+    module: s3
+    type: detect
+    bucket: aws-bucket-name
+    key_id: 105c750e-8d6f-4ee5-9815-5975fda15e5b
+    secret_key: 403aabff-d7a8-4602-ab9c-815a638a8a30
+    is_indexing: "true"
+    is_compression: "true"
+  output1:
+    module: scp
+    type: artifact
+    dest_host: storage.corp.com
+    dir: /uploads/
+    username: root
+    password: 9a7448cb-df59-423d-b879-d3a83d6ced50
+  output2:
+    module: slack
+    type: detect
+    slack_api_token: e8ef2263-baeb-4459-87d3-c7d0cff8aba1
+    slack_channe: #detections
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlOutputs), &orgConfig))
@@ -484,26 +484,26 @@ output2:
 	// force sync in dry run
 	yamlOutputs = `
 outputs:
-output0:
-  module: s3
-  type: detect
-  bucket: aws-bucket-name
-  key_id: 105c750e-8d6f-4ee5-9815-5975fda15e5b
-  secret_key: 403aabff-d7a8-4602-ab9c-815a638a8a30
-  is_indexing: "true"
-  is_compression: "true"
-output11:
-  module: scp
-  type: artifact
-  dest_host: storage.corp.com
-  dir: /uploads/
-  username: root
-  password: 9a7448cb-df59-423d-b879-d3a83d6ced50
-output12:
-  module: slack
-  type: detect
-  slack_api_token: e8ef2263-baeb-4459-87d3-c7d0cff8aba1
-  slack_channe: #detections
+  output0:
+    module: s3
+    type: detect
+    bucket: aws-bucket-name
+    key_id: 105c750e-8d6f-4ee5-9815-5975fda15e5b
+    secret_key: 403aabff-d7a8-4602-ab9c-815a638a8a30
+    is_indexing: "true"
+    is_compression: "true"
+  output11:
+    module: scp
+    type: artifact
+    dest_host: storage.corp.com
+    dir: /uploads/
+    username: root
+    password: 9a7448cb-df59-423d-b879-d3a83d6ced50
+  output12:
+    module: slack
+    type: detect
+    slack_api_token: e8ef2263-baeb-4459-87d3-c7d0cff8aba1
+    slack_channe: #detections
 `
 	orgConfigForce := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlOutputs), &orgConfigForce))
@@ -573,21 +573,21 @@ func TestSyncPushIntegrity(t *testing.T) {
 
 	yamlIntegrityRules := `
 integrity:
-testrule0:
-  patterns:
-  - /root/.ssh/authorized_keys
-  platforms:
-  - linux
-testrule1:
-  patterns:
-  - /home/user/.ssh/*
-  platforms:
-  - linux
-testrule2:
-  patterns:
-  - c:\\test.txt
-  platforms:
-  - windows
+  testrule0:
+    patterns:
+    - /root/.ssh/authorized_keys
+    platforms:
+    - linux
+  testrule1:
+    patterns:
+    - /home/user/.ssh/*
+    platforms:
+    - linux
+  testrule2:
+    patterns:
+    - c:\\test.txt
+    platforms:
+    - windows
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlIntegrityRules), &orgConfig))
@@ -621,17 +621,17 @@ testrule2:
 	// force and dry run
 	yamlIntegrityRules = `
 integrity:
-testrule1:
-  patterns:
-  - /home/user/.ssh/*
-  platforms:
-  - linux
-testrule3:
-  patterns:
-  - /home/user/.gitconfig
-  platforms:
-  - linux
-  - windows
+  testrule1:
+    patterns:
+    - /home/user/.ssh/*
+    platforms:
+    - linux
+  testrule3:
+    patterns:
+    - /home/user/.gitconfig
+    platforms:
+    - linux
+    - windows
 `
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlIntegrityRules), &forceOrgConfig))
@@ -697,34 +697,34 @@ func TestSyncPushExfil(t *testing.T) {
 
 	yamlExfil := `
 exfil:
-watch:
-  watch_evil:
-    event: NEW_PROCESS
-    path:
-      - COMMAND_LINE
-    operator: contains
-    value: evil
-  watch_ps1:
-    event: NEW_DOCUMENT
-    path:
-      - FILE_PATH
-    operator: ends with
-    value: .ps1
-list:
-  event_base:
-    events:
-      - NEW_PROCESS
-      - EXEC_OOB
-    filters:
-      platforms:
-        - windows
-        - linux
-  event_chrome:
-    events:
-      - DNS_REQUEST
-    filters:
-      platforms:
-        - chrome
+  watch:
+    watch_evil:
+      event: NEW_PROCESS
+      path:
+        - COMMAND_LINE
+      operator: contains
+      value: evil
+    watch_ps1:
+      event: NEW_DOCUMENT
+      path:
+        - FILE_PATH
+      operator: ends with
+      value: .ps1
+  list:
+    event_base:
+      events:
+        - NEW_PROCESS
+        - EXEC_OOB
+      filters:
+        platforms:
+          - windows
+          - linux
+    event_chrome:
+      events:
+        - DNS_REQUEST
+      filters:
+        platforms:
+          - chrome
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlExfil), &orgConfig))
@@ -778,22 +778,22 @@ list:
 	// force sync and dry run
 	yamlExfil = `
 exfil:
-watch:
-  watch_evil:
-    event: NEW_PROCESS
-    path:
-      - COMMAND_LINE
-    operator: contains
-    value: evil
-list:
-  event_base:
-    events:
-      - NEW_PROCESS
-      - EXEC_OOB
-    filters:
-      platforms:
-        - windows
-        - linux
+  watch:
+    watch_evil:
+      event: NEW_PROCESS
+      path:
+        - COMMAND_LINE
+      operator: contains
+      value: evil
+  list:
+    event_base:
+      events:
+        - NEW_PROCESS
+        - EXEC_OOB
+      filters:
+        platforms:
+          - windows
+          - linux
 `
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlExfil), &forceOrgConfig))
@@ -872,36 +872,36 @@ func TestSyncPushArtifact(t *testing.T) {
 
 	yamlArtifact := `
 artifact:
-linux-logs:
-  is_delete_after: false
-  is_ignore_cert: false
-  patterns:
-  - /var/log/syslog.1
-  - /var/log/auth.log.1
-  platforms:
-  - linux
-  days_retention: 30
-  tags: []
-windows-logs:
-  is_delete_after: false
-  is_ignore_cert: false
-  patterns:
-  - c:\\windows\\system32\\winevt\\logs\\Security.evtx
-  - c:\\windows\\system32\\winevt\\logs\\System.evtx
-  platforms:
-  - windows
-  days_retention: 30
-  tags: []
-browser-chrome-logs:
-  is_delete_after: false
-  is_ignore_cert: false
-  patterns:
-  - "%homepath%\\AppData\\Local\\Google\\Chrome\\User Data\\Crashpad\\reports"
-  - "~/Library/Application Support/Google/Chrome/Crashpad/completed/"
-  platforms:
-  - windows
-  - macos
-  tags: []
+  linux-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - /var/log/syslog.1
+    - /var/log/auth.log.1
+    platforms:
+    - linux
+    days_retention: 30
+    tags: []
+  windows-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - c:\\windows\\system32\\winevt\\logs\\Security.evtx
+    - c:\\windows\\system32\\winevt\\logs\\System.evtx
+    platforms:
+    - windows
+    days_retention: 30
+    tags: []
+  browser-chrome-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - "%homepath%\\AppData\\Local\\Google\\Chrome\\User Data\\Crashpad\\reports"
+    - "~/Library/Application Support/Google/Chrome/Crashpad/completed/"
+    platforms:
+    - windows
+    - macos
+    tags: []
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlArtifact), &orgConfig))
@@ -936,16 +936,16 @@ browser-chrome-logs:
 	// dry run - force
 	yamlArtifact = `
 artifact:
-windows-logs:
-  is_delete_after: false
-  is_ignore_cert: false
-  patterns:
-  - c:\\windows\\system32\\winevt\\logs\\Security.evtx
-  - c:\\windows\\system32\\winevt\\logs\\System.evtx
-  platforms:
-  - windows
-  days_retention: 30
-  tags: []
+  windows-logs:
+    is_delete_after: false
+    is_ignore_cert: false
+    patterns:
+    - c:\\windows\\system32\\winevt\\logs\\Security.evtx
+    - c:\\windows\\system32\\winevt\\logs\\System.evtx
+    platforms:
+    - windows
+    days_retention: 30
+    tags: []
 `
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlArtifact), &forceOrgConfig))
@@ -1005,26 +1005,26 @@ func TestSyncNetPolicies(t *testing.T) {
 
 	yamlNetPolicies := fmt.Sprintf(`
 net-policy:
-allow-outbound:
-  oid: %s
-  type: firewall
-  policy:
-    is_allow: true
-    bpf_filter: ""
-sinkhole:
-  oid: %s
-  type: dns
-  policy:
-    domain: evil.com
-    to_a:
-      - 127.0.0.1
-    with_subdomains: true
-custom_google:
-  oid: %s
-  type: dns
-  policy:
-    domain: google.local.com
-    to_cname: www.google.com
+  allow-outbound:
+    oid: %s  
+    type: firewall
+    policy:
+      is_allow: true
+      bpf_filter: ""
+  sinkhole:
+    oid: %s
+    type: dns
+    policy:
+      domain: evil.com
+      to_a:
+        - 127.0.0.1
+      with_subdomains: true
+  custom_google:
+    oid: %s
+    type: dns
+    policy:
+      domain: google.local.com
+      to_cname: www.google.com
 `, org.client.options.OID, org.client.options.OID, org.client.options.OID)
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlNetPolicies), &orgConfig))
@@ -1063,19 +1063,19 @@ custom_google:
 	// dry run - force
 	yamlNetPolicies = fmt.Sprintf(`
 net-policy:
-sinkhole:
-  type: dns
-  policy:
-    domain: evil.com
-    to_a:
-      - 127.0.0.1
-    with_subdomains: true
-no_ssh:
-  oid: %s
-  type: dns
-  policy:
-    domain: google.local.com
-    to_cname: www.google.com
+  sinkhole:
+    type: dns
+    policy:
+      domain: evil.com
+      to_a:
+        - 127.0.0.1
+      with_subdomains: true
+  no_ssh:
+    oid: %s
+    type: dns
+    policy:
+      domain: google.local.com
+      to_cname: www.google.com
 `, org.client.options.OID)
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlNetPolicies), &forceOrgConfig))
@@ -1175,27 +1175,27 @@ func TestMerge(t *testing.T) {
 	}
 	expected := `version: 3
 resources:
-replicant:
-- a1
-- a2
-- a3
+  replicant:
+  - a1
+  - a2
+  - a3
 rules:
-r1:
-  name: r1
-  namespace: general
-  detect:
-    t: v1
-  respond:
-  - l11
-  - l21
-r2:
-  name: r2
-  namespace: managed
-  detect:
-    t: v
-  respond:
-  - l1
-  - l2
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
 `
 
 	out := o1.Merge(o2)
@@ -1213,10 +1213,10 @@ func TestPushMultiFiles(t *testing.T) {
 	files := map[string][]byte{
 		"f1": []byte(`version: 3
 resources:
-replicant:
-- a1
-- a2
-- a3
+  replicant:
+  - a1
+  - a2
+  - a3
 `),
 		"r": []byte(`version: 3
 include:
@@ -1227,59 +1227,59 @@ include:
 include:
 - f3
 rules:
-r1:
-  name: r1
-  namespace: managed
-  detect:
-    t: v1
-  respond:
-  - l11
-  - l21
-r2:
-  name: r2
-  namespace: managed
-  detect:
-    t: v
-  respond:
-  - l1
-  - l2
+  r1:
+    name: r1
+    namespace: managed
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
 `),
 		"s/f3": []byte(`version: 3
 rules:
-r1:
-  name: r1
-  namespace: general
-  detect:
-    t: v1
-  respond:
-  - l11
-  - l21
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
 `),
 	}
 
 	expected := `version: 3
 resources:
-replicant:
-- a1
-- a2
-- a3
+  replicant:
+  - a1
+  - a2
+  - a3
 rules:
-r1:
-  name: r1
-  namespace: general
-  detect:
-    t: v1
-  respond:
-  - l11
-  - l21
-r2:
-  name: r2
-  namespace: managed
-  detect:
-    t: v
-  respond:
-  - l1
-  - l2
+  r1:
+    name: r1
+    namespace: general
+    detect:
+      t: v1
+    respond:
+    - l11
+    - l21
+  r2:
+    name: r2
+    namespace: managed
+    detect:
+      t: v
+    respond:
+    - l1
+    - l2
 `
 
 	ldr := func(parent string, configFile string) ([]byte, error) {
@@ -1319,8 +1319,8 @@ func TestSyncOrgValues(t *testing.T) {
 	ov1 := uuid.NewString()
 	ov2 := uuid.NewString()
 	yamlValues := fmt.Sprintf(`org-value:
-otx: %s
-twilio: %s
+  otx: %s
+  twilio: %s
 `, ov1, ov2)
 	orgConf := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
@@ -1340,7 +1340,7 @@ twilio: %s
 	a.Equal(ov2, ov.Value)
 
 	yamlValues = fmt.Sprintf(`org-value:
-otx: %s
+  otx: %s
 `, ov1)
 	orgConf = OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
@@ -1363,79 +1363,79 @@ otx: %s
 func TestSyncFullBidirectional(t *testing.T) {
 	rawConf := `version: 3
 resources:
-api:
-- vt
-- insight
-replicant:
-- infrastructure-service
-- integrity
-- reliable-tasking
-- responder
-- sigma
-- logging
-- yara
+  api:
+  - vt
+  - insight
+  replicant:
+  - infrastructure-service
+  - integrity
+  - reliable-tasking
+  - responder
+  - sigma
+  - logging
+  - yara
 rules:
-vt-domains:
-  name: vt-domains
-  namespace: general
-  detect:
-    event: DNS_REQUEST
-    metadata_rules:
-      length of: true
-      op: is greater than
-      path: /
-      value: 4
-    op: lookup
-    path: event/DOMAIN_NAME
-    resource: lcr://api/vt
-  respond:
-  - action: report
-    name: vt-bad-domain
-vt-hashes:
-  name: vt-hashes
-  namespace: general
-  detect:
-    event: CODE_IDENTITY
-    metadata_rules:
-      length of: true
-      op: is greater than
-      path: /
-      value: 3
-    op: lookup
-    path: event/HASH
-    resource: lcr://api/vt
-  respond:
-  - action: report
-    name: vt-bad-hash
+  vt-domains:
+    name: vt-domains
+    namespace: general
+    detect:
+      event: DNS_REQUEST
+      metadata_rules:
+        length of: true
+        op: is greater than
+        path: /
+        value: 4
+      op: lookup
+      path: event/DOMAIN_NAME
+      resource: lcr://api/vt
+    respond:
+    - action: report
+      name: vt-bad-domain
+  vt-hashes:
+    name: vt-hashes
+    namespace: general
+    detect:
+      event: CODE_IDENTITY
+      metadata_rules:
+        length of: true
+        op: is greater than
+        path: /
+        value: 3
+      op: lookup
+      path: event/HASH
+      resource: lcr://api/vt
+    respond:
+    - action: report
+      name: vt-bad-hash
 integrity:
-linux-key:
-  patterns:
-  - /home/*/.ssh/*
-  tags: []
-  platforms:
-  - linux
+  linux-key:
+    patterns:
+    - /home/*/.ssh/*
+    tags: []
+    platforms:
+    - linux
 artifact:
-linux-logs:
-  is_ignore_cert: false
-  is_delete_after: false
-  days_retention: 30
-  patterns:
-  - /var/log/syslog.1
-  - /var/log/auth.log.1
-  tags: []
-  platforms:
-  - linux
-windows-logs:
-  is_ignore_cert: false
-  is_delete_after: false
-  days_retention: 30
-  patterns:
-  - wel://system:*
-  - wel://security:*
-  - wel://application:*
-  tags: []
-  platforms:
-  - windows
+  linux-logs:
+    is_ignore_cert: false
+    is_delete_after: false
+    days_retention: 30
+    patterns:
+    - /var/log/syslog.1
+    - /var/log/auth.log.1
+    tags: []
+    platforms:
+    - linux
+  windows-logs:
+    is_ignore_cert: false
+    is_delete_after: false
+    days_retention: 30
+    patterns:
+    - wel://system:*
+    - wel://security:*
+    - wel://application:*
+    tags: []
+    platforms:
+    - windows
 `
 	c := OrgConfig{}
 	if err := yaml.Unmarshal([]byte(rawConf), &c); err != nil {

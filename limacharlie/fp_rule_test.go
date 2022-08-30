@@ -43,12 +43,15 @@ func TestFPRuleAddDelete(t *testing.T) {
 
 	rules, err = org.FPRules()
 	a.NoError(err)
-	a.Equal(1, len(rules))
+	a.GreaterOrEqual(1, len(rules))
 
 	err = org.FPRuleDelete(fpRuleName)
 	a.NoError(err)
 
 	rules, err = org.FPRules()
 	a.NoError(err)
-	a.Empty(rules)
+	if _, ok := rules[fpRuleName]; ok {
+		t.Errorf("fp rule with key %s was not deleted  ", fpRuleName)
+	}
+
 }

@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -559,9 +558,6 @@ func TestHiveRemove(t *testing.T) {
 		t.Errorf("testRemove failed no org opts present ")
 		return
 	}
-
-	fmt.Println("this is orgOps in remove ")
-	fmt.Printf("%+v ", orgOps)
 
 	syncOpS3, syncOpOffice := false, false
 	for _, syncOp := range orgOps { // lets validate actual run
