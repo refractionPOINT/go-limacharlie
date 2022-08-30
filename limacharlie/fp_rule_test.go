@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,8 @@ func TestFPRuleAddDelete(t *testing.T) {
 	a.NoError(err)
 	a.Empty(rules, "unexpected preexisting rules in list: %+v", rules)
 
-	fpRuleName := "testrule"
+	fpRuleName := "testrule" + "/" + randSeq(6)
+	fmt.Println("this is testrule ", fpRuleName)
 	err = org.FPRuleAdd(fpRuleName, Dict{
 		"op":    "ends with",
 		"path":  "detect/event/FILE_PATH",
