@@ -26,7 +26,7 @@ func TestDRRuleAddDelete(t *testing.T) {
 	}
 
 	testRuleName := "testrule"
-	testRuleExp := int64(3600)
+	testRuleExp := int64(1773563700000)
 	testRuleDetect := map[string]interface{}{
 		"op":    "is",
 		"event": "NEW_PROCESS",
