@@ -11,6 +11,7 @@ func TestDRRuleList(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 	rules, err := org.DRRules()
+
 	a.NoError(err)
 	if len(rules) != 0 {
 		t.Errorf("unexpected preexisting rules in list: %+v", rules)
@@ -26,7 +27,16 @@ func TestDRRuleAddDelete(t *testing.T) {
 		t.Errorf("unexpected preexisting rules in add/delete: %+v", rules)
 	}
 
-	testRuleName := "testrule"
+	orgInfo, err := org.GetInfo()
+	if err != nil {
+		fmt.Println("error getting orgInfo ", err)
+	} else {
+		fmt.Println("this is orgInfo in drrule and delete")
+		fmt.Println(orgInfo.OID)
+		fmt.Println(orgInfo.Name)
+	}
+
+	testRuleName := "testrule" + randSeq(6)
 	testRuleExp := int64(1773563700000)
 	testRuleDetect := map[string]interface{}{
 		"op":    "is",
@@ -58,8 +68,6 @@ func TestDRRuleAddDelete(t *testing.T) {
 
 	rules, err = org.DRRules()
 	a.NoError(err)
-	fmt.Println("this is rules")
-	fmt.Println(rules)
 	if len(rules) != 0 {
 		t.Errorf("rules is not empty")
 	}
