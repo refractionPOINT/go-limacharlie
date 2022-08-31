@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -764,7 +765,7 @@ func TestHiveDRService(t *testing.T) {
 		return
 	}
 
-	defer resetResource(org)
+	defer unsubscribeYara(org)
 
 	// give changes a few secs to take place before list call
 	time.Sleep(time.Second * 2)
@@ -994,4 +995,14 @@ func TestHiveMerge(t *testing.T) {
 	if gcpTest.Data == nil {
 		t.Error("testMergeHive new data was not added for key test-gcpTest-key")
 	}
+}
+
+func unsubscribeYara(org *Organization) error {
+	fmt.Print("unsubscribing from yara ")
+	err := org.ResourceUnsubscribe("yara", "replicant")
+	if err != nil {
+		return err
+	}
+	time.Sleep(time.Second * 5)
+	return nil
 }
