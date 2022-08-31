@@ -24,12 +24,13 @@ func resetResource(org *Organization) {
 func TestSyncPushResources(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	resourcesBase, err := org.Resources()
-	a.NoError(err)
-	defer resetResource(org)
 
 	resetResource(org)
 	time.Sleep(5 * time.Second)
+	resourcesBase, err := org.Resources()
+
+	a.NoError(err)
+	defer resetResource(org)
 
 	resourcesConfig := `
 resources:

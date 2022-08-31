@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -765,8 +764,6 @@ func TestHiveDRService(t *testing.T) {
 		return
 	}
 
-	defer unsubscribeYara(org)
-
 	// give changes a few secs to take place before list call
 	time.Sleep(time.Second * 2)
 	setData, err := hive.List(HiveArgs{HiveName: "dr-service", PartitionKey: os.Getenv("_OID")})
@@ -844,6 +841,11 @@ hives:
 	}
 	if len(drData.UsrMtd.Tags) != 3 {
 		t.Errorf("failed usr mtd tags update %s \n", drData.UsrMtd.Tags)
+	}
+
+	err = org.ResourceUnsubscribe("yara", "replicant")
+	if err != nil {
+		t.Errorf("failed to unsubscribe from yara rule %+v ", err)
 	}
 }
 
@@ -995,14 +997,4 @@ func TestHiveMerge(t *testing.T) {
 	if gcpTest.Data == nil {
 		t.Error("testMergeHive new data was not added for key test-gcpTest-key")
 	}
-}
-
-func unsubscribeYara(org *Organization) error {
-	fmt.Print("unsubscribing from yara ")
-	err := org.ResourceUnsubscribe("yara", "replicant")
-	if err != nil {
-		return err
-	}
-	time.Sleep(time.Second * 5)
-	return nil
 }
