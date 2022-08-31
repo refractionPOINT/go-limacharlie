@@ -50,7 +50,7 @@ resources:
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsAdded: true},
 	})
-	a.Equal(expectedOps, sortSyncOps(ops))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(ops))
 	resources, err := org.Resources()
 	a.NoError(err)
 	a.Equal(resourcesBase, resources)

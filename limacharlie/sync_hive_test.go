@@ -764,6 +764,8 @@ func TestHiveDRService(t *testing.T) {
 		return
 	}
 
+	defer resetResource(org)
+
 	// give changes a few secs to take place before list call
 	time.Sleep(time.Second * 2)
 	setData, err := hive.List(HiveArgs{HiveName: "dr-service", PartitionKey: os.Getenv("_OID")})
@@ -841,12 +843,6 @@ hives:
 	}
 	if len(drData.UsrMtd.Tags) != 3 {
 		t.Errorf("failed usr mtd tags update %s \n", drData.UsrMtd.Tags)
-	}
-
-	// unsubscribe from resource
-	err = org.ResourceUnsubscribe("yara", "replicant")
-	if err != nil {
-		t.Errorf("error in unsubscribe %+v", err)
 	}
 }
 
