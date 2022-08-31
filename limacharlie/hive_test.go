@@ -60,7 +60,7 @@ func hiveAddTest(t *testing.T) {
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
-		Data:         &data})
+		Data:         data})
 
 	if err != nil {
 		t.Errorf("hive client failed add: %+v \n", err)
@@ -195,8 +195,8 @@ func hiveUpdate(t *testing.T) {
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
-		Data:         &data,
-		Tags:         &[]string{"test1", "test2"},
+		Data:         data,
+		Tags:         []string{"test1", "test2"},
 	})
 
 	// validate test ran correctly

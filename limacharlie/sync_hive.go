@@ -193,10 +193,10 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd HiveData) error {
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
 		HiveName:     ha.HiveName,
-		Data:         &data,
+		Data:         data,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
-		Tags:         &Tags,
+		Tags:         Tags,
 	}
 
 	_, err = hiveClient.Update(args) // run actual update call
@@ -221,10 +221,10 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd HiveData) error {
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
 		HiveName:     ha.HiveName,
-		Data:         &mData,
+		Data:         mData,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
-		Tags:         &Tags,
+		Tags:         Tags,
 	}
 
 	_, err = hiveClient.Add(args)

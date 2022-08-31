@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 var s3TestHiveKey string
@@ -590,7 +591,9 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + office365TestHiveKey, IsAdded: true, IsRemoved: false},
 		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "cloud_sensor/" + s3TestHiveKey, IsAdded: true, IsRemoved: false},
 	})
-	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
+	if !a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps)) {
+		return
+	}
 
 	// process actual run
 	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
@@ -747,6 +750,103 @@ func TestHiveRemove(t *testing.T) {
 	if !syncOpFp {
 		t.Errorf("syncOp remove operation failed for key %s ", fpTestHiveKey)
 		return
+	}
+}
+
+func TestHiveDRService(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	hive := NewHiveClient(org)
+
+	err := org.ResourceSubscribe("yara", "replicant")
+	if err != nil {
+		t.Errorf("%+v err resource subscribe ", err)
+		return
+	}
+
+	// give changes a few secs to take place before list call
+	time.Sleep(time.Second * 2)
+	setData, err := hive.List(HiveArgs{HiveName: "dr-service", PartitionKey: os.Getenv("_OID")})
+	if err != nil {
+		t.Errorf("error getting hive list %+v ", err)
+		return
+	}
+
+	// ensure data is returning as null
+	for k, v := range setData {
+		if v.Data != nil {
+			t.Errorf("set data is not showing as nil for key %s ", k)
+			return
+		}
+	}
+
+	yaraRule := `
+hives:
+  dr-service:
+    __YaraReplicant___sensor_sync_yara:
+      data: null
+      usr_mtd:
+        enabled: false
+        expiry: 1773563700000
+        tags: ["test1", "test2", "test3"]`
+
+	orgConfig := OrgConfig{}
+	err = yaml.Unmarshal([]byte(yaraRule), &orgConfig)
+	if err != nil {
+		t.Errorf("unmarshal TestFPService error: %v \n", err)
+		return
+	}
+
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"dr-service": true}})
+	if err != nil {
+		t.Errorf("error TestRemove hive sync push %+v", err)
+		return
+	}
+	if orgOps == nil || len(orgOps) == 0 {
+		t.Errorf("testRemove failed no org opts present ")
+		return
+	}
+
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "dr-service/" + "__YaraReplicant___sensor_sync_yara", IsAdded: true, IsRemoved: false},
+	})
+	if !a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps)) {
+		return
+	}
+
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"dr-service": true}})
+	if err != nil {
+		t.Errorf("error TestRemove hive sync push %+v \n", err)
+		return
+	}
+	if orgOps == nil || len(orgOps) == 0 {
+		t.Errorf("testRemove failed no org opts present ")
+		return
+	}
+
+	drData, err := hive.GetMTD(HiveArgs{HiveName: "dr-service", PartitionKey: os.Getenv("_OID"), Key: "__YaraReplicant___sensor_sync_yara"})
+	if err != nil {
+		t.Errorf("error getting hive list %+v ", err)
+		return
+	}
+
+	if drData.Data != nil {
+		t.Errorf("data is not showing as nil for get mtd call \n")
+	}
+	if drData.UsrMtd.Enabled {
+		t.Errorf("failed usr mtd enabled call \n")
+	}
+	if drData.UsrMtd.Expiry != int64(1773563700000) {
+		t.Errorf("failed usr mtd exipry update ")
+	}
+	if len(drData.UsrMtd.Tags) != 3 {
+		t.Errorf("failed usr mtd tags update %s \n", drData.UsrMtd.Tags)
+	}
+
+	// unsubscribe from resource
+	err = org.ResourceUnsubscribe("yara", "replicant")
+	if err != nil {
+		t.Errorf("error in unsubscribe %+v", err)
 	}
 }
 
