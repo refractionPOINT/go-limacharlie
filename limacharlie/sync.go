@@ -40,7 +40,7 @@ type SyncOptions struct {
 	SyncArtifacts   bool            `json:"sync_artifacts"`
 	SyncNetPolicies bool            `json:"sync_net_policies"`
 	SyncOrgValues   bool            `json:"sync_org_values"`
-	SyncHives       map[string]bool `json:"sync_hive"`
+	SyncHives       map[string]bool `json:"sync_hives"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
