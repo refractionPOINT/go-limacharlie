@@ -60,7 +60,7 @@ func hiveAddTest(t *testing.T) {
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
-		Data:         &data})
+		Data:         data})
 
 	if err != nil {
 		t.Errorf("hive client failed add: %+v \n", err)
@@ -130,8 +130,7 @@ func hiveGetMtdTest(t *testing.T) {
 func hiveListTest(t *testing.T) {
 	hiveSet, err := testHiveClient.List(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey})
+		PartitionKey: os.Getenv("_OID")})
 
 	// validate test ran correctly
 	if err != nil {
@@ -152,8 +151,7 @@ func hiveListTest(t *testing.T) {
 func hiveListMtdTest(t *testing.T) {
 	hiveSet, err := testHiveClient.ListMtd(HiveArgs{
 		HiveName:     "cloud_sensor",
-		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey})
+		PartitionKey: os.Getenv("_OID")})
 
 	// validate test ran correctly
 	if err != nil {
@@ -197,8 +195,8 @@ func hiveUpdate(t *testing.T) {
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
-		Data:         &data,
-		Tags:         &[]string{"test1", "test2"},
+		Data:         data,
+		Tags:         []string{"test1", "test2"},
 	})
 
 	// validate test ran correctly
@@ -238,7 +236,7 @@ func hiveRemove(t *testing.T) {
 	_, err := testHiveClient.Remove(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
-		Key:          testKey}, false)
+		Key:          testKey})
 
 	// validate test ran correctly
 	if err != nil {

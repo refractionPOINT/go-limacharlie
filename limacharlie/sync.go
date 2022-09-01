@@ -3,13 +3,12 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -32,15 +31,16 @@ type SyncOptions struct {
 	// Only simulate changes to the Org.
 	IsDryRun bool `json:"is_dry_run"`
 
-	SyncDRRules     bool `json:"sync_dr"`
-	SyncOutputs     bool `json:"sync_outputs"`
-	SyncResources   bool `json:"sync_resources"`
-	SyncIntegrity   bool `json:"sync_integrity"`
-	SyncFPRules     bool `json:"sync_fp"`
-	SyncExfil       bool `json:"sync_exfil"`
-	SyncArtifacts   bool `json:"sync_artifacts"`
-	SyncNetPolicies bool `json:"sync_net_policies"`
-	SyncOrgValues   bool `json:"sync_org_values"`
+	SyncDRRules     bool            `json:"sync_dr"`
+	SyncOutputs     bool            `json:"sync_outputs"`
+	SyncResources   bool            `json:"sync_resources"`
+	SyncIntegrity   bool            `json:"sync_integrity"`
+	SyncFPRules     bool            `json:"sync_fp"`
+	SyncExfil       bool            `json:"sync_exfil"`
+	SyncArtifacts   bool            `json:"sync_artifacts"`
+	SyncNetPolicies bool            `json:"sync_net_policies"`
+	SyncOrgValues   bool            `json:"sync_org_values"`
+	SyncHives       map[string]bool `json:"sync_hive"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
@@ -191,6 +191,7 @@ type orgSyncExfilRules = ExfilRulesType
 type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
 type orgSyncOrgValues = map[OrgValueName]OrgValue
+type orgSyncHives = map[HiveName]map[HiveKey]HiveData
 
 type OrgConfig struct {
 	Version     int                   `json:"version" yaml:"version"`
@@ -204,6 +205,7 @@ type OrgConfig struct {
 	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
 	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
 	OrgValues   orgSyncOrgValues      `json:"org-value,omitempty" yaml:"org-value,omitempty"`
+	Hives       orgSyncHives          `json:"hives,omitempty" yaml:"hives,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -254,6 +256,7 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.Artifacts = o.mergeArtifacts(conf.Artifacts)
 	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
+	o.Hives = o.mergeHives(conf.Hives)
 	return o
 }
 
@@ -332,6 +335,21 @@ func (a OrgConfig) mergeIntegrity(b orgSyncIntegrityRules) orgSyncIntegrityRules
 		n[k] = v
 	}
 	for k, v := range b {
+		n[k] = v
+	}
+	return n
+}
+
+func (a OrgConfig) mergeHives(hiveConfig orgSyncHives) orgSyncHives {
+	if a.Hives == nil && hiveConfig == nil {
+		return orgSyncHives{}
+	}
+
+	n := orgSyncHives{}
+	for k, v := range a.Hives {
+		n[k] = v
+	}
+	for k, v := range hiveConfig {
 		n[k] = v
 	}
 	return n
@@ -435,6 +453,7 @@ var OrgSyncOperationElementType = struct {
 	Artifact   string
 	NetPolicy  string
 	OrgValue   string
+	Hives      string
 }{
 	DRRule:     "dr-rule",
 	FPRule:     "fp-rule",
@@ -446,6 +465,7 @@ var OrgSyncOperationElementType = struct {
 	Artifact:   "artifact",
 	NetPolicy:  "net-policy",
 	OrgValue:   "org-value",
+	Hives:      "hives",
 }
 
 type OrgSyncOperation struct {
@@ -524,6 +544,10 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("org-value: %v", err)
 		}
 	}
+	if options.SyncHives != nil || len(options.SyncHives) != 0 {
+		orgConfig.Hives, err = org.syncFetchHive(options.SyncHives)
+	}
+
 	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
 }
@@ -850,6 +874,14 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 			return ops, fmt.Errorf("net-policy: %v", err)
 		}
 	}
+	if options.SyncHives != nil || len(options.SyncHives) != 0 {
+		newOps, err := org.syncHive(conf.Hives, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("synchHives: %+v ", err)
+		}
+	}
+
 	return ops, nil
 }
 
