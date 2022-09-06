@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"gopkg.in/yaml.v3"
 	"sync"
 )
 
@@ -182,6 +183,11 @@ func (org Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, erro
 func (org Organization) updateHiveConfigData(ha HiveArgs, hd HiveData) error {
 	hiveClient := NewHiveClient(&org)
 
+	err := encodeDecodeHiveData(&hd.Data)
+	if err != nil {
+		return err
+	}
+
 	data, err := json.Marshal(hd.Data)
 	if err != nil {
 		return err
@@ -208,6 +214,11 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd HiveData) error {
 
 func (org Organization) addHiveConfigData(ha HiveArgs, hd HiveData) error {
 	hiveClient := NewHiveClient(&org)
+
+	err := encodeDecodeHiveData(&hd.Data)
+	if err != nil {
+		return err
+	}
 
 	mData, err := json.Marshal(hd.Data)
 	if err != nil {
@@ -243,4 +254,14 @@ func (org Organization) removeHiveConfigData(args HiveArgs) error {
 	}
 
 	return nil
+}
+
+// encodeDecodeHiveData ensures that any passed hiveData is properly
+// encoded using YamlV3 to handle json type of map[interface {}]interface{}
+func encodeDecodeHiveData(hd *map[string]interface{}) error {
+	out, err := yaml.Marshal(hd)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(out, &hd)
 }
