@@ -878,7 +878,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
 		if err != nil {
-			return ops, fmt.Errorf("synchHives: %+v ", err)
+			return ops, fmt.Errorf("syncHives: %+v ", err)
 		}
 	}
 
