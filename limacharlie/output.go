@@ -12,37 +12,41 @@ type OutputModuleType = string
 
 // OutputTypes is all supported modules
 var OutputTypes = struct {
-	S3          OutputModuleType
-	GCS         OutputModuleType
-	Pubsub      OutputModuleType
-	BigQuery    OutputModuleType
-	SCP         OutputModuleType
-	SFTP        OutputModuleType
-	Slack       OutputModuleType
-	Syslog      OutputModuleType
-	Webhook     OutputModuleType
-	WebhookBulk OutputModuleType
-	SMTP        OutputModuleType
-	Humio       OutputModuleType
-	Kafka       OutputModuleType
-	Tines       OutputModuleType
-	Torq        OutputModuleType
+	S3               OutputModuleType
+	GCS              OutputModuleType
+	Pubsub           OutputModuleType
+	BigQuery         OutputModuleType
+	SCP              OutputModuleType
+	SFTP             OutputModuleType
+	Slack            OutputModuleType
+	Syslog           OutputModuleType
+	Webhook          OutputModuleType
+	WebhookBulk      OutputModuleType
+	SMTP             OutputModuleType
+	Humio            OutputModuleType
+	Kafka            OutputModuleType
+	AzureStorageBlob OutputModuleType
+	AzureEventHub    OutputModuleType
+	Tines            OutputModuleType
+	Torq             OutputModuleType
 }{
-	S3:          "s3",
-	GCS:         "gcs",
-	Pubsub:      "pubsub",
-	BigQuery:    "bigquery",
-	SCP:         "scp",
-	SFTP:        "sftp",
-	Slack:       "slack",
-	Syslog:      "syslog",
-	Webhook:     "webhook",
-	WebhookBulk: "webhook_bulk",
-	SMTP:        "smtp",
-	Humio:       "humio",
-	Kafka:       "kafka",
-	Tines:       "tines",
-	Torq:        "torq",
+	S3:               "s3",
+	GCS:              "gcs",
+	Pubsub:           "pubsub",
+	BigQuery:         "bigquery",
+	SCP:              "scp",
+	SFTP:             "sftp",
+	Slack:            "slack",
+	Syslog:           "syslog",
+	Webhook:          "webhook",
+	WebhookBulk:      "webhook_bulk",
+	SMTP:             "smtp",
+	Humio:            "humio",
+	Kafka:            "kafka",
+	AzureStorageBlob: "azure_storage_blog",
+	AzureEventHub:    "azure_event_hub",
+	Tines:            "tines",
+	Torq:             "torq",
 }
 
 // OutputDataType is the type of data
@@ -128,6 +132,11 @@ type OutputConfig struct {
 	Table             string `json:"table,omitempty" yaml:"table,omitempty"`
 	HumioRepo         string `json:"humio_repo,omitempty" yaml:"humio_repo,omitempty"`
 	HumioToken        string `json:"humio_api_token,omitempty" yaml:"humio_api_token,omitempty"`
+	CustomTransform   string `json:"custom_transform" yaml:"custom_transform"`
+	KeyID             string `json:"key_id" yaml:"key_id"`
+	AttachmentText    string `json:"attachment_text" yaml:"attachment_text"`
+	Message           string `json:"message" yaml:"message"`
+	Color             string `json:"color" yaml:"color"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
