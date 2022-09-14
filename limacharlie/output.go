@@ -132,11 +132,11 @@ type OutputConfig struct {
 	Table             string `json:"table,omitempty" yaml:"table,omitempty"`
 	HumioRepo         string `json:"humio_repo,omitempty" yaml:"humio_repo,omitempty"`
 	HumioToken        string `json:"humio_api_token,omitempty" yaml:"humio_api_token,omitempty"`
-	CustomTransform   string `json:"custom_transform" yaml:"custom_transform"`
-	KeyID             string `json:"key_id" yaml:"key_id"`
-	AttachmentText    string `json:"attachment_text" yaml:"attachment_text"`
-	Message           string `json:"message" yaml:"message"`
-	Color             string `json:"color" yaml:"color"`
+	CustomTransform   string `json:"custom_transform,omitempty" yaml:"custom_transform,omitempty"`
+	KeyID             string `json:"key_id,omitempty" yaml:"key_id,omitempty"`
+	AttachmentText    string `json:"attachment_text,omitempty" yaml:"attachment_text,omitempty"`
+	Message           string `json:"message,omitempty" yaml:"message,omitempty"`
+	Color             string `json:"color,omitempty" yaml:"color,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
