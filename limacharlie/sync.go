@@ -546,6 +546,9 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 	}
 	if options.SyncHives != nil || len(options.SyncHives) != 0 {
 		orgConfig.Hives, err = org.syncFetchHive(options.SyncHives)
+		if err != nil {
+			return orgConfig, fmt.Errorf("sync_hives: %v", err)
+		}
 	}
 
 	orgConfig.Version = OrgConfigLatestVersion
@@ -878,7 +881,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
 		if err != nil {
-			return ops, fmt.Errorf("syncHives: %+v ", err)
+			return ops, fmt.Errorf("sync_hives: %+v ", err)
 		}
 	}
 
