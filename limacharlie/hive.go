@@ -245,25 +245,31 @@ func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 		return false, err
 	}
 
-	currentData, err := json.Marshal(hsd.Data)
+	newData, err := json.Marshal(hsd.Data)
 	if err != nil {
 		return false, err
 	}
+	if string(newData) == "{}" || string(newData) == "null" {
+		newData = nil
+	}
 
-	newData, err := json.Marshal(cData.Data)
+	currentData, err := json.Marshal(cData.Data)
 	if err != nil {
 		return false, err
+	}
+	if string(currentData) == "{}" || string(currentData) == "null" {
+		currentData = nil
 	}
 	if string(currentData) != string(newData) {
 		return false, nil
 	}
 
-	curUsrMtd, err := json.Marshal(hsd.UsrMtd)
+	newUsrMTd, err := json.Marshal(hsd.UsrMtd)
 	if err != nil {
 		return false, err
 	}
 
-	newUsrMTd, err := json.Marshal(cData.UsrMtd)
+	curUsrMtd, err := json.Marshal(cData.UsrMtd)
 	if err != nil {
 		return false, err
 	}
