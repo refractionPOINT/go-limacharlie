@@ -175,6 +175,15 @@ func (org Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, erro
 				Expiry:  v.UsrMtd.Expiry,
 				Tags:    v.UsrMtd.Tags,
 			},
+			SysMtd: SysMtd{
+				CreatedBy:   v.SysMtd.CreatedBy,
+				Etag:        v.SysMtd.Etag,
+				GUID:        v.SysMtd.GUID,
+				LastAuthor:  v.SysMtd.LastAuthor,
+				LastError:   v.SysMtd.LastError,
+				LastErrorTs: v.SysMtd.LastErrorTs,
+				LastMod:     v.SysMtd.LastMod,
+			},
 		}
 	}
 	return currentHiveDataConfig, nil

@@ -349,7 +349,7 @@ func TestHiveUsrMtdUpdate(t *testing.T) {
         sensor_type: s3
       usr_mtd:
         enabled: false
-        expiry: 1663563600000
+        expiry: 2663563600000
         tags: ["test1", "test2", "test3", "test4"]`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
@@ -787,7 +787,7 @@ hives:
       data: null
       usr_mtd:
         enabled: false
-        expiry: 1773563700000
+        expiry: 2663563600000
         tags: ["test1", "test2", "test3"]`
 
 	orgConfig := OrgConfig{}
@@ -836,7 +836,7 @@ hives:
 	if drData.UsrMtd.Enabled {
 		t.Errorf("failed usr mtd enabled call \n")
 	}
-	if drData.UsrMtd.Expiry != int64(1773563700000) {
+	if drData.UsrMtd.Expiry != int64(2663563600000) {
 		t.Errorf("failed usr mtd exipry update ")
 	}
 	if len(drData.UsrMtd.Tags) != 3 {
@@ -924,7 +924,7 @@ func TestHiveMerge(t *testing.T) {
           sensor_type: s3
         usr_mtd:
           enabled: false
-          expiry: 1663563600000
+          expiry: 2663563600000
           tags: ["test1", "test2", "test3"]
     test-office-365-key:
       data:
@@ -946,7 +946,7 @@ func TestHiveMerge(t *testing.T) {
         sensor_type: office365
       usr_mtd:
         enabled: false
-        expiry: 1663563600000
+        expiry: 2663563600000
         tags: ["test1", "test2", "test3"]
     test-gcpTest-key:
       data:
