@@ -26,7 +26,7 @@ func TestSyncPushResources(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	resetResource(org)
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 	resourcesBase, err := org.Resources()
 
 	a.NoError(err)
