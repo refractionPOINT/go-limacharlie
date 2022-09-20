@@ -240,6 +240,8 @@ func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 }
 
 func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
+	fmt.Println("inside of equals ")
+
 	err := encodeDecodeHiveData(&hsd.Data)
 	if err != nil {
 		return false, err
@@ -264,11 +266,17 @@ func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 		return false, nil
 	}
 
+	if len(hsd.UsrMtd.Tags) == 0 {
+		hsd.UsrMtd.Tags = nil
+	}
 	newUsrMTd, err := json.Marshal(hsd.UsrMtd)
 	if err != nil {
 		return false, err
 	}
 
+	if len(cData.UsrMtd.Tags) == 0 {
+		cData.UsrMtd.Tags = nil
+	}
 	curUsrMtd, err := json.Marshal(cData.UsrMtd)
 	if err != nil {
 		return false, err
