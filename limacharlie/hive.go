@@ -240,8 +240,6 @@ func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 }
 
 func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
-	fmt.Println("inside of equals ")
-
 	err := encodeDecodeHiveData(&hsd.Data)
 	if err != nil {
 		return false, err
