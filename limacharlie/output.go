@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -84,7 +85,7 @@ type OutputConfig struct {
 	Module OutputModuleType `json:"module"`
 	Type   OutputDataType   `json:"type"`
 
-	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempt"`
+	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempty"`
 	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string" yaml:"is_delete_on_failure,omitempty"`
 	NoRouting         bool   `json:"is_no_routing,omitempty,string" yaml:"is_no_routing,omitempty"`
 	NoSharding        bool   `json:"is_no_sharding,omitempty,string" yaml:"is_no_sharding,omitempty"`
@@ -152,6 +153,7 @@ func (o OutputConfig) Equals(other OutputConfig) bool {
 }
 
 func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+
 	// Outputs have some fields as "string" which is not
 	// supported by the YAML lib. So we use custom marshaling.
 	// Since JSON supports it, we'll leverage it.
@@ -175,10 +177,22 @@ func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		genericVersion[fn] = "0"
 	}
 
+	for key, val := range genericVersion {
+		if strings.HasPrefix(key, "is_") {
+			s, ok := val.(string)
+			if ok {
+				if strings.TrimSpace(s) == "" { // default to false
+					genericVersion[key] = "false"
+				}
+			}
+		}
+	}
+
 	rawJSON, err := json.Marshal(genericVersion)
 	if err != nil {
 		return err
 	}
+
 	newO := OutputConfig{}
 	if err := json.Unmarshal(rawJSON, &newO); err != nil {
 		return err
