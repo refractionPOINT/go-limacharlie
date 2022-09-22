@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +25,6 @@ func TestSyncPushResources(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	resetResource(org)
-	time.Sleep(10 * time.Second)
 	resourcesBase, err := org.Resources()
 
 	a.NoError(err)
@@ -60,7 +58,6 @@ resources:
 	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncResources: true})
 	a.NoError(err)
 	a.Equal(expectedOps, sortSyncOps(ops))
-	time.Sleep(5 * time.Second)
 	resources, err = org.Resources()
 	a.NoError(err)
 	expectedResources := resourcesBase.duplicate()
@@ -88,7 +85,6 @@ resources:
 	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, SyncResources: true})
 	a.NoError(err)
 	a.Equal(expectedOps, sortSyncOps(ops))
-	time.Sleep(5 * time.Second)
 	resources, err = org.Resources()
 	a.NoError(err)
 	a.Equal(postForce, resources)
@@ -184,18 +180,17 @@ rules:
 			t.Errorf("non-add op: %+v", o)
 		}
 	}
-
 	rules, err = org.DRRules(WithNamespace("general"))
 	a.NoError(err)
 	if len(rules) != 2 {
 		t.Errorf("general rules has: %+v", rules)
-	}
-
-	if rules["r1"]["is_enabled"].(bool) {
-		t.Errorf("rule should be disabled: %+v", rules["r1"])
-	}
-	if !rules["r2"]["is_enabled"].(bool) {
-		t.Errorf("rule should be enabled: %+v", rules["r2"])
+	} else {
+		if rules["r1"]["is_enabled"].(bool) {
+			t.Errorf("rule should be disabled: %+v", rules["r1"])
+		}
+		if !rules["r2"]["is_enabled"].(bool) {
+			t.Errorf("rule should be enabled: %+v", rules["r2"])
+		}
 	}
 
 	rules, err = org.DRRules(WithNamespace("managed"))
