@@ -24,12 +24,13 @@ func resetResource(org *Organization) {
 func TestSyncPushResources(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	resourcesBase, err := org.Resources()
-	a.NoError(err)
-	defer resetResource(org)
 
 	resetResource(org)
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
+	resourcesBase, err := org.Resources()
+
+	a.NoError(err)
+	defer resetResource(org)
 
 	resourcesConfig := `
 resources:
@@ -50,7 +51,7 @@ resources:
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsAdded: true},
 	})
-	a.Equal(expectedOps, sortSyncOps(ops))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(ops))
 	resources, err := org.Resources()
 	a.NoError(err)
 	a.Equal(resourcesBase, resources)
@@ -1091,7 +1092,7 @@ net-policy:
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "sinkhole"},
 		{ElementType: OrgSyncOperationElementType.NetPolicy, ElementName: "no_ssh", IsAdded: true},
 	})
-	a.Equal(expectedOps, sortSyncOps(ops))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(ops))
 	netPolicies, err = org.NetPolicies()
 	a.NoError(err)
 	a.Equal(netPoliciesCountStart+3, len(netPolicies))
@@ -1105,7 +1106,7 @@ net-policy:
 	// force
 	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncNetPolicies: true})
 	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
+	a.Equal(sortSyncOps(expectedOps), sortSyncOps(ops))
 	netPolicies, err = org.NetPolicies()
 	a.NoError(err)
 	a.Equal(netPoliciesCountStart-1, len(netPolicies))

@@ -1,17 +1,15 @@
 package limacharlie
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestFPRuleList(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	rules, err := org.FPRules()
+	_, err := org.FPRules()
 	a.NoError(err)
-	a.Empty(rules, "unexpected preexisting rules in list: %+v", rules)
 }
 
 func TestFPRuleAddDelete(t *testing.T) {
@@ -21,7 +19,7 @@ func TestFPRuleAddDelete(t *testing.T) {
 	a.NoError(err)
 	a.Empty(rules, "unexpected preexisting rules in list: %+v", rules)
 
-	fpRuleName := "testrule"
+	fpRuleName := "testrule" + "-" + randSeq(6)
 	err = org.FPRuleAdd(fpRuleName, Dict{
 		"op":    "ends with",
 		"path":  "detect/event/FILE_PATH",
@@ -45,12 +43,15 @@ func TestFPRuleAddDelete(t *testing.T) {
 
 	rules, err = org.FPRules()
 	a.NoError(err)
-	a.Equal(1, len(rules))
+	a.GreaterOrEqual(1, len(rules))
 
 	err = org.FPRuleDelete(fpRuleName)
 	a.NoError(err)
 
 	rules, err = org.FPRules()
 	a.NoError(err)
-	a.Empty(rules)
+	if _, ok := rules[fpRuleName]; ok {
+		t.Errorf("fp rule with key %s was not deleted  ", fpRuleName)
+	}
+
 }

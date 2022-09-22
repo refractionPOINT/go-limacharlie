@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -12,37 +13,41 @@ type OutputModuleType = string
 
 // OutputTypes is all supported modules
 var OutputTypes = struct {
-	S3          OutputModuleType
-	GCS         OutputModuleType
-	Pubsub      OutputModuleType
-	BigQuery    OutputModuleType
-	SCP         OutputModuleType
-	SFTP        OutputModuleType
-	Slack       OutputModuleType
-	Syslog      OutputModuleType
-	Webhook     OutputModuleType
-	WebhookBulk OutputModuleType
-	SMTP        OutputModuleType
-	Humio       OutputModuleType
-	Kafka       OutputModuleType
-	Tines       OutputModuleType
-	Torq        OutputModuleType
+	S3               OutputModuleType
+	GCS              OutputModuleType
+	Pubsub           OutputModuleType
+	BigQuery         OutputModuleType
+	SCP              OutputModuleType
+	SFTP             OutputModuleType
+	Slack            OutputModuleType
+	Syslog           OutputModuleType
+	Webhook          OutputModuleType
+	WebhookBulk      OutputModuleType
+	SMTP             OutputModuleType
+	Humio            OutputModuleType
+	Kafka            OutputModuleType
+	AzureStorageBlob OutputModuleType
+	AzureEventHub    OutputModuleType
+	Tines            OutputModuleType
+	Torq             OutputModuleType
 }{
-	S3:          "s3",
-	GCS:         "gcs",
-	Pubsub:      "pubsub",
-	BigQuery:    "bigquery",
-	SCP:         "scp",
-	SFTP:        "sftp",
-	Slack:       "slack",
-	Syslog:      "syslog",
-	Webhook:     "webhook",
-	WebhookBulk: "webhook_bulk",
-	SMTP:        "smtp",
-	Humio:       "humio",
-	Kafka:       "kafka",
-	Tines:       "tines",
-	Torq:        "torq",
+	S3:               "s3",
+	GCS:              "gcs",
+	Pubsub:           "pubsub",
+	BigQuery:         "bigquery",
+	SCP:              "scp",
+	SFTP:             "sftp",
+	Slack:            "slack",
+	Syslog:           "syslog",
+	Webhook:          "webhook",
+	WebhookBulk:      "webhook_bulk",
+	SMTP:             "smtp",
+	Humio:            "humio",
+	Kafka:            "kafka",
+	AzureStorageBlob: "azure_storage_blog",
+	AzureEventHub:    "azure_event_hub",
+	Tines:            "tines",
+	Torq:             "torq",
 }
 
 // OutputDataType is the type of data
@@ -80,7 +85,7 @@ type OutputConfig struct {
 	Module OutputModuleType `json:"module"`
 	Type   OutputDataType   `json:"type"`
 
-	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempt"`
+	PrefixData        bool   `json:"is_prefix_data,omitempty,string" yaml:"is_prefix_data,omitempty"`
 	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string" yaml:"is_delete_on_failure,omitempty"`
 	NoRouting         bool   `json:"is_no_routing,omitempty,string" yaml:"is_no_routing,omitempty"`
 	NoSharding        bool   `json:"is_no_sharding,omitempty,string" yaml:"is_no_sharding,omitempty"`
@@ -128,6 +133,11 @@ type OutputConfig struct {
 	Table             string `json:"table,omitempty" yaml:"table,omitempty"`
 	HumioRepo         string `json:"humio_repo,omitempty" yaml:"humio_repo,omitempty"`
 	HumioToken        string `json:"humio_api_token,omitempty" yaml:"humio_api_token,omitempty"`
+	CustomTransform   string `json:"custom_transform,omitempty" yaml:"custom_transform,omitempty"`
+	KeyID             string `json:"key_id,omitempty" yaml:"key_id,omitempty"`
+	AttachmentText    string `json:"attachment_text,omitempty" yaml:"attachment_text,omitempty"`
+	Message           string `json:"message,omitempty" yaml:"message,omitempty"`
+	Color             string `json:"color,omitempty" yaml:"color,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
@@ -143,6 +153,7 @@ func (o OutputConfig) Equals(other OutputConfig) bool {
 }
 
 func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+
 	// Outputs have some fields as "string" which is not
 	// supported by the YAML lib. So we use custom marshaling.
 	// Since JSON supports it, we'll leverage it.
@@ -166,10 +177,22 @@ func (o *OutputConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		genericVersion[fn] = "0"
 	}
 
+	for key, val := range genericVersion {
+		if strings.HasPrefix(key, "is_") {
+			s, ok := val.(string)
+			if ok {
+				if strings.TrimSpace(s) == "" { // default to false
+					genericVersion[key] = "false"
+				}
+			}
+		}
+	}
+
 	rawJSON, err := json.Marshal(genericVersion)
 	if err != nil {
 		return err
 	}
+
 	newO := OutputConfig{}
 	if err := json.Unmarshal(rawJSON, &newO); err != nil {
 		return err
