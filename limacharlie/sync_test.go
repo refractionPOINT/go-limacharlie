@@ -189,13 +189,13 @@ rules:
 	a.NoError(err)
 	if len(rules) != 2 {
 		t.Errorf("general rules has: %+v", rules)
-	}
-
-	if rules["r1"]["is_enabled"].(bool) {
-		t.Errorf("rule should be disabled: %+v", rules["r1"])
-	}
-	if !rules["r2"]["is_enabled"].(bool) {
-		t.Errorf("rule should be enabled: %+v", rules["r2"])
+	} else {
+		if rules["r1"]["is_enabled"].(bool) {
+			t.Errorf("rule should be disabled: %+v", rules["r1"])
+		}
+		if !rules["r2"]["is_enabled"].(bool) {
+			t.Errorf("rule should be enabled: %+v", rules["r2"])
+		}
 	}
 
 	rules, err = org.DRRules(WithNamespace("managed"))
