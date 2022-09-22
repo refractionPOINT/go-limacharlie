@@ -29,8 +29,9 @@ const (
 	keyEnvVar                 = "LC_API_KEY"
 	credsEnvVar               = "LC_CREDS_FILE"
 
-	restRetries = 3
-	restTimeout = 5 * time.Second
+	restRetries          = 3
+	restTimeout          = 5 * time.Second
+	restCreateOrgTimeout = 35 * time.Second
 )
 
 // Client makes raw request to LC cloud

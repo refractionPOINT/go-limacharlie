@@ -2,9 +2,8 @@ package limacharlie
 
 import (
 	"fmt"
-	"net/http"
-
 	"gopkg.in/yaml.v2"
+	"net/http"
 )
 
 // Organization holds a connection to the LC cloud organization
@@ -196,7 +195,7 @@ func (o *Organization) CreateOrganization(location, name string, template ...int
 	if yamlTemplate != "" {
 		req["template"] = yamlTemplate
 	}
-	request := makeDefaultRequest(&resp).withFormData(req)
+	request := makeDefaultRequest(&resp).withFormData(req).withTimeout(restCreateOrgTimeout)
 	if err := o.client.reliableRequest(http.MethodPost, "orgs/new", request); err != nil {
 		return NewOrganizationResponse{}, err
 	}
