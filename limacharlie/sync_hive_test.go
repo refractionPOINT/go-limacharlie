@@ -849,9 +849,6 @@ hives:
 	}
 
 	resetResource(org)
-
-	// Give the org a chance to settle.
-	time.Sleep(5*time.Second)
 }
 
 func TestHiveMerge(t *testing.T) {

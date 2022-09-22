@@ -26,7 +26,6 @@ func TestSyncPushResources(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	resetResource(org)
-	time.Sleep(10 * time.Second)
 	resourcesBase, err := org.Resources()
 
 	a.NoError(err)
@@ -60,7 +59,6 @@ resources:
 	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncResources: true})
 	a.NoError(err)
 	a.Equal(expectedOps, sortSyncOps(ops))
-	time.Sleep(5 * time.Second)
 	resources, err = org.Resources()
 	a.NoError(err)
 	expectedResources := resourcesBase.duplicate()
@@ -88,7 +86,6 @@ resources:
 	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, SyncResources: true})
 	a.NoError(err)
 	a.Equal(expectedOps, sortSyncOps(ops))
-	time.Sleep(5 * time.Second)
 	resources, err = org.Resources()
 	a.NoError(err)
 	a.Equal(postForce, resources)
@@ -184,7 +181,6 @@ rules:
 			t.Errorf("non-add op: %+v", o)
 		}
 	}
-	time.Sleep(5*time.Second)
 	rules, err = org.DRRules(WithNamespace("general"))
 	a.NoError(err)
 	if len(rules) != 2 {
