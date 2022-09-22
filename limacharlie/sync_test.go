@@ -184,7 +184,7 @@ rules:
 			t.Errorf("non-add op: %+v", o)
 		}
 	}
-	time.Sleep(100*time.Millisecond)
+	time.Sleep(5*time.Second)
 	rules, err = org.DRRules(WithNamespace("general"))
 	a.NoError(err)
 	if len(rules) != 2 {
