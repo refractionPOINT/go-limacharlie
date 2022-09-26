@@ -6,6 +6,12 @@ import (
 	"sync"
 )
 
+type SyncHiveConfigData map[string]SyncHiveData
+type SyncHiveData struct {
+	Data   map[string]interface{} `json:"data" yaml:"data,omitempty"`
+	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
+}
+
 func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
@@ -18,7 +24,7 @@ func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive
 	errCh := make(chan error)
 	hiveSync := orgSyncHives{}
 	go func() {
-		for hiveName, _ := range syncHiveOpts {
+		for hiveName := range syncHiveOpts {
 			if syncHiveOpts[hiveName] {
 				wg.Add(1)
 				go func(hive string) {
@@ -85,8 +91,8 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 				err = org.addHiveConfigData(HiveArgs{
 					Key:          hiveKey,
 					HiveName:     hiveName,
-					PartitionKey: orgInfo.OID},
-					newConfigData[hiveKey])
+					PartitionKey: orgInfo.OID,
+				}, newConfigData[hiveKey])
 				if err != nil {
 					return orgOps, err
 				}
@@ -158,7 +164,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 	return orgOps, nil
 }
 
-func (org Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, error) {
+func (org Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, error) {
 	hiveClient := NewHiveClient(&org)
 
 	dataSet, err := hiveClient.List(args)
@@ -166,30 +172,21 @@ func (org Organization) fetchHiveConfigData(args HiveArgs) (HiveConfigData, erro
 		return nil, err
 	}
 
-	currentHiveDataConfig := map[string]HiveData{}
+	currentHiveDataConfig := map[string]SyncHiveData{}
 	for k, v := range dataSet {
-		currentHiveDataConfig[k] = HiveData{
+		currentHiveDataConfig[k] = SyncHiveData{
 			Data: v.Data,
 			UsrMtd: UsrMtd{
 				Enabled: v.UsrMtd.Enabled,
 				Expiry:  v.UsrMtd.Expiry,
 				Tags:    v.UsrMtd.Tags,
 			},
-			SysMtd: SysMtd{
-				CreatedBy:   v.SysMtd.CreatedBy,
-				Etag:        v.SysMtd.Etag,
-				GUID:        v.SysMtd.GUID,
-				LastAuthor:  v.SysMtd.LastAuthor,
-				LastError:   v.SysMtd.LastError,
-				LastErrorTs: v.SysMtd.LastErrorTs,
-				LastMod:     v.SysMtd.LastMod,
-			},
 		}
 	}
 	return currentHiveDataConfig, nil
 }
 
-func (org Organization) updateHiveConfigData(ha HiveArgs, hd HiveData) error {
+func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 	hiveClient := NewHiveClient(&org)
 
 	err := encodeDecodeHiveData(&hd.Data)
@@ -221,7 +218,7 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd HiveData) error {
 	return nil
 }
 
-func (org Organization) addHiveConfigData(ha HiveArgs, hd HiveData) error {
+func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 	hiveClient := NewHiveClient(&org)
 
 	err := encodeDecodeHiveData(&hd.Data)
@@ -273,4 +270,52 @@ func encodeDecodeHiveData(hd *map[string]interface{}) error {
 		return err
 	}
 	return yaml.Unmarshal(out, &hd)
+}
+
+func (hsd *SyncHiveData) Equals(cData SyncHiveData) (bool, error) {
+	err := encodeDecodeHiveData(&hsd.Data)
+	if err != nil {
+		return false, err
+	}
+
+	newData, err := json.Marshal(hsd.Data)
+	if err != nil {
+		return false, err
+	}
+	if string(newData) == "{}" || string(newData) == "null" {
+		newData = nil
+	}
+
+	currentData, err := json.Marshal(cData.Data)
+	if err != nil {
+		return false, err
+	}
+	if string(currentData) == "{}" || string(currentData) == "null" {
+		currentData = nil
+	}
+	if string(currentData) != string(newData) {
+		return false, nil
+	}
+
+	if len(hsd.UsrMtd.Tags) == 0 {
+		hsd.UsrMtd.Tags = nil
+	}
+	newUsrMTd, err := json.Marshal(hsd.UsrMtd)
+	if err != nil {
+		return false, err
+	}
+
+	if len(cData.UsrMtd.Tags) == 0 {
+		cData.UsrMtd.Tags = nil
+	}
+	curUsrMtd, err := json.Marshal(cData.UsrMtd)
+	if err != nil {
+		return false, err
+	}
+
+	if string(curUsrMtd) != string(newUsrMTd) {
+		return false, nil
+	}
+
+	return true, nil
 }

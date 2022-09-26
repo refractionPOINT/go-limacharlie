@@ -191,7 +191,7 @@ type orgSyncExfilRules = ExfilRulesType
 type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
 type orgSyncOrgValues = map[OrgValueName]OrgValue
-type orgSyncHives = map[HiveName]map[HiveKey]HiveData
+type orgSyncHives = map[HiveName]map[HiveKey]SyncHiveData
 
 type OrgConfig struct {
 	Version     int                   `json:"version" yaml:"version"`
