@@ -319,3 +319,18 @@ func (hsd *SyncHiveData) Equals(cData SyncHiveData) (bool, error) {
 
 	return true, nil
 }
+
+func (hcd HiveConfigData) AsSyncConfigData() SyncHiveConfigData {
+	out := SyncHiveConfigData{}
+	for k, v := range hcd {
+		out[k] = v.AsSyncData()
+	}
+	return out
+}
+
+func (hd HiveData) AsSyncData() SyncHiveData {
+	return SyncHiveData{
+		Data:   hd.Data,
+		UsrMtd: hd.UsrMtd,
+	}
+}

@@ -218,9 +218,9 @@ func TestHiveNoUpdate(t *testing.T) {
 	}
 
 	orgConfig := OrgConfig{}
-	configHive := map[HiveName]map[HiveKey]HiveData{
-		"cloud_sensor": hiveSensorData,
-		"fp":           hiveFpData,
+	configHive := map[HiveName]map[HiveKey]SyncHiveData{
+		"cloud_sensor": hiveSensorData.AsSyncConfigData(),
+		"fp":           hiveFpData.AsSyncConfigData(),
 	}
 	orgConfig.Hives = configHive
 
