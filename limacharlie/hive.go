@@ -158,7 +158,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	}
 
 	var hiveResp HiveResp
-	req := makeDefaultRequest(&hiveResp).withQueryData(reqDict)
+	req := makeDefaultRequest(&hiveResp).withFormData(reqDict)
 	if err := h.Organization.client.reliableRequest(http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key, target), req); err != nil {
 		return nil, err
@@ -220,7 +220,7 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	}
 
 	var updateResp HiveResp
-	req := makeDefaultRequest(&updateResp).withQueryData(reqData)
+	req := makeDefaultRequest(&updateResp).withFormData(reqData)
 	if err := h.Organization.client.reliableRequest(http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, args.Key, target), req); err != nil {
 		return nil, err
