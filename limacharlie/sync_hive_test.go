@@ -98,7 +98,7 @@ func TestHiveAddData(t *testing.T) {
 		t.Errorf("hive sync push failure TestAddData err: %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps testAddData")
 		return
 	}
@@ -115,7 +115,7 @@ func TestHiveAddData(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps testAddData")
 		return
 	}
@@ -169,7 +169,7 @@ func TestHiveDataUpdate(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps testDataUpdate")
 		return
 	}
@@ -184,7 +184,7 @@ func TestHiveDataUpdate(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for update ")
 	}
 	expectedOps = sortSyncOps([]OrgSyncOperation{
@@ -218,9 +218,9 @@ func TestHiveNoUpdate(t *testing.T) {
 	}
 
 	orgConfig := OrgConfig{}
-	configHive := map[HiveName]map[HiveKey]HiveData{
-		"cloud_sensor": hiveSensorData,
-		"fp":           hiveFpData,
+	configHive := map[HiveName]map[HiveKey]SyncHiveData{
+		"cloud_sensor": hiveSensorData.AsSyncConfigData(),
+		"fp":           hiveFpData.AsSyncConfigData(),
 	}
 	orgConfig.Hives = configHive
 
@@ -229,7 +229,7 @@ func TestHiveNoUpdate(t *testing.T) {
 		t.Errorf("hive sync push testNoUpdate err: %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for testNoUpdate")
 		return
 	}
@@ -280,7 +280,7 @@ func TestHiveNoUpdate(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for update ")
 		return
 	}
@@ -366,7 +366,7 @@ func TestHiveUsrMtdUpdate(t *testing.T) {
 		t.Errorf("hive sync push testUsrMtdUpdate err: %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for update ")
 		return
 	}
@@ -381,7 +381,7 @@ func TestHiveUsrMtdUpdate(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for update ")
 		return
 	}
@@ -473,7 +473,7 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 		t.Errorf("error hive sync push testMultipleDataUpdates %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("fith test failed no org opts present ")
 		return
 	}
@@ -490,7 +490,7 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("fith test failed no org opts present ")
 	}
 	expectedOps = sortSyncOps([]OrgSyncOperation{
@@ -582,7 +582,7 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 		t.Errorf("error  testMultipleUsrMtdUpdate hive sync push %+v ", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("testMultipleUsrMtdUpdate failed no org opts present ")
 		return
 	}
@@ -601,7 +601,7 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 		t.Errorf("error testMultipleUsrMtdUpdate hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("testMultipleUsrMtdUpdate failed no org opts present ")
 		return
 	}
@@ -636,29 +636,29 @@ func TestHiveRemove(t *testing.T) {
 		return
 	}
 
-	for k, _ := range hiveSensorData {
+	for k := range hiveSensorData {
 		if k == s3TestHiveKey || k == office365TestHiveKey {
 			delete(hiveSensorData, k)
 		}
 	}
 
-	for k, _ := range hiveFpData {
+	for k := range hiveFpData {
 		if k == fpTestHiveKey {
 			delete(hiveFpData, k)
 		}
 	}
 
 	orgConfig := OrgConfig{}
-	orgConfig.Hives = map[HiveName]map[HiveKey]HiveData{
-		"cloud_sensor": hiveSensorData,
-		"fp":           hiveFpData,
+	orgConfig.Hives = map[HiveName]map[HiveKey]SyncHiveData{
+		"cloud_sensor": hiveSensorData.AsSyncConfigData(),
+		"fp":           hiveFpData.AsSyncConfigData(),
 	}
 	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, IsForce: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error TestRemove hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("testRemove failed no org opts present ")
 		return
 	}
@@ -708,7 +708,7 @@ func TestHiveRemove(t *testing.T) {
 		t.Errorf("error hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("seventh test failed no org opts present ")
 	}
 
@@ -802,7 +802,7 @@ hives:
 		t.Errorf("error TestRemove hive sync push %+v", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("testRemove failed no org opts present ")
 		return
 	}
@@ -819,7 +819,7 @@ hives:
 		t.Errorf("error TestRemove hive sync push %+v \n", err)
 		return
 	}
-	if orgOps == nil || len(orgOps) == 0 {
+	if len(orgOps) == 0 {
 		t.Errorf("testRemove failed no org opts present ")
 		return
 	}
@@ -978,7 +978,7 @@ func TestHiveMerge(t *testing.T) {
 
 	// process merge
 	newOrgConfig := orgConfigOne.Merge(orgConfigTwo)
-	for n, _ := range newOrgConfig.Hives {
+	for n := range newOrgConfig.Hives {
 		for k, data := range newOrgConfig.Hives[n] {
 			if k == s3TestHiveKey || k == office365TestHiveKey {
 				equal, err := data.Equals(orgConfigTwo.Hives[n][k])

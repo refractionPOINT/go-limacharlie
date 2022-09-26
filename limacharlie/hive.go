@@ -25,7 +25,7 @@ type HiveArgs struct {
 type HiveConfigData map[string]HiveData
 
 type HiveData struct {
-	Data   map[string]interface{} `json:"data" yaml:"data"`
+	Data   map[string]interface{} `json:"data" yaml:"data,omitempty"`
 	SysMtd SysMtd                 `json:"sys_mtd" yaml:"sys_mtd"`
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
@@ -249,7 +249,7 @@ func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if string(newData) == "{}" || string(newData) == "null" {
+	if string(newData) == "null" {
 		newData = nil
 	}
 
@@ -257,7 +257,7 @@ func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if string(currentData) == "{}" || string(currentData) == "null" {
+	if string(currentData) == "null" {
 		currentData = nil
 	}
 	if string(currentData) != string(newData) {
