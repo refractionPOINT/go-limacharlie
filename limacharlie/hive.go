@@ -97,7 +97,7 @@ func (h *HiveClient) Get(args HiveArgs) (*HiveData, error) {
 
 	var hiveSet HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive/%s/%s/%s/data", args.HiveName, args.PartitionKey, url.QueryEscape(args.Key)), makeDefaultRequest(&hiveSet)); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s/data", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +111,7 @@ func (h *HiveClient) GetMTD(args HiveArgs) (*HiveData, error) {
 
 	var hd HiveData
 	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive/%s/%s/%s/mtd", args.HiveName, args.PartitionKey, url.QueryEscape(args.Key)), makeDefaultRequest(&hd)); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s/mtd", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&hd)); err != nil {
 		return nil, err
 	}
 	hd.Data = nil
@@ -161,7 +161,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	var hiveResp HiveResp
 	req := makeDefaultRequest(&hiveResp).withFormData(reqDict)
 	if err := h.Organization.client.reliableRequest(http.MethodPost,
-		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.QueryEscape(args.Key), target), req); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
 	}
 
@@ -223,7 +223,7 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	var updateResp HiveResp
 	req := makeDefaultRequest(&updateResp).withFormData(reqData)
 	if err := h.Organization.client.reliableRequest(http.MethodPost,
-		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.QueryEscape(args.Key), target), req); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
 	}
 
@@ -233,7 +233,7 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 	var delResp interface{}
 	if err := h.Organization.client.reliableRequest(http.MethodDelete,
-		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, url.QueryEscape(args.Key)), makeDefaultRequest(&delResp)); err != nil {
+		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&delResp)); err != nil {
 		return nil, err
 	}
 
