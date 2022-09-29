@@ -199,24 +199,25 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	}
 
 	// set usr mtd data
+	var usrMtd UsrMtd
 	if args.Expiry != nil {
-		existing.UsrMtd.Expiry = *args.Expiry
+		usrMtd.Expiry = *args.Expiry
 	}
 	if args.Enabled != nil {
-		existing.UsrMtd.Enabled = *args.Enabled
+		usrMtd.Enabled = *args.Enabled
 	}
 	if args.Tags != nil {
-		existing.UsrMtd.Tags = args.Tags
+		usrMtd.Tags = args.Tags
 	}
 
 	// empty data request only update with usr_mtd and etag
 	reqData := Dict{}
 	if target == "data" {
 		reqData["data"] = existing.Data
-		reqData["usr_mtd"] = existing.UsrMtd
+		reqData["usr_mtd"] = usrMtd
 		reqData["sys_mtd"] = existing.SysMtd
 	} else {
-		reqData["usr_mtd"] = existing.UsrMtd
+		reqData["usr_mtd"] = usrMtd
 		reqData["etag"] = existing.SysMtd.Etag
 	}
 
