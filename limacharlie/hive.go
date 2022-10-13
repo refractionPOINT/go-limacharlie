@@ -125,7 +125,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	}
 
 	target := "mtd" // if no data set default to target type mtd
-	if args.Data != nil {
+	if len(args.Data) != 0 {
 		target = "data"
 	}
 
@@ -167,7 +167,7 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	target := "mtd" // if no data set default to target type mtd
 	existing := &HiveData{}
 	var err error
-	if args.Data != nil {
+	if len(args.Data) != 0 {
 		target = "data"
 		existing, err = h.Get(args)
 		if err != nil {
