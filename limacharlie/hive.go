@@ -16,7 +16,7 @@ type HiveArgs struct {
 	HiveName     string
 	PartitionKey string
 	Key          string
-	Data         []byte
+	Data         Dict
 	Expiry       *int64
 	Enabled      *bool
 	Tags         []string
@@ -125,17 +125,8 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	}
 
 	target := "mtd" // if no data set default to target type mtd
-	var data map[string]interface{}
 	if args.Data != nil {
-		// ensure passed data can unmarshal correctly
-		err := json.Unmarshal(args.Data, &data)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data) != 0 { // no actual data
-			target = "data"
-		}
+		target = "data"
 	}
 
 	var userMtd UsrMtd // set UsrMtd Data
@@ -150,7 +141,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	}
 
 	reqDict := Dict{
-		"data":    data,
+		"data":    args.Data,
 		"usr_mtd": userMtd,
 	}
 
@@ -177,20 +168,12 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 	existing := &HiveData{}
 	var err error
 	if args.Data != nil {
-		var data map[string]interface{}
-		err = json.Unmarshal(args.Data, &data)
+		target = "data"
+		existing, err = h.Get(args)
 		if err != nil {
 			return nil, err
 		}
-
-		if len(data) != 0 {
-			target = "data"
-			existing, err = h.Get(args)
-			if err != nil {
-				return nil, err
-			}
-			existing.Data = data
-		}
+		existing.Data = args.Data
 	} else {
 		existing, err = h.GetMTD(args)
 		if err != nil {
