@@ -194,10 +194,6 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error
 		return err
 	}
 
-	data, err := json.Marshal(hd.Data)
-	if err != nil {
-		return err
-	}
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	Tags := hd.UsrMtd.Tags
@@ -205,7 +201,7 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
 		HiveName:     ha.HiveName,
-		Data:         data,
+		Data:         hd.Data,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
 		Tags:         Tags,
@@ -226,11 +222,6 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		return err
 	}
 
-	mData, err := json.Marshal(hd.Data)
-	if err != nil {
-		return err
-	}
-
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	Tags := hd.UsrMtd.Tags
@@ -238,7 +229,7 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
 		HiveName:     ha.HiveName,
-		Data:         mData,
+		Data:         hd.Data,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
 		Tags:         Tags,

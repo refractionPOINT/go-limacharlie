@@ -1,12 +1,14 @@
 package limacharlie
 
 import (
-	"github.com/stretchr/testify/assert"
+	"encoding/json"
 	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var testHiveClient *HiveClient
@@ -55,7 +57,10 @@ func hiveAddTest(t *testing.T) {
 	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
 
 	testKey = "hive-test-" + randSeq(8) // ran key to keep track of newly created hive data record
-	data := []byte(jsonString)
+	data := Dict{}
+	if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
+		panic(err)
+	}
 	hiveResp, err := testHiveClient.Add(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
@@ -190,7 +195,10 @@ func hiveUpdate(t *testing.T) {
 				}`
 	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
 
-	data := []byte(jsonString)
+	data := Dict{}
+	if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
+		panic(err)
+	}
 	_, err := testHiveClient.Update(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
