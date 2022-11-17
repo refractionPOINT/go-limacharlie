@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -22,7 +21,8 @@ type InstallationKeyName = string
 
 func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 	d := map[string]interface{}{}
-	if err := json.Unmarshal(data, &d); err != nil {
+	d, err := UnmarshalCleanJSON(string(data))
+	if err != nil {
 		return err
 	}
 
