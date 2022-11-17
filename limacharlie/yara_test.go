@@ -52,7 +52,7 @@ func TestYaraRuleAddDelete(t *testing.T) {
 	a.NotEmpty(ruleFound.Author)
 	a.NotZero(ruleFound.LastUpdated)
 	a.Equal(YaraRuleFilter{
-		Tags:      []string{},
+		Tags:      rule.Filters.Tags,
 		Platforms: rule.Filters.Platforms,
 	}, ruleFound.Filters)
 
