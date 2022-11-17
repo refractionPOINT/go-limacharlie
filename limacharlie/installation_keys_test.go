@@ -41,15 +41,16 @@ func TestInstallationKeys(t *testing.T) {
 	k, err := org.InstallationKey(iid)
 	if err != nil {
 		t.Errorf("InstallationKey(): %v", err)
-	}
-	if k.CreatedAt == 0 {
-		t.Errorf("InstallationKey missing data(): %#v", k)
-	}
-	if err := org.DelInstallationKey(iid); err != nil {
-		t.Errorf("DelInstallationKey(): %v", err)
-	}
-	k, err = org.InstallationKey(iid)
-	if err == nil {
-		t.Errorf("InstallationKey() should be deleted: %#v", k)
+	} else {
+		if k.CreatedAt == 0 {
+			t.Errorf("InstallationKey missing data(): %#v", k)
+		}
+		if err := org.DelInstallationKey(iid); err != nil {
+			t.Errorf("DelInstallationKey(): %v", err)
+		}
+		k, err = org.InstallationKey(iid)
+		if err == nil {
+			t.Errorf("InstallationKey() should be deleted: %#v", k)
+		}
 	}
 }

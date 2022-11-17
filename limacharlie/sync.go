@@ -371,6 +371,30 @@ func (a OrgConfig) mergeInstallationKeys(ikeys orgSyncInstallationKeys) orgSyncI
 }
 
 func (a OrgConfig) mergeYara(yara *orgSyncYara) *orgSyncYara {
+	ny := &orgSyncYara{}
+	if a.Yara.Sources != nil && yara.Sources != nil {
+		ny.Sources = map[YaraSourceName]YaraSource{}
+		for k, v := range a.Yara.Sources {
+			ny.Sources[k] = v
+		}
+		if yara != nil {
+			for k, v := range yara.Sources {
+				ny.Sources[k] = v
+			}
+		}
+	}
+	if a.Yara.Rules != nil && yara.Rules != nil {
+		ny.Rules = map[YaraRuleName]YaraRule{}
+		for k, v := range a.Yara.Rules {
+			ny.Rules[k] = v
+		}
+		if yara != nil {
+			for k, v := range yara.Rules {
+				ny.Rules[k] = v
+			}
+		}
+	}
+
 	return yara
 }
 
