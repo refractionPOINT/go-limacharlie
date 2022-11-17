@@ -751,6 +751,10 @@ func (org Organization) syncFetchInstallationKeys() (orgSyncInstallationKeys, er
 	}
 	keys := orgSyncInstallationKeys{}
 	for _, key := range ikeys {
+		key.CreatedAt = 0
+		key.ID = ""
+		key.Key = ""
+		key.JsonKey = ""
 		keys[key.Description] = key
 	}
 	return keys, nil
@@ -761,9 +765,19 @@ func (org Organization) syncFetchYara() (*orgSyncYara, error) {
 	if err != nil {
 		return nil, err
 	}
+	for k, rule := range rules {
+		rule.Author = ""
+		rule.LastUpdated = 0
+		rules[k] = rule
+	}
 	sources, err := org.YaraListSources()
 	if err != nil {
 		return nil, err
+	}
+	for k, source := range sources {
+		source.Author = ""
+		source.LastUpdated = 0
+		sources[k] = source
 	}
 	return &orgSyncYara{
 		Rules:   rules,
