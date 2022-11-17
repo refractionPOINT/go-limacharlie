@@ -266,6 +266,8 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
 	o.Hives = o.mergeHives(conf.Hives)
+	o.InstallationKeys = o.mergeInstallationKeys(conf.InstallationKeys)
+	o.Yara = o.mergeYara(conf.Yara)
 	return o
 }
 

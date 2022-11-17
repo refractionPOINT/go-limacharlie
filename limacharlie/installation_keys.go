@@ -60,7 +60,7 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 	if !ok {
 		i, ok := d["created"].(int64)
 		if !ok {
-			return errors.New("invalid field created")
+			return fmt.Errorf("invalid field created: %#v (%T)", d["created"], d["created"])
 		}
 		ik.CreatedAt = i
 	} else {
