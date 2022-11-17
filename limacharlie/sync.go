@@ -31,16 +31,18 @@ type SyncOptions struct {
 	// Only simulate changes to the Org.
 	IsDryRun bool `json:"is_dry_run"`
 
-	SyncDRRules     bool            `json:"sync_dr"`
-	SyncOutputs     bool            `json:"sync_outputs"`
-	SyncResources   bool            `json:"sync_resources"`
-	SyncIntegrity   bool            `json:"sync_integrity"`
-	SyncFPRules     bool            `json:"sync_fp"`
-	SyncExfil       bool            `json:"sync_exfil"`
-	SyncArtifacts   bool            `json:"sync_artifacts"`
-	SyncNetPolicies bool            `json:"sync_net_policies"`
-	SyncOrgValues   bool            `json:"sync_org_values"`
-	SyncHives       map[string]bool `json:"sync_hives"`
+	SyncDRRules          bool            `json:"sync_dr"`
+	SyncOutputs          bool            `json:"sync_outputs"`
+	SyncResources        bool            `json:"sync_resources"`
+	SyncIntegrity        bool            `json:"sync_integrity"`
+	SyncFPRules          bool            `json:"sync_fp"`
+	SyncExfil            bool            `json:"sync_exfil"`
+	SyncArtifacts        bool            `json:"sync_artifacts"`
+	SyncNetPolicies      bool            `json:"sync_net_policies"`
+	SyncOrgValues        bool            `json:"sync_org_values"`
+	SyncHives            map[string]bool `json:"sync_hives"`
+	SyncInstallationKeys bool            `json:"sync_installation_keys"`
+	SyncYara             bool            `json:"sync_yara"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
@@ -192,20 +194,27 @@ type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
 type orgSyncOrgValues = map[OrgValueName]OrgValue
 type orgSyncHives = map[HiveName]map[HiveKey]SyncHiveData
+type orgSyncInstallationKeys = map[InstallationKeyName]InstallationKey
+type orgSyncYara = struct {
+	Rules   map[YaraRuleName]YaraRule     `json:"rules,omitempty" yaml:"rules,omitempty"`
+	Sources map[YaraSourceName]YaraSource `json:"sources,omitempty" yaml:"sources,omitempty"`
+}
 
 type OrgConfig struct {
-	Version     int                   `json:"version" yaml:"version"`
-	Includes    []string              `json:"-" yaml:"-"`
-	Resources   orgSyncResources      `json:"resources,omitempty" yaml:"resources,omitempty"`
-	DRRules     orgSyncDRRules        `json:"rules,omitempty" yaml:"rules,omitempty"`
-	FPRules     orgSyncFPRules        `json:"fps,omitempty" yaml:"fps,omitempty"`
-	Outputs     orgSyncOutputs        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
-	Integrity   orgSyncIntegrityRules `json:"integrity,omitempty" yaml:"integrity,omitempty"`
-	Exfil       *orgSyncExfilRules    `json:"exfil,omitempty" yaml:"exfil,omitempty"`
-	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
-	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
-	OrgValues   orgSyncOrgValues      `json:"org-value,omitempty" yaml:"org-value,omitempty"`
-	Hives       orgSyncHives          `json:"hives,omitempty" yaml:"hives,omitempty"`
+	Version          int                     `json:"version" yaml:"version"`
+	Includes         []string                `json:"-" yaml:"-"`
+	Resources        orgSyncResources        `json:"resources,omitempty" yaml:"resources,omitempty"`
+	DRRules          orgSyncDRRules          `json:"rules,omitempty" yaml:"rules,omitempty"`
+	FPRules          orgSyncFPRules          `json:"fps,omitempty" yaml:"fps,omitempty"`
+	Outputs          orgSyncOutputs          `json:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Integrity        orgSyncIntegrityRules   `json:"integrity,omitempty" yaml:"integrity,omitempty"`
+	Exfil            *orgSyncExfilRules      `json:"exfil,omitempty" yaml:"exfil,omitempty"`
+	Artifacts        orgSyncArtifacts        `json:"artifact,omitempty" yaml:"artifact,omitempty"`
+	NetPolicies      orgSyncNetPolicies      `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
+	OrgValues        orgSyncOrgValues        `json:"org-value,omitempty" yaml:"org-value,omitempty"`
+	Hives            orgSyncHives            `json:"hives,omitempty" yaml:"hives,omitempty"`
+	InstallationKeys orgSyncInstallationKeys `json:"installation_keys,omitempty" yaml:"installation_keys,omitempty"`
+	Yara             *orgSyncYara            `json:"yara,omitempty" yaml:"yara,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -550,6 +559,18 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("sync_hives: %v", err)
 		}
 	}
+	if options.SyncInstallationKeys {
+		orgConfig.InstallationKeys, err = org.syncFetchInstallationKeys()
+		if err != nil {
+			return orgConfig, fmt.Errorf("installation_keys: %v", err)
+		}
+	}
+	if options.SyncYara {
+		orgConfig.Yara, err = org.syncFetchYara()
+		if err != nil {
+			return orgConfig, fmt.Errorf("integrity: %v", err)
+		}
+	}
 
 	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
@@ -721,6 +742,33 @@ func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules
 		rules[ruleName] = rule
 	}
 	return rules, nil
+}
+
+func (org Organization) syncFetchInstallationKeys() (orgSyncInstallationKeys, error) {
+	ikeys, err := org.InstallationKeys()
+	if err != nil {
+		return nil, err
+	}
+	keys := orgSyncInstallationKeys{}
+	for _, key := range ikeys {
+		keys[key.Description] = key
+	}
+	return keys, nil
+}
+
+func (org Organization) syncFetchYara() (*orgSyncYara, error) {
+	rules, err := org.YaraListRules()
+	if err != nil {
+		return nil, err
+	}
+	sources, err := org.YaraListSources()
+	if err != nil {
+		return nil, err
+	}
+	return &orgSyncYara{
+		Rules:   rules,
+		Sources: sources,
+	}, nil
 }
 
 func (org Organization) SyncPushFromFiles(rootConfigFile string, options SyncOptions) ([]OrgSyncOperation, error) {
