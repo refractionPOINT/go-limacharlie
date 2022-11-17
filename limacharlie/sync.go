@@ -366,6 +366,14 @@ func (a OrgConfig) mergeHives(hiveConfig orgSyncHives) orgSyncHives {
 	return n
 }
 
+func (a OrgConfig) mergeInstallationKeys(ikeys orgSyncInstallationKeys) orgSyncInstallationKeys {
+	return ikeys
+}
+
+func (a OrgConfig) mergeYara(yara *orgSyncYara) *orgSyncYara {
+	return yara
+}
+
 func IsInterfaceNil(v interface{}) bool {
 	return v == nil || reflect.ValueOf(v).Kind() == reflect.Ptr && reflect.ValueOf(v).IsNil()
 }
