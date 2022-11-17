@@ -367,6 +367,13 @@ func (a OrgConfig) mergeHives(hiveConfig orgSyncHives) orgSyncHives {
 }
 
 func (a OrgConfig) mergeInstallationKeys(ikeys orgSyncInstallationKeys) orgSyncInstallationKeys {
+	nk := orgSyncInstallationKeys{}
+	for k, v := range a.InstallationKeys {
+		nk[k] = v
+	}
+	for k, v := range ikeys {
+		nk[k] = v
+	}
 	return ikeys
 }
 
