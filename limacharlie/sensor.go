@@ -105,7 +105,8 @@ func (s *Sensor) Update() *Sensor {
 }
 
 func (s *Sensor) IsolateFromNetwork() error {
-	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(s)); err != nil {
+	resp := Dict{}
+	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(resp)); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -113,7 +114,8 @@ func (s *Sensor) IsolateFromNetwork() error {
 }
 
 func (s *Sensor) RejoinNetwork() error {
-	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(s)); err != nil {
+	resp := Dict{}
+	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(resp)); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -138,7 +140,8 @@ func (s *Sensor) GetTags() ([]TagInfo, error) {
 }
 
 func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
-	req := makeDefaultRequest(s).withFormData(Dict{
+	resp := Dict{}
+	req := makeDefaultRequest(resp).withFormData(Dict{
 		"tags": tag,
 		"ttl":  ttl / time.Second,
 	})
@@ -150,7 +153,8 @@ func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 }
 
 func (s *Sensor) RemoveTag(tag string) error {
-	req := makeDefaultRequest(s).withFormData(Dict{
+	resp := Dict{}
+	req := makeDefaultRequest(resp).withFormData(Dict{
 		"tags": tag,
 	})
 	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
@@ -177,7 +181,8 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 	if effectiveInvestigationID != "" {
 		data["investigation_id"] = effectiveInvestigationID
 	}
-	req := makeDefaultRequest(s).withFormData(data)
+	resp := Dict{}
+	req := makeDefaultRequest(resp).withFormData(data)
 	if err := s.Organization.client.reliableRequest(http.MethodPost, s.SID, req); err != nil {
 		s.LastError = err
 		return err
