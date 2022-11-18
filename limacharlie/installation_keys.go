@@ -20,7 +20,6 @@ type InstallationKey struct {
 type InstallationKeyName = string
 
 func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
-	d := map[string]interface{}{}
 	d, err := UnmarshalCleanJSON(string(data))
 	if err != nil {
 		return err
@@ -71,6 +70,14 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 		ik.CreatedAt = t.Unix()
 	}
 	return nil
+}
+
+func (k InstallationKey) EqualsContent(k2 InstallationKey) bool {
+	if k.Description != k2.Description {
+		return false
+	}
+	// TODO: compare tags when we can update them.
+	return true
 }
 
 func (org Organization) InstallationKeys() ([]InstallationKey, error) {

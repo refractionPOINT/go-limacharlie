@@ -1,5 +1,7 @@
 package limacharlie
 
+import "encoding/json"
+
 type YaraSource struct {
 	Author      string `json:"by,omitempty" yaml:"by,omitempty"`
 	Source      string `json:"source,omitempty" yaml:"source,omitempty"`
@@ -23,6 +25,26 @@ type YaraSourceName = string
 
 type YaraSources map[YaraSourceName]YaraSource
 type YaraRules map[YaraRuleName]YaraRule
+
+func (r YaraRule) EqualsContent(r2 YaraRule) bool {
+	r.Author = ""
+	r.LastUpdated = 0
+	r2.Author = ""
+	r2.LastUpdated = 0
+	d1, err := json.Marshal(r)
+	if err != nil {
+		return false
+	}
+	d2, err := json.Marshal(r2)
+	if err != nil {
+		return false
+	}
+	return string(d1) == string(d2)
+}
+
+func (s YaraSource) EqualsContent(s2 YaraSource) bool {
+	return s.Source == s2.Source
+}
 
 func (org Organization) yara(responseData interface{}, action string, req Dict) error {
 	reqData := req

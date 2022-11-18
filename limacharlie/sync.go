@@ -493,29 +493,35 @@ func (a OrgConfig) mergeOrgValues(b orgSyncOrgValues) orgSyncOrgValues {
 }
 
 var OrgSyncOperationElementType = struct {
-	DRRule     string
-	FPRule     string
-	Output     string
-	Resource   string
-	Integrity  string
-	ExfilEvent string
-	ExfilWatch string
-	Artifact   string
-	NetPolicy  string
-	OrgValue   string
-	Hives      string
+	DRRule          string
+	FPRule          string
+	Output          string
+	Resource        string
+	Integrity       string
+	ExfilEvent      string
+	ExfilWatch      string
+	Artifact        string
+	NetPolicy       string
+	OrgValue        string
+	Hives           string
+	InstallationKey string
+	YaraRule        string
+	YaraSource      string
 }{
-	DRRule:     "dr-rule",
-	FPRule:     "fp-rule",
-	Output:     "output",
-	Resource:   "resource",
-	Integrity:  "integrity",
-	ExfilEvent: "exfil-list",
-	ExfilWatch: "exfil-watch",
-	Artifact:   "artifact",
-	NetPolicy:  "net-policy",
-	OrgValue:   "org-value",
-	Hives:      "hives",
+	DRRule:          "dr-rule",
+	FPRule:          "fp-rule",
+	Output:          "output",
+	Resource:        "resource",
+	Integrity:       "integrity",
+	ExfilEvent:      "exfil-list",
+	ExfilWatch:      "exfil-watch",
+	Artifact:        "artifact",
+	NetPolicy:       "net-policy",
+	OrgValue:        "org-value",
+	Hives:           "hives",
+	InstallationKey: "installation-key",
+	YaraRule:        "yara-rule",
+	YaraSource:      "yara-source",
 }
 
 type OrgSyncOperation struct {
@@ -985,6 +991,20 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("sync_hives: %+v ", err)
+		}
+	}
+	if options.SyncInstallationKeys {
+		newOps, err := org.syncInstallationKeys(conf.InstallationKeys, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("installation_keys: %v", err)
+		}
+	}
+	if options.SyncYara {
+		newOps, err := org.syncYara(conf.Yara, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("yara: %v", err)
 		}
 	}
 
@@ -1600,6 +1620,226 @@ func (org Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) (
 		ops = append(ops, OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.FPRule,
 			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
+	return ops, nil
+}
+
+func (org Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(ikeys) == 0 {
+		return nil, nil
+	}
+
+	ops := []OrgSyncOperation{}
+	orgKeys, err := org.InstallationKeys()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	orgKeyMap := map[string]InstallationKey{}
+	for _, k := range orgKeys {
+		orgKeyMap[k.Description] = k
+	}
+
+	for keyName, key := range ikeys {
+		orgKey, found := orgKeyMap[keyName]
+		if found {
+			if key.EqualsContent(orgKey) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.InstallationKey,
+					ElementName: keyName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.InstallationKey,
+				ElementName: keyName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if _, err := org.AddInstallationKey(key); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.InstallationKey,
+			ElementName: keyName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// refetch
+	orgKeys, err = org.InstallationKeys()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	// list the existing rules and remove the ones not in our list
+	for _, k := range orgKeys {
+		_, found := ikeys[k.Description]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.InstallationKey,
+				ElementName: k.Description,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.DelInstallationKey(k.Description); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.InstallationKey,
+			ElementName: k.Description,
+			IsRemoved:   true,
+		})
+	}
+	return ops, nil
+}
+
+func (org Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && (yara == nil || (len(yara.Rules) == 0 && len(yara.Sources) == 0)) {
+		return nil, nil
+	}
+
+	ops := []OrgSyncOperation{}
+	orgRules, err := org.YaraListRules()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	orgSources, err := org.YaraListSources()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+
+	for sourceName, source := range yara.Sources {
+		orgSource, found := orgSources[sourceName]
+		if found {
+			if source.EqualsContent(orgSource) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.YaraSource,
+					ElementName: sourceName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraSource,
+				ElementName: sourceName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.YaraSourceAdd(sourceName, source); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraSource,
+			ElementName: sourceName,
+			IsAdded:     true,
+		})
+	}
+
+	for ruleName, rule := range yara.Rules {
+		orgRule, found := orgRules[ruleName]
+		if found {
+			if rule.EqualsContent(orgRule) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.YaraRule,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraRule,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.YaraRuleAdd(ruleName, rule); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraRule,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// refetch
+	orgRules, err = org.YaraListRules()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	orgSources, err = org.YaraListSources()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	// list the existing rules and remove the ones not in our list
+	for ruleName := range orgRules {
+		_, found := yara.Rules[ruleName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraRule,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.YaraRuleDelete(ruleName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraRule,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
+
+	for sourceName := range orgSources {
+		_, found := yara.Sources[sourceName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraSource,
+				ElementName: sourceName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.YaraSourceDelete(sourceName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraSource,
+			ElementName: sourceName,
 			IsRemoved:   true,
 		})
 	}
