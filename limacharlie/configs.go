@@ -6,7 +6,7 @@ import (
 	"os/user"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // ConfigFile is the actual config file format may seem a bit odd
