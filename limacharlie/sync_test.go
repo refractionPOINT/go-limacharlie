@@ -1512,7 +1512,7 @@ yara:
 	a.Empty(sources)
 
 	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncIntegrity: true})
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncYara: true})
 	a.NoError(err)
 	a.Equal(expectedOps, sortSyncOps(ops))
 	rules, err = org.YaraListRules()
@@ -1557,7 +1557,7 @@ yara:
 	forceOrgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &forceOrgConfig))
 
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncIntegrity: true})
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncYara: true})
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource"},
@@ -1585,7 +1585,7 @@ yara:
 
 	// force and no dry run
 
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncIntegrity: true})
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncYara: true})
 	a.NoError(err)
 	a.Equal(expectedOps, sortSyncOps(ops))
 	rules, err = org.YaraListRules()
