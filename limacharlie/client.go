@@ -381,8 +381,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	if originalResponse, ok := request.response.(*map[string]interface{}); ok {
 		tmpResp, err := UnmarshalCleanJSON(respData.String())
 		if err != nil {
-			fmt.Println("TMP DEBUG:", respData.String())
-			return resp.StatusCode, fmt.Errorf("error parsing response: %v", err)
+			return resp.StatusCode, fmt.Errorf("error parsing response: %v / %s", err, respData.String())
 		}
 		for k, v := range tmpResp {
 			(*originalResponse)[k] = v
@@ -392,7 +391,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 
 	// Looks like it is not a map[string]interface{}, let json do its thing.
 	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
-		return resp.StatusCode, fmt.Errorf("error parsing response: %v", err)
+		return resp.StatusCode, fmt.Errorf("error parsing response: %v / %s", err, respData.String())
 	}
 	return resp.StatusCode, nil
 }
