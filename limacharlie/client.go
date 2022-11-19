@@ -184,6 +184,7 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	}
 
 	r.Header.Set("User-Agent", "limacharlie-sdk")
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := getHTTPClient(10 * time.Second).Do(r)
 	if err != nil {
