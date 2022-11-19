@@ -379,10 +379,9 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	// interpret large integers to int64 whenever
 	// possible instead of the json's default float64.
 	if originalResponse, ok := request.response.(*map[string]interface{}); ok {
-		s := respData.String()
-		tmpResp, err := UnmarshalCleanJSON(s)
+		tmpResp, err := UnmarshalCleanJSON(respData.String())
 		if err != nil {
-			return resp.StatusCode, fmt.Errorf("error parsing response: %v / %s", err, s)
+			return resp.StatusCode, fmt.Errorf("error parsing response: %v", err)
 		}
 		for k, v := range tmpResp {
 			(*originalResponse)[k] = v
@@ -391,9 +390,8 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	}
 
 	// Looks like it is not a map[string]interface{}, let json do its thing.
-	b := respData.Bytes()
-	if err := json.Unmarshal(b, request.response); err != nil {
-		return resp.StatusCode, fmt.Errorf("error parsing response: %v / %s", err, string(b))
+	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
+		return resp.StatusCode, fmt.Errorf("error parsing response: %v", err)
 	}
 	return resp.StatusCode, nil
 }
