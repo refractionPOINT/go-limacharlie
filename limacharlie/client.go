@@ -20,7 +20,7 @@ import (
 const (
 	rootURL           = "https://api.limacharlie.io"
 	currentAPIVersion = "v1"
-	getJWTURL         = "https://app.limacharlie.io/jwt"
+	getJWTURL         = "https://jwt.limacharlie.io"
 
 	defaultConfigFileLocation = "~/.limacharlie"
 	environmentNameEnvVar     = "LC_CURRENT_ENV"
