@@ -178,7 +178,14 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 		authData.Set("perms", strings.Join(c.options.Permissions, ","))
 	}
 
-	resp, err := http.PostForm(getJWTURL, authData)
+	r, err := http.NewRequest(http.MethodPost, getJWTURL, strings.NewReader(authData.Encode()))
+	if err != nil {
+		return "", err
+	}
+
+	r.Header.Set("User-Agent", "limacharlie-sdk")
+
+	resp, err := getHTTPClient(10 * time.Second).Do(r)
 	if err != nil {
 		return "", err
 	}
