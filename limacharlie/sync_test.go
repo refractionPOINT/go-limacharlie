@@ -1171,27 +1171,27 @@ func TestMerge(t *testing.T) {
 	}
 	expected := `version: 3
 resources:
-  replicant:
-  - a1
-  - a2
-  - a3
+    replicant:
+        - a1
+        - a2
+        - a3
 rules:
-  r1:
-    name: r1
-    namespace: general
-    detect:
-      t: v1
-    respond:
-    - l11
-    - l21
-  r2:
-    name: r2
-    namespace: managed
-    detect:
-      t: v
-    respond:
-    - l1
-    - l2
+    r1:
+        name: r1
+        namespace: general
+        detect:
+            t: v1
+        respond:
+            - l11
+            - l21
+    r2:
+        name: r2
+        namespace: managed
+        detect:
+            t: v
+        respond:
+            - l1
+            - l2
 `
 
 	out := o1.Merge(o2)
@@ -1255,27 +1255,27 @@ rules:
 
 	expected := `version: 3
 resources:
-  replicant:
-  - a1
-  - a2
-  - a3
+    replicant:
+        - a1
+        - a2
+        - a3
 rules:
-  r1:
-    name: r1
-    namespace: general
-    detect:
-      t: v1
-    respond:
-    - l11
-    - l21
-  r2:
-    name: r2
-    namespace: managed
-    detect:
-      t: v
-    respond:
-    - l1
-    - l2
+    r1:
+        name: r1
+        namespace: general
+        detect:
+            t: v1
+        respond:
+            - l11
+            - l21
+    r2:
+        name: r2
+        namespace: managed
+        detect:
+            t: v
+        respond:
+            - l1
+            - l2
 `
 
 	ldr := func(parent string, configFile string) ([]byte, error) {
@@ -1359,79 +1359,79 @@ func TestSyncOrgValues(t *testing.T) {
 func TestSyncFullBidirectional(t *testing.T) {
 	rawConf := `version: 3
 resources:
-  api:
-  - vt
-  - insight
-  replicant:
-  - infrastructure-service
-  - integrity
-  - reliable-tasking
-  - responder
-  - sigma
-  - logging
-  - yara
+    api:
+        - vt
+        - insight
+    replicant:
+        - infrastructure-service
+        - integrity
+        - reliable-tasking
+        - responder
+        - sigma
+        - logging
+        - yara
 rules:
-  vt-domains:
-    name: vt-domains
-    namespace: general
-    detect:
-      event: DNS_REQUEST
-      metadata_rules:
-        length of: true
-        op: is greater than
-        path: /
-        value: 4
-      op: lookup
-      path: event/DOMAIN_NAME
-      resource: lcr://api/vt
-    respond:
-    - action: report
-      name: vt-bad-domain
-  vt-hashes:
-    name: vt-hashes
-    namespace: general
-    detect:
-      event: CODE_IDENTITY
-      metadata_rules:
-        length of: true
-        op: is greater than
-        path: /
-        value: 3
-      op: lookup
-      path: event/HASH
-      resource: lcr://api/vt
-    respond:
-    - action: report
-      name: vt-bad-hash
+    vt-domains:
+        name: vt-domains
+        namespace: general
+        detect:
+            event: DNS_REQUEST
+            metadata_rules:
+                length of: true
+                op: is greater than
+                path: /
+                value: 4
+            op: lookup
+            path: event/DOMAIN_NAME
+            resource: lcr://api/vt
+        respond:
+            - action: report
+              name: vt-bad-domain
+    vt-hashes:
+        name: vt-hashes
+        namespace: general
+        detect:
+            event: CODE_IDENTITY
+            metadata_rules:
+                length of: true
+                op: is greater than
+                path: /
+                value: 3
+            op: lookup
+            path: event/HASH
+            resource: lcr://api/vt
+        respond:
+            - action: report
+              name: vt-bad-hash
 integrity:
-  linux-key:
-    patterns:
-    - /home/*/.ssh/*
-    tags: []
-    platforms:
-    - linux
+    linux-key:
+        patterns:
+            - /home/*/.ssh/*
+        tags: []
+        platforms:
+            - linux
 artifact:
-  linux-logs:
-    is_ignore_cert: false
-    is_delete_after: false
-    days_retention: 30
-    patterns:
-    - /var/log/syslog.1
-    - /var/log/auth.log.1
-    tags: []
-    platforms:
-    - linux
-  windows-logs:
-    is_ignore_cert: false
-    is_delete_after: false
-    days_retention: 30
-    patterns:
-    - wel://system:*
-    - wel://security:*
-    - wel://application:*
-    tags: []
-    platforms:
-    - windows
+    linux-logs:
+        is_ignore_cert: false
+        is_delete_after: false
+        days_retention: 30
+        patterns:
+            - /var/log/syslog.1
+            - /var/log/auth.log.1
+        tags: []
+        platforms:
+            - linux
+    windows-logs:
+        is_ignore_cert: false
+        is_delete_after: false
+        days_retention: 30
+        patterns:
+            - wel://system:*
+            - wel://security:*
+            - wel://application:*
+        tags: []
+        platforms:
+            - windows
 `
 	c := OrgConfig{}
 	if err := yaml.Unmarshal([]byte(rawConf), &c); err != nil {
