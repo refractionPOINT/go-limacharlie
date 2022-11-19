@@ -1445,3 +1445,163 @@ artifact:
 		t.Errorf("round trip through yaml failed to produce same output: %s\n\n!=\n\n%s", newConf, rawConf)
 	}
 }
+
+func deleteYaraRules(org *Organization) {
+	rules, _ := org.IntegrityRules()
+	for ruleName := range rules {
+		org.IntegrityRuleDelete(ruleName)
+	}
+}
+
+func TestSyncPushYara(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteYaraRules(org)
+
+	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
+
+	rules, err := org.YaraListRules()
+	a.NoError(err)
+	a.Empty(rules)
+	sources, err := org.YaraListSources()
+	a.NoError(err)
+	a.Empty(sources)
+
+	yamlYaraRules := `
+yara:
+  rules:
+    testrule:
+      sources: testsource
+      filters:
+      tags:
+        - t1
+      platforms:
+        - windows
+	testrule2:
+      sources: testsource
+      filters:
+      tags:
+        - t2
+      platforms:
+        - windows
+  sources:
+    testsource:
+      source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &orgConfig))
+
+	// dry run
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncYara: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Empty(rules)
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Empty(sources)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncIntegrity: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Rules), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Yara.Rules[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal %v != %v", configRule, rule)
+	}
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Sources), len(sources))
+	for sourceName, source := range sources {
+		configRule, found := orgConfig.Yara.Sources[sourceName]
+		a.True(found)
+		a.True(configRule.EqualsContent(source), "yara source content not equal %v != %v", configRule, source)
+	}
+
+	// force and dry run
+	yamlYaraRules = `
+yara:
+  rules:
+    testrule3:
+      sources: testsource
+      filters:
+      tags:
+        - t3
+      platforms:
+        - linux
+	testrule2:
+      sources: testsource
+      filters:
+      tags:
+        - t2
+      platforms:
+        - windows
+  sources:
+    testsource:
+      source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
+`
+	forceOrgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &forceOrgConfig))
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncIntegrity: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource"},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule3", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2"},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule1", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Rules), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Yara.Rules[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal %v != %v", configRule, rule)
+	}
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Sources), len(sources))
+	for sourceName, source := range sources {
+		configRule, found := orgConfig.Yara.Sources[sourceName]
+		a.True(found)
+		a.True(configRule.EqualsContent(source), "yara source content not equal %v != %v", configRule, source)
+	}
+
+	// force and no dry run
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncIntegrity: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Rules), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Yara.Rules[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal %v != %v", configRule, rule)
+	}
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Sources), len(sources))
+	for sourceName, source := range sources {
+		configRule, found := orgConfig.Yara.Sources[sourceName]
+		a.True(found)
+		a.True(configRule.EqualsContent(source), "yara source content not equal %v != %v", configRule, source)
+	}
+}
