@@ -9,6 +9,11 @@ import (
 func TestInsightObjects(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	unsubReplicantCB, err := findUnsubscribeCallback(org, "api", "insight")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
 	resp, err := org.InsightObjects(InsightObjectsRequest{
 		IndicatorName:  "%google%",
 		ObjectType:     InsightObjectTypes.Domain,
@@ -23,6 +28,11 @@ func TestInsightObjects(t *testing.T) {
 func TestInsightObjectsPerObject(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	unsubReplicantCB, err := findUnsubscribeCallback(org, "api", "insight")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
 	resp, err := org.InsightObjectsPerObject(InsightObjectsRequest{
 		IndicatorName:  "%google%",
 		ObjectType:     InsightObjectTypes.Domain,
@@ -37,7 +47,12 @@ func TestInsightObjectsPerObject(t *testing.T) {
 func TestInsightObjectsBatch(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	_, err := org.InsightObjectsBatch(InsightObjectsBatchRequest{
+	unsubReplicantCB, err := findUnsubscribeCallback(org, "api", "insight")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
+	_, err = org.InsightObjectsBatch(InsightObjectsBatchRequest{
 		Objects: map[InsightObjectType][]string{
 			InsightObjectTypes.Domain: {"google.com", "microsoft.com"},
 		},
