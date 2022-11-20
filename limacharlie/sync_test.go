@@ -1481,7 +1481,7 @@ yara:
         - t1
       platforms:
         - windows
-	testrule2:
+    testrule2:
       sources: testsource
       filters:
       tags:
@@ -1543,7 +1543,7 @@ yara:
         - t3
       platforms:
         - linux
-	testrule2:
+    testrule2:
       sources: testsource
       filters:
       tags:
