@@ -1609,3 +1609,118 @@ yara:
 		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
 	}
 }
+
+func TestSyncInstallationKeys(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteAllInstallationKeys(org)
+
+	keys, err := org.InstallationKeys()
+	a.NoError(err)
+	a.Empty(keys)
+
+	// sync rules in dry run
+	orgKeys := `
+installation_keys:
+  testk1:
+    desc: test 1
+    tags:
+      - t1
+      - t2
+  testk2:
+    desc: test 1
+    tags:
+      - t1
+      - t2
+  testk3:
+    desc: test 1
+    tags:
+      - t1
+      - t2
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(orgKeys), &orgConfig))
+
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncInstallationKeys: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk2", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk3", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keys, err = org.InstallationKeys()
+	a.NoError(err)
+	a.Empty(keys)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncInstallationKeys: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keys, err = org.InstallationKeys()
+	a.NoError(err)
+	a.Equal(len(orgConfig.InstallationKeys), len(keys))
+	for _, k := range keys {
+		configKey, found := orgConfig.InstallationKeys[k.Description]
+		a.True(found)
+		a.True(configKey.EqualsContent(k))
+	}
+
+	// force sync in dry run
+	orgKeysForce := `
+installation_keys:
+  testk1:
+    desc: test 1
+    tags:
+      - t1
+      - t2
+  testk4:
+    desc: test 4
+    tags:
+      - t1
+  testk3:
+    desc: test 1
+    tags:
+      - t1
+      - t2
+`
+	orgConfigForce := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(orgKeysForce), &orgConfigForce))
+
+	ops, err = org.SyncPush(orgConfigForce, SyncOptions{IsDryRun: true, SyncInstallationKeys: true, IsForce: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk1"},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk3"},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk2", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk4", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keysForce, err := org.InstallationKeys()
+	a.NoError(err)
+	for _, k := range keysForce {
+		configKey, found := orgConfig.InstallationKeys[k.Description]
+		a.True(found)
+		a.True(configKey.EqualsContent(k))
+	}
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfigForce, SyncOptions{SyncInstallationKeys: true, IsForce: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keysForce, err = org.InstallationKeys()
+	a.NoError(err)
+	a.Equal(len(orgConfigForce.InstallationKeys), len(keysForce))
+	for _, k := range keysForce {
+		configKey, found := orgConfigForce.InstallationKeys[k.Description]
+		a.True(found)
+		a.True(configKey.EqualsContent(k))
+	}
+}
+
+func deleteAllInstallationKeys(org *Organization) {
+	keys, _ := org.InstallationKeys()
+	for _, k := range keys {
+		org.DelInstallationKey(k.ID)
+	}
+}
