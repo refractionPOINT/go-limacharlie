@@ -29,8 +29,26 @@ type YaraRules map[YaraRuleName]YaraRule
 func (r YaraRule) EqualsContent(r2 YaraRule) bool {
 	r.Author = ""
 	r.LastUpdated = 0
+	if len(r.Sources) == 0 {
+		r.Sources = nil
+	}
+	if len(r.Filters.Platforms) == 0 {
+		r.Filters.Platforms = nil
+	}
+	if len(r.Filters.Tags) == 0 {
+		r.Filters.Tags = nil
+	}
 	r2.Author = ""
 	r2.LastUpdated = 0
+	if len(r2.Sources) == 0 {
+		r2.Sources = nil
+	}
+	if len(r2.Filters.Platforms) == 0 {
+		r2.Filters.Platforms = nil
+	}
+	if len(r2.Filters.Tags) == 0 {
+		r2.Filters.Tags = nil
+	}
 	d1, err := json.Marshal(r)
 	if err != nil {
 		return false
