@@ -1502,7 +1502,7 @@ yara:
 	a.NoError(err)
 	expectedOps := sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule1", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2", IsAdded: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
