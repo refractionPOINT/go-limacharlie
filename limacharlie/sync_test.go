@@ -1474,7 +1474,7 @@ func TestSyncPushYara(t *testing.T) {
 	yamlYaraRules := `
 yara:
   rules:
-    testrule:
+    testrule1:
       sources:
         - testsource
       filters:
