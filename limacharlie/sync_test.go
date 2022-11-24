@@ -1614,6 +1614,7 @@ yara:
 func TestSyncInstallationKeys(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	deleteAllInstallationKeys(org)
 	defer deleteAllInstallationKeys(org)
 
 	keys, err := org.InstallationKeys()
