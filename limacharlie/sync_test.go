@@ -1594,17 +1594,17 @@ yara:
 	a.Equal(expectedOps, sortSyncOps(ops))
 	rules, err = org.YaraListRules()
 	a.NoError(err)
-	a.Equal(len(orgConfig.Yara.Rules), len(rules))
+	a.Equal(len(forceOrgConfig.Yara.Rules), len(rules))
 	for ruleName, rule := range rules {
-		configRule, found := orgConfig.Yara.Rules[ruleName]
+		configRule, found := forceOrgConfig.Yara.Rules[ruleName]
 		a.True(found)
 		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 	sources, err = org.YaraListSources()
 	a.NoError(err)
-	a.Equal(len(orgConfig.Yara.Sources), len(sources))
+	a.Equal(len(forceOrgConfig.Yara.Sources), len(sources))
 	for sourceName, source := range sources {
-		configRule, found := orgConfig.Yara.Sources[sourceName]
+		configRule, found := forceOrgConfig.Yara.Sources[sourceName]
 		a.True(found)
 		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
 	}
