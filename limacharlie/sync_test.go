@@ -1475,14 +1475,16 @@ func TestSyncPushYara(t *testing.T) {
 yara:
   rules:
     testrule:
-      sources: testsource
+      sources:
+        - testsource
       filters:
       tags:
         - t1
       platforms:
         - windows
     testrule2:
-      sources: testsource
+      sources:
+        - testsource
       filters:
       tags:
         - t2
@@ -1537,14 +1539,16 @@ yara:
 yara:
   rules:
     testrule3:
-      sources: testsource
+      sources:
+        - testsource
       filters:
       tags:
         - t3
       platforms:
         - linux
     testrule2:
-      sources: testsource
+      sources:
+        - testsource
       filters:
       tags:
         - t2
