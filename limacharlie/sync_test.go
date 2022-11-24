@@ -611,7 +611,7 @@ integrity:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Integrity[ruleName]
 		a.True(found)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 
 	// force and dry run
@@ -647,7 +647,7 @@ integrity:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Integrity[ruleName]
 		a.True(found, "rule '%s' not found", ruleName)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 
 	// force and no dry run
@@ -661,7 +661,7 @@ integrity:
 	for ruleName, rule := range rules {
 		configRule, found := forceOrgConfig.Integrity[ruleName]
 		a.True(found, "rule '%s' not found", ruleName)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 }
 
@@ -1523,7 +1523,7 @@ yara:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Yara.Rules[ruleName]
 		a.True(found)
-		a.True(configRule.EqualsContent(rule), "yara rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 	sources, err = org.YaraListSources()
 	a.NoError(err)
@@ -1531,7 +1531,7 @@ yara:
 	for sourceName, source := range sources {
 		configRule, found := orgConfig.Yara.Sources[sourceName]
 		a.True(found)
-		a.True(configRule.EqualsContent(source), "yara source content not equal %v != %v", configRule, source)
+		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
 	}
 
 	// force and dry run
@@ -1576,7 +1576,7 @@ yara:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Yara.Rules[ruleName]
 		a.True(found)
-		a.True(configRule.EqualsContent(rule), "yara rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 	sources, err = org.YaraListSources()
 	a.NoError(err)
@@ -1584,7 +1584,7 @@ yara:
 	for sourceName, source := range sources {
 		configRule, found := orgConfig.Yara.Sources[sourceName]
 		a.True(found)
-		a.True(configRule.EqualsContent(source), "yara source content not equal %v != %v", configRule, source)
+		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
 	}
 
 	// force and no dry run
@@ -1598,7 +1598,7 @@ yara:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Yara.Rules[ruleName]
 		a.True(found)
-		a.True(configRule.EqualsContent(rule), "yara rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 	sources, err = org.YaraListSources()
 	a.NoError(err)
@@ -1606,6 +1606,6 @@ yara:
 	for sourceName, source := range sources {
 		configRule, found := orgConfig.Yara.Sources[sourceName]
 		a.True(found)
-		a.True(configRule.EqualsContent(source), "yara source content not equal %v != %v", configRule, source)
+		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
 	}
 }
