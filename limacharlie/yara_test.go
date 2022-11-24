@@ -55,6 +55,7 @@ func TestYaraRuleAddDelete(t *testing.T) {
 		Tags:      rule.Filters.Tags,
 		Platforms: rule.Filters.Platforms,
 	}, ruleFound.Filters)
+	a.True(rule.EqualsContent(ruleFound))
 
 	err = org.YaraRuleDelete(ruleName)
 	a.NoError(err)
