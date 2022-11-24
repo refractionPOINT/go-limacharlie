@@ -88,10 +88,7 @@ func (org Organization) InstallationKeys() ([]InstallationKey, error) {
 		return nil, err
 	}
 	keys := []InstallationKey{}
-	orgKeys, ok := resp[org.client.options.OID]
-	if !ok {
-		return nil, errors.New("response missing org keys")
-	}
+	orgKeys, _ := resp[org.client.options.OID]
 	for _, k := range orgKeys {
 		keys = append(keys, k)
 	}
