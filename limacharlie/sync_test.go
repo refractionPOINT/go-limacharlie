@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -1723,4 +1724,5 @@ func deleteAllInstallationKeys(org *Organization) {
 	for _, k := range keys {
 		org.DelInstallationKey(k.ID)
 	}
+	time.Sleep(1 * time.Second)
 }
