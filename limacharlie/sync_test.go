@@ -1625,17 +1625,17 @@ func TestSyncInstallationKeys(t *testing.T) {
 	orgKeys := `
 installation_keys:
   testk1:
-    desc: test 1
+    desc: testk1
     tags:
       - t1
       - t2
   testk2:
-    desc: test 1
+    desc: testk2
     tags:
       - t1
       - t2
   testk3:
-    desc: test 1
+    desc: testk3
     tags:
       - t1
       - t2
@@ -1672,16 +1672,16 @@ installation_keys:
 	orgKeysForce := `
 installation_keys:
   testk1:
-    desc: test 1
+    desc: testk1
     tags:
       - t1
       - t2
   testk4:
-    desc: test 4
+    desc: testk4
     tags:
       - t1
   testk3:
-    desc: test 1
+    desc: testk3
     tags:
       - t1
       - t2
