@@ -1695,7 +1695,7 @@ func (org Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, opti
 			})
 			continue
 		}
-		if err := org.DelInstallationKey(k.Description); err != nil {
+		if err := org.DelInstallationKey(k.ID); err != nil {
 			return ops, err
 		}
 		ops = append(ops, OrgSyncOperation{
