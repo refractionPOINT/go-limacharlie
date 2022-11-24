@@ -1486,10 +1486,10 @@ yara:
       sources:
         - testsource
       filters:
-      tags:
-        - t2
-      platforms:
-        - windows
+        tags:
+          - t2
+        platforms:
+          - windows
   sources:
     testsource:
       source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
@@ -1542,18 +1542,18 @@ yara:
       sources:
         - testsource
       filters:
-      tags:
-        - t3
-      platforms:
-        - linux
+        tags:
+          - t3
+        platforms:
+          - linux
     testrule2:
       sources:
         - testsource
       filters:
-      tags:
-        - t2
-      platforms:
-        - windows
+        tags:
+          - t2
+        platforms:
+          - windows
   sources:
     testsource:
       source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
