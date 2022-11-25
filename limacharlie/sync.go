@@ -31,16 +31,18 @@ type SyncOptions struct {
 	// Only simulate changes to the Org.
 	IsDryRun bool `json:"is_dry_run"`
 
-	SyncDRRules     bool            `json:"sync_dr"`
-	SyncOutputs     bool            `json:"sync_outputs"`
-	SyncResources   bool            `json:"sync_resources"`
-	SyncIntegrity   bool            `json:"sync_integrity"`
-	SyncFPRules     bool            `json:"sync_fp"`
-	SyncExfil       bool            `json:"sync_exfil"`
-	SyncArtifacts   bool            `json:"sync_artifacts"`
-	SyncNetPolicies bool            `json:"sync_net_policies"`
-	SyncOrgValues   bool            `json:"sync_org_values"`
-	SyncHives       map[string]bool `json:"sync_hives"`
+	SyncDRRules          bool            `json:"sync_dr"`
+	SyncOutputs          bool            `json:"sync_outputs"`
+	SyncResources        bool            `json:"sync_resources"`
+	SyncIntegrity        bool            `json:"sync_integrity"`
+	SyncFPRules          bool            `json:"sync_fp"`
+	SyncExfil            bool            `json:"sync_exfil"`
+	SyncArtifacts        bool            `json:"sync_artifacts"`
+	SyncNetPolicies      bool            `json:"sync_net_policies"`
+	SyncOrgValues        bool            `json:"sync_org_values"`
+	SyncHives            map[string]bool `json:"sync_hives"`
+	SyncInstallationKeys bool            `json:"sync_installation_keys"`
+	SyncYara             bool            `json:"sync_yara"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
@@ -192,20 +194,27 @@ type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
 type orgSyncNetPolicies = NetPoliciesByName
 type orgSyncOrgValues = map[OrgValueName]OrgValue
 type orgSyncHives = map[HiveName]map[HiveKey]SyncHiveData
+type orgSyncInstallationKeys = map[InstallationKeyName]InstallationKey
+type orgSyncYara = struct {
+	Rules   map[YaraRuleName]YaraRule     `json:"rules,omitempty" yaml:"rules,omitempty"`
+	Sources map[YaraSourceName]YaraSource `json:"sources,omitempty" yaml:"sources,omitempty"`
+}
 
 type OrgConfig struct {
-	Version     int                   `json:"version" yaml:"version"`
-	Includes    []string              `json:"-" yaml:"-"`
-	Resources   orgSyncResources      `json:"resources,omitempty" yaml:"resources,omitempty"`
-	DRRules     orgSyncDRRules        `json:"rules,omitempty" yaml:"rules,omitempty"`
-	FPRules     orgSyncFPRules        `json:"fps,omitempty" yaml:"fps,omitempty"`
-	Outputs     orgSyncOutputs        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
-	Integrity   orgSyncIntegrityRules `json:"integrity,omitempty" yaml:"integrity,omitempty"`
-	Exfil       *orgSyncExfilRules    `json:"exfil,omitempty" yaml:"exfil,omitempty"`
-	Artifacts   orgSyncArtifacts      `json:"artifact,omitempty" yaml:"artifact,omitempty"`
-	NetPolicies orgSyncNetPolicies    `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
-	OrgValues   orgSyncOrgValues      `json:"org-value,omitempty" yaml:"org-value,omitempty"`
-	Hives       orgSyncHives          `json:"hives,omitempty" yaml:"hives,omitempty"`
+	Version          int                     `json:"version" yaml:"version"`
+	Includes         []string                `json:"-" yaml:"-"`
+	Resources        orgSyncResources        `json:"resources,omitempty" yaml:"resources,omitempty"`
+	DRRules          orgSyncDRRules          `json:"rules,omitempty" yaml:"rules,omitempty"`
+	FPRules          orgSyncFPRules          `json:"fps,omitempty" yaml:"fps,omitempty"`
+	Outputs          orgSyncOutputs          `json:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Integrity        orgSyncIntegrityRules   `json:"integrity,omitempty" yaml:"integrity,omitempty"`
+	Exfil            *orgSyncExfilRules      `json:"exfil,omitempty" yaml:"exfil,omitempty"`
+	Artifacts        orgSyncArtifacts        `json:"artifact,omitempty" yaml:"artifact,omitempty"`
+	NetPolicies      orgSyncNetPolicies      `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
+	OrgValues        orgSyncOrgValues        `json:"org-value,omitempty" yaml:"org-value,omitempty"`
+	Hives            orgSyncHives            `json:"hives,omitempty" yaml:"hives,omitempty"`
+	InstallationKeys orgSyncInstallationKeys `json:"installation_keys,omitempty" yaml:"installation_keys,omitempty"`
+	Yara             *orgSyncYara            `json:"yara,omitempty" yaml:"yara,omitempty"`
 }
 
 type orgConfigRaw OrgConfig
@@ -257,6 +266,8 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
 	o.Hives = o.mergeHives(conf.Hives)
+	o.InstallationKeys = o.mergeInstallationKeys(conf.InstallationKeys)
+	o.Yara = o.mergeYara(conf.Yara)
 	return o
 }
 
@@ -355,6 +366,45 @@ func (a OrgConfig) mergeHives(hiveConfig orgSyncHives) orgSyncHives {
 	return n
 }
 
+func (a OrgConfig) mergeInstallationKeys(ikeys orgSyncInstallationKeys) orgSyncInstallationKeys {
+	nk := orgSyncInstallationKeys{}
+	for k, v := range a.InstallationKeys {
+		nk[k] = v
+	}
+	for k, v := range ikeys {
+		nk[k] = v
+	}
+	return ikeys
+}
+
+func (a OrgConfig) mergeYara(yara *orgSyncYara) *orgSyncYara {
+	ny := &orgSyncYara{}
+	if a.Yara != nil && a.Yara.Sources != nil && yara != nil && yara.Sources != nil {
+		ny.Sources = map[YaraSourceName]YaraSource{}
+		for k, v := range a.Yara.Sources {
+			ny.Sources[k] = v
+		}
+		if yara != nil {
+			for k, v := range yara.Sources {
+				ny.Sources[k] = v
+			}
+		}
+	}
+	if a.Yara != nil && a.Yara.Rules != nil && yara != nil && yara.Rules != nil {
+		ny.Rules = map[YaraRuleName]YaraRule{}
+		for k, v := range a.Yara.Rules {
+			ny.Rules[k] = v
+		}
+		if yara != nil {
+			for k, v := range yara.Rules {
+				ny.Rules[k] = v
+			}
+		}
+	}
+
+	return yara
+}
+
 func IsInterfaceNil(v interface{}) bool {
 	return v == nil || reflect.ValueOf(v).Kind() == reflect.Ptr && reflect.ValueOf(v).IsNil()
 }
@@ -443,29 +493,35 @@ func (a OrgConfig) mergeOrgValues(b orgSyncOrgValues) orgSyncOrgValues {
 }
 
 var OrgSyncOperationElementType = struct {
-	DRRule     string
-	FPRule     string
-	Output     string
-	Resource   string
-	Integrity  string
-	ExfilEvent string
-	ExfilWatch string
-	Artifact   string
-	NetPolicy  string
-	OrgValue   string
-	Hives      string
+	DRRule          string
+	FPRule          string
+	Output          string
+	Resource        string
+	Integrity       string
+	ExfilEvent      string
+	ExfilWatch      string
+	Artifact        string
+	NetPolicy       string
+	OrgValue        string
+	Hives           string
+	InstallationKey string
+	YaraRule        string
+	YaraSource      string
 }{
-	DRRule:     "dr-rule",
-	FPRule:     "fp-rule",
-	Output:     "output",
-	Resource:   "resource",
-	Integrity:  "integrity",
-	ExfilEvent: "exfil-list",
-	ExfilWatch: "exfil-watch",
-	Artifact:   "artifact",
-	NetPolicy:  "net-policy",
-	OrgValue:   "org-value",
-	Hives:      "hives",
+	DRRule:          "dr-rule",
+	FPRule:          "fp-rule",
+	Output:          "output",
+	Resource:        "resource",
+	Integrity:       "integrity",
+	ExfilEvent:      "exfil-list",
+	ExfilWatch:      "exfil-watch",
+	Artifact:        "artifact",
+	NetPolicy:       "net-policy",
+	OrgValue:        "org-value",
+	Hives:           "hives",
+	InstallationKey: "installation-key",
+	YaraRule:        "yara-rule",
+	YaraSource:      "yara-source",
 }
 
 type OrgSyncOperation struct {
@@ -548,6 +604,18 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		orgConfig.Hives, err = org.syncFetchHive(options.SyncHives)
 		if err != nil {
 			return orgConfig, fmt.Errorf("sync_hives: %v", err)
+		}
+	}
+	if options.SyncInstallationKeys {
+		orgConfig.InstallationKeys, err = org.syncFetchInstallationKeys()
+		if err != nil {
+			return orgConfig, fmt.Errorf("installation_keys: %v", err)
+		}
+	}
+	if options.SyncYara {
+		orgConfig.Yara, err = org.syncFetchYara()
+		if err != nil {
+			return orgConfig, fmt.Errorf("integrity: %v", err)
 		}
 	}
 
@@ -723,6 +791,47 @@ func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules
 	return rules, nil
 }
 
+func (org Organization) syncFetchInstallationKeys() (orgSyncInstallationKeys, error) {
+	ikeys, err := org.InstallationKeys()
+	if err != nil {
+		return nil, err
+	}
+	keys := orgSyncInstallationKeys{}
+	for _, key := range ikeys {
+		key.CreatedAt = 0
+		key.ID = ""
+		key.Key = ""
+		key.JsonKey = ""
+		keys[key.Description] = key
+	}
+	return keys, nil
+}
+
+func (org Organization) syncFetchYara() (*orgSyncYara, error) {
+	rules, err := org.YaraListRules()
+	if err != nil {
+		return nil, err
+	}
+	for k, rule := range rules {
+		rule.Author = ""
+		rule.LastUpdated = 0
+		rules[k] = rule
+	}
+	sources, err := org.YaraListSources()
+	if err != nil {
+		return nil, err
+	}
+	for k, source := range sources {
+		source.Author = ""
+		source.LastUpdated = 0
+		sources[k] = source
+	}
+	return &orgSyncYara{
+		Rules:   rules,
+		Sources: sources,
+	}, nil
+}
+
 func (org Organization) SyncPushFromFiles(rootConfigFile string, options SyncOptions) ([]OrgSyncOperation, error) {
 	// If no custom loader was included, default to the built-in
 	// local file system loader.
@@ -882,6 +991,20 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("sync_hives: %+v ", err)
+		}
+	}
+	if options.SyncInstallationKeys {
+		newOps, err := org.syncInstallationKeys(conf.InstallationKeys, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("installation_keys: %v", err)
+		}
+	}
+	if options.SyncYara {
+		newOps, err := org.syncYara(conf.Yara, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("yara: %v", err)
 		}
 	}
 
@@ -1497,6 +1620,226 @@ func (org Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) (
 		ops = append(ops, OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.FPRule,
 			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
+	return ops, nil
+}
+
+func (org Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(ikeys) == 0 {
+		return nil, nil
+	}
+
+	ops := []OrgSyncOperation{}
+	orgKeys, err := org.InstallationKeys()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	orgKeyMap := map[string]InstallationKey{}
+	for _, k := range orgKeys {
+		orgKeyMap[k.Description] = k
+	}
+
+	for keyName, key := range ikeys {
+		orgKey, found := orgKeyMap[keyName]
+		if found {
+			if key.EqualsContent(orgKey) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.InstallationKey,
+					ElementName: keyName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.InstallationKey,
+				ElementName: keyName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if _, err := org.AddInstallationKey(key); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.InstallationKey,
+			ElementName: keyName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// refetch
+	orgKeys, err = org.InstallationKeys()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	// list the existing rules and remove the ones not in our list
+	for _, k := range orgKeys {
+		_, found := ikeys[k.Description]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.InstallationKey,
+				ElementName: k.Description,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.DelInstallationKey(k.ID); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.InstallationKey,
+			ElementName: k.Description,
+			IsRemoved:   true,
+		})
+	}
+	return ops, nil
+}
+
+func (org Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && (yara == nil || (len(yara.Rules) == 0 && len(yara.Sources) == 0)) {
+		return nil, nil
+	}
+
+	ops := []OrgSyncOperation{}
+	orgRules, err := org.YaraListRules()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	orgSources, err := org.YaraListSources()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+
+	for sourceName, source := range yara.Sources {
+		orgSource, found := orgSources[sourceName]
+		if found {
+			if source.EqualsContent(orgSource) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.YaraSource,
+					ElementName: sourceName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraSource,
+				ElementName: sourceName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.YaraSourceAdd(sourceName, source); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraSource,
+			ElementName: sourceName,
+			IsAdded:     true,
+		})
+	}
+
+	for ruleName, rule := range yara.Rules {
+		orgRule, found := orgRules[ruleName]
+		if found {
+			if rule.EqualsContent(orgRule) {
+				ops = append(ops, OrgSyncOperation{
+					ElementType: OrgSyncOperationElementType.YaraRule,
+					ElementName: ruleName,
+				})
+				continue
+			}
+		}
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraRule,
+				ElementName: ruleName,
+				IsAdded:     true,
+			})
+			continue
+		}
+
+		if err := org.YaraRuleAdd(ruleName, rule); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraRule,
+			ElementName: ruleName,
+			IsAdded:     true,
+		})
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	// refetch
+	orgRules, err = org.YaraListRules()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	orgSources, err = org.YaraListSources()
+	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
+		return ops, err
+	}
+	// list the existing rules and remove the ones not in our list
+	for ruleName := range orgRules {
+		_, found := yara.Rules[ruleName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraRule,
+				ElementName: ruleName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.YaraRuleDelete(ruleName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraRule,
+			ElementName: ruleName,
+			IsRemoved:   true,
+		})
+	}
+
+	for sourceName := range orgSources {
+		_, found := yara.Sources[sourceName]
+		if found {
+			continue
+		}
+
+		if options.IsDryRun {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.YaraSource,
+				ElementName: sourceName,
+				IsRemoved:   true,
+			})
+			continue
+		}
+		if err := org.YaraSourceDelete(sourceName); err != nil {
+			return ops, err
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.YaraSource,
+			ElementName: sourceName,
 			IsRemoved:   true,
 		})
 	}

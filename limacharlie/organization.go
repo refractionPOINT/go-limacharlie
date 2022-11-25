@@ -2,7 +2,7 @@ package limacharlie
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"net/http"
 )
 

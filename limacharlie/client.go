@@ -20,7 +20,7 @@ import (
 const (
 	rootURL           = "https://api.limacharlie.io"
 	currentAPIVersion = "v1"
-	getJWTURL         = "https://app.limacharlie.io/jwt"
+	getJWTURL         = "https://jwt.limacharlie.io"
 
 	defaultConfigFileLocation = "~/.limacharlie"
 	environmentNameEnvVar     = "LC_CURRENT_ENV"
@@ -178,7 +178,15 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 		authData.Set("perms", strings.Join(c.options.Permissions, ","))
 	}
 
-	resp, err := http.PostForm(getJWTURL, authData)
+	r, err := http.NewRequest(http.MethodPost, getJWTURL, strings.NewReader(authData.Encode()))
+	if err != nil {
+		return "", err
+	}
+
+	r.Header.Set("User-Agent", "limacharlie-sdk")
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := getHTTPClient(10 * time.Second).Do(r)
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +381,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	if originalResponse, ok := request.response.(*map[string]interface{}); ok {
 		tmpResp, err := UnmarshalCleanJSON(respData.String())
 		if err != nil {
-			return resp.StatusCode, err
+			return resp.StatusCode, fmt.Errorf("error parsing response: %v", err)
 		}
 		for k, v := range tmpResp {
 			(*originalResponse)[k] = v
@@ -383,7 +391,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 
 	// Looks like it is not a map[string]interface{}, let json do its thing.
 	if err := json.Unmarshal(respData.Bytes(), request.response); err != nil {
-		return resp.StatusCode, err
+		return resp.StatusCode, fmt.Errorf("error parsing response: %v", err)
 	}
 	return resp.StatusCode, nil
 }

@@ -14,6 +14,7 @@ func findUnsubscribeCallback(org *Organization, category string, name string) (u
 	// To simplify all tests, we assume no resources are subscribed to
 	// and all subscriptions need to be undone after.
 	cb := func() {
+		org.logger.Info(fmt.Sprintf("cleaning up resource: %s/%s", category, name))
 		org.ResourceUnsubscribe(name, category)
 		time.Sleep(6 * time.Second)
 	}

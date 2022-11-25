@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func resetResource(org *Organization) {
@@ -611,7 +612,7 @@ integrity:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Integrity[ruleName]
 		a.True(found)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 
 	// force and dry run
@@ -647,7 +648,7 @@ integrity:
 	for ruleName, rule := range rules {
 		configRule, found := orgConfig.Integrity[ruleName]
 		a.True(found, "rule '%s' not found", ruleName)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 
 	// force and no dry run
@@ -661,7 +662,7 @@ integrity:
 	for ruleName, rule := range rules {
 		configRule, found := forceOrgConfig.Integrity[ruleName]
 		a.True(found, "rule '%s' not found", ruleName)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal %v != %v", configRule, rule)
+		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
 	}
 }
 
@@ -1171,27 +1172,27 @@ func TestMerge(t *testing.T) {
 	}
 	expected := `version: 3
 resources:
-  replicant:
-  - a1
-  - a2
-  - a3
+    replicant:
+        - a1
+        - a2
+        - a3
 rules:
-  r1:
-    name: r1
-    namespace: general
-    detect:
-      t: v1
-    respond:
-    - l11
-    - l21
-  r2:
-    name: r2
-    namespace: managed
-    detect:
-      t: v
-    respond:
-    - l1
-    - l2
+    r1:
+        name: r1
+        namespace: general
+        detect:
+            t: v1
+        respond:
+            - l11
+            - l21
+    r2:
+        name: r2
+        namespace: managed
+        detect:
+            t: v
+        respond:
+            - l1
+            - l2
 `
 
 	out := o1.Merge(o2)
@@ -1255,27 +1256,27 @@ rules:
 
 	expected := `version: 3
 resources:
-  replicant:
-  - a1
-  - a2
-  - a3
+    replicant:
+        - a1
+        - a2
+        - a3
 rules:
-  r1:
-    name: r1
-    namespace: general
-    detect:
-      t: v1
-    respond:
-    - l11
-    - l21
-  r2:
-    name: r2
-    namespace: managed
-    detect:
-      t: v
-    respond:
-    - l1
-    - l2
+    r1:
+        name: r1
+        namespace: general
+        detect:
+            t: v1
+        respond:
+            - l11
+            - l21
+    r2:
+        name: r2
+        namespace: managed
+        detect:
+            t: v
+        respond:
+            - l1
+            - l2
 `
 
 	ldr := func(parent string, configFile string) ([]byte, error) {
@@ -1359,79 +1360,79 @@ func TestSyncOrgValues(t *testing.T) {
 func TestSyncFullBidirectional(t *testing.T) {
 	rawConf := `version: 3
 resources:
-  api:
-  - vt
-  - insight
-  replicant:
-  - infrastructure-service
-  - integrity
-  - reliable-tasking
-  - responder
-  - sigma
-  - logging
-  - yara
+    api:
+        - vt
+        - insight
+    replicant:
+        - infrastructure-service
+        - integrity
+        - reliable-tasking
+        - responder
+        - sigma
+        - logging
+        - yara
 rules:
-  vt-domains:
-    name: vt-domains
-    namespace: general
-    detect:
-      event: DNS_REQUEST
-      metadata_rules:
-        length of: true
-        op: is greater than
-        path: /
-        value: 4
-      op: lookup
-      path: event/DOMAIN_NAME
-      resource: lcr://api/vt
-    respond:
-    - action: report
-      name: vt-bad-domain
-  vt-hashes:
-    name: vt-hashes
-    namespace: general
-    detect:
-      event: CODE_IDENTITY
-      metadata_rules:
-        length of: true
-        op: is greater than
-        path: /
-        value: 3
-      op: lookup
-      path: event/HASH
-      resource: lcr://api/vt
-    respond:
-    - action: report
-      name: vt-bad-hash
+    vt-domains:
+        name: vt-domains
+        namespace: general
+        detect:
+            event: DNS_REQUEST
+            metadata_rules:
+                length of: true
+                op: is greater than
+                path: /
+                value: 4
+            op: lookup
+            path: event/DOMAIN_NAME
+            resource: lcr://api/vt
+        respond:
+            - action: report
+              name: vt-bad-domain
+    vt-hashes:
+        name: vt-hashes
+        namespace: general
+        detect:
+            event: CODE_IDENTITY
+            metadata_rules:
+                length of: true
+                op: is greater than
+                path: /
+                value: 3
+            op: lookup
+            path: event/HASH
+            resource: lcr://api/vt
+        respond:
+            - action: report
+              name: vt-bad-hash
 integrity:
-  linux-key:
-    patterns:
-    - /home/*/.ssh/*
-    tags: []
-    platforms:
-    - linux
+    linux-key:
+        patterns:
+            - /home/*/.ssh/*
+        tags: []
+        platforms:
+            - linux
 artifact:
-  linux-logs:
-    is_ignore_cert: false
-    is_delete_after: false
-    days_retention: 30
-    patterns:
-    - /var/log/syslog.1
-    - /var/log/auth.log.1
-    tags: []
-    platforms:
-    - linux
-  windows-logs:
-    is_ignore_cert: false
-    is_delete_after: false
-    days_retention: 30
-    patterns:
-    - wel://system:*
-    - wel://security:*
-    - wel://application:*
-    tags: []
-    platforms:
-    - windows
+    linux-logs:
+        is_ignore_cert: false
+        is_delete_after: false
+        days_retention: 30
+        patterns:
+            - /var/log/syslog.1
+            - /var/log/auth.log.1
+        tags: []
+        platforms:
+            - linux
+    windows-logs:
+        is_ignore_cert: false
+        is_delete_after: false
+        days_retention: 30
+        patterns:
+            - wel://system:*
+            - wel://security:*
+            - wel://application:*
+        tags: []
+        platforms:
+            - windows
 `
 	c := OrgConfig{}
 	if err := yaml.Unmarshal([]byte(rawConf), &c); err != nil {
@@ -1444,4 +1445,285 @@ artifact:
 	if string(newConf) != rawConf {
 		t.Errorf("round trip through yaml failed to produce same output: %s\n\n!=\n\n%s", newConf, rawConf)
 	}
+}
+
+func deleteYaraRules(org *Organization) {
+	rules, _ := org.IntegrityRules()
+	for ruleName := range rules {
+		org.IntegrityRuleDelete(ruleName)
+	}
+}
+
+func TestSyncPushYara(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer deleteYaraRules(org)
+
+	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
+	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
+
+	rules, err := org.YaraListRules()
+	a.NoError(err)
+	a.Empty(rules)
+	sources, err := org.YaraListSources()
+	a.NoError(err)
+	a.Empty(sources)
+
+	yamlYaraRules := `
+yara:
+  rules:
+    testrule1:
+      sources:
+        - testsource
+      filters:
+      tags:
+        - t1
+      platforms:
+        - windows
+    testrule2:
+      sources:
+        - testsource
+      filters:
+        tags:
+          - t2
+        platforms:
+          - windows
+  sources:
+    testsource:
+      source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &orgConfig))
+
+	// dry run
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncYara: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Empty(rules)
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Empty(sources)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncYara: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Rules), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Yara.Rules[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
+	}
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Sources), len(sources))
+	for sourceName, source := range sources {
+		configRule, found := orgConfig.Yara.Sources[sourceName]
+		a.True(found)
+		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
+	}
+
+	// force and dry run
+	yamlYaraRules = `
+yara:
+  rules:
+    testrule3:
+      sources:
+        - testsource
+      filters:
+        tags:
+          - t3
+        platforms:
+          - linux
+    testrule2:
+      sources:
+        - testsource
+      filters:
+        tags:
+          - t2
+        platforms:
+          - windows
+  sources:
+    testsource:
+      source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
+`
+	forceOrgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &forceOrgConfig))
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncYara: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource"},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule3", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2"},
+		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule1", IsRemoved: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Rules), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := orgConfig.Yara.Rules[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
+	}
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Equal(len(orgConfig.Yara.Sources), len(sources))
+	for sourceName, source := range sources {
+		configRule, found := orgConfig.Yara.Sources[sourceName]
+		a.True(found)
+		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
+	}
+
+	// force and no dry run
+
+	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncYara: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	rules, err = org.YaraListRules()
+	a.NoError(err)
+	a.Equal(len(forceOrgConfig.Yara.Rules), len(rules))
+	for ruleName, rule := range rules {
+		configRule, found := forceOrgConfig.Yara.Rules[ruleName]
+		a.True(found)
+		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
+	}
+	sources, err = org.YaraListSources()
+	a.NoError(err)
+	a.Equal(len(forceOrgConfig.Yara.Sources), len(sources))
+	for sourceName, source := range sources {
+		configRule, found := forceOrgConfig.Yara.Sources[sourceName]
+		a.True(found)
+		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
+	}
+}
+
+func TestSyncInstallationKeys(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	deleteAllInstallationKeys(org)
+	defer deleteAllInstallationKeys(org)
+
+	keys, err := org.InstallationKeys()
+	a.NoError(err)
+	a.Empty(keys)
+
+	// sync rules in dry run
+	orgKeys := `
+installation_keys:
+  testk1:
+    desc: testk1
+    tags:
+      - t1
+      - t2
+  testk2:
+    desc: testk2
+    tags:
+      - t1
+      - t2
+  testk3:
+    desc: testk3
+    tags:
+      - t1
+      - t2
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(orgKeys), &orgConfig))
+
+	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncInstallationKeys: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk1", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk2", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk3", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keys, err = org.InstallationKeys()
+	a.NoError(err)
+	a.Empty(keys)
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncInstallationKeys: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keys, err = org.InstallationKeys()
+	a.NoError(err)
+	a.Equal(len(orgConfig.InstallationKeys), len(keys))
+	for _, k := range keys {
+		configKey, found := orgConfig.InstallationKeys[k.Description]
+		a.True(found)
+		a.True(configKey.EqualsContent(k))
+	}
+
+	// force sync in dry run
+	orgKeysForce := `
+installation_keys:
+  testk1:
+    desc: testk1
+    tags:
+      - t1
+      - t2
+  testk4:
+    desc: testk4
+    tags:
+      - t1
+  testk3:
+    desc: testk3
+    tags:
+      - t1
+      - t2
+`
+	orgConfigForce := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(orgKeysForce), &orgConfigForce))
+
+	ops, err = org.SyncPush(orgConfigForce, SyncOptions{IsDryRun: true, SyncInstallationKeys: true, IsForce: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk1"},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk3"},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk2", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.InstallationKey, ElementName: "testk4", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keysForce, err := org.InstallationKeys()
+	a.NoError(err)
+	for _, k := range keysForce {
+		configKey, found := orgConfig.InstallationKeys[k.Description]
+		a.True(found)
+		a.True(configKey.EqualsContent(k))
+	}
+
+	// no dry run
+	ops, err = org.SyncPush(orgConfigForce, SyncOptions{SyncInstallationKeys: true, IsForce: true})
+	a.NoError(err)
+	a.Equal(expectedOps, sortSyncOps(ops))
+	keysForce, err = org.InstallationKeys()
+	a.NoError(err)
+	a.Equal(len(orgConfigForce.InstallationKeys), len(keysForce))
+	for _, k := range keysForce {
+		configKey, found := orgConfigForce.InstallationKeys[k.Description]
+		a.True(found)
+		a.True(configKey.EqualsContent(k))
+	}
+}
+
+func deleteAllInstallationKeys(org *Organization) {
+	keys, _ := org.InstallationKeys()
+	for _, k := range keys {
+		org.DelInstallationKey(k.ID)
+	}
+	time.Sleep(1 * time.Second)
 }
