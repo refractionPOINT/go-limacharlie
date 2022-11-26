@@ -9,7 +9,7 @@ import (
 )
 
 type InstallationKey struct {
-	CreatedAt   int64    `json:"created,omitempty": yaml:"created,omitempty"`
+	CreatedAt   int64    `json:"created,omitempty" yaml:"created,omitempty"`
 	Description string   `json:"desc,omitempty" yaml:"desc,omitempty"`
 	ID          string   `json:"iid,omitempty" yaml:"iid,omitempty"`
 	Key         string   `json:"key,omitempty" yaml:"key,omitempty"`
