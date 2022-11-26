@@ -53,7 +53,13 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 	if !ok {
 		return errors.New("invalid field tags")
 	}
-	ik.Tags = strings.Split(s, ",")
+	for _, tag := range strings.Split(s, ",") {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		ik.Tags = append(ik.Tags, tag)
+	}
 
 	s, ok = d["created"].(string)
 	if !ok {
