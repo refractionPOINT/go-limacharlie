@@ -9,7 +9,7 @@ import (
 )
 
 type InstallationKey struct {
-	CreatedAt   int64    `json:"created,omitempty": yaml:"created,omitempty"`
+	CreatedAt   int64    `json:"created,omitempty" yaml:"created,omitempty"`
 	Description string   `json:"desc,omitempty" yaml:"desc,omitempty"`
 	ID          string   `json:"iid,omitempty" yaml:"iid,omitempty"`
 	Key         string   `json:"key,omitempty" yaml:"key,omitempty"`
@@ -53,7 +53,13 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 	if !ok {
 		return errors.New("invalid field tags")
 	}
-	ik.Tags = strings.Split(s, ",")
+	for _, tag := range strings.Split(s, ",") {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		ik.Tags = append(ik.Tags, tag)
+	}
 
 	s, ok = d["created"].(string)
 	if !ok {
