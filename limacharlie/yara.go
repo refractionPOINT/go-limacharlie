@@ -5,6 +5,7 @@ import "encoding/json"
 type YaraSource struct {
 	Author      string `json:"by,omitempty" yaml:"by,omitempty"`
 	Source      string `json:"source,omitempty" yaml:"source,omitempty"`
+	Content     string `json:"content,omitempty" yaml:"content,omitempty"`
 	LastUpdated int64  `json:"updated,omitempty" yaml:"updated,omitempty"`
 }
 
@@ -113,14 +114,29 @@ func (org Organization) YaraListSources() (YaraSources, error) {
 	if err := org.yara(&resp, "list_sources", Dict{}); err != nil {
 		return nil, err
 	}
+	for srcName, src := range resp {
+		if src.Source != "<literal rules>" {
+			continue
+		}
+		// Let's fetch the content of the rule since
+		// it was not acquired from a remote repo, it just is.
+		data, err := org.YaraGetSource(srcName)
+		if err != nil {
+			return nil, err
+		}
+		src.Content = data
+		src.Source = ""
+		resp[srcName] = src
+	}
 	return resp, nil
 }
 
-func (org Organization) YaraSourceAdd(sourceName string, source YaraSource) error {
+func (org Organization) YaraSourceAdd(sourceName string, optSource YaraSource, optContent string) error {
 	resp := Dict{}
 	err := org.yara(&resp, "add_source", Dict{
-		"name":   sourceName,
-		"source": source.Source,
+		"name":    sourceName,
+		"source":  optSource.Source,
+		"content": optContent,
 	})
 	return err
 }
