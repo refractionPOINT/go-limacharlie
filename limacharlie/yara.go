@@ -62,11 +62,7 @@ func (r YaraRule) EqualsContent(r2 YaraRule) bool {
 }
 
 func (s YaraSource) EqualsContent(s2 YaraSource) bool {
-	s.Author = ""
-	s.LastUpdated = 0
-	s2.Author = ""
-	s2.LastUpdated = 0
-	return s.Source == s2.Source
+	return s.Source == s2.Source && s.Content == s2.Content
 }
 
 func (org Organization) yara(responseData interface{}, action string, req Dict) error {
