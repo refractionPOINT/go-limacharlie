@@ -131,12 +131,12 @@ func (org Organization) YaraListSources() (YaraSources, error) {
 	return resp, nil
 }
 
-func (org Organization) YaraSourceAdd(sourceName string, optSource YaraSource, optContent string) error {
+func (org Organization) YaraSourceAdd(sourceName string, source YaraSource) error {
 	resp := Dict{}
 	err := org.yara(&resp, "add_source", Dict{
 		"name":    sourceName,
-		"source":  optSource.Source,
-		"content": optContent,
+		"source":  source.Source,
+		"content": source.Content,
 	})
 	return err
 }
