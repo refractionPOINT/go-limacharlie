@@ -31,6 +31,9 @@ func TestInstallationKeys(t *testing.T) {
 	isFound := false
 	for _, k := range keys {
 		if k.ID == iid {
+			if len(k.Tags) != 2 {
+				t.Errorf("Tags not set properly: %#v", k.Tags)
+			}
 			isFound = true
 			break
 		}
