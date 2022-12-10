@@ -270,7 +270,7 @@ func (c *Client) serviceRequest(responseData interface{}, serviceName string, se
 	return c.reliableRequest(http.MethodPost, fmt.Sprintf("service/%s/%s", c.options.OID, serviceName), req)
 }
 
-func getStringKV(d interface{}) (map[string]string, error) {
+func getStringKV(d interface{}) (*url.Values, error) {
 	b, err := json.Marshal(d)
 	if err != nil {
 		return nil, err
@@ -281,7 +281,7 @@ func getStringKV(d interface{}) (map[string]string, error) {
 	if err := decoder.Decode(&o); err != nil {
 		return nil, err
 	}
-	m := map[string]string{}
+	m := &url.Values{}
 	for k, v := range o {
 		if _, ok := v.(Dict); ok {
 			// If the value is a dict, assume
@@ -290,7 +290,7 @@ func getStringKV(d interface{}) (map[string]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			m[k] = string(s)
+			m.Set(k, string(s))
 		} else if _, ok := v.(map[string]interface{}); ok {
 			// If the value is a dict, assume
 			// we want to ship its JSON string value.
@@ -298,11 +298,22 @@ func getStringKV(d interface{}) (map[string]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			m[k] = string(s)
+			m.Set(k, string(s))
+		} else if l, ok := v.([]string); ok {
+			for _, e := range l {
+				m.Add(k, e)
+			}
+		} else if l, ok := v.([]interface{}); ok {
+			for _, e := range l {
+				m.Add(k, fmt.Sprintf("%v", e))
+			}
 		} else {
 			// Just the normal value itself.
-			m[k] = fmt.Sprintf("%v", v)
+			m.Set(k, fmt.Sprintf("%v", v))
 		}
+	}
+	if len(o) == 0 {
+		return nil, nil
 	}
 	return m, nil
 }
@@ -317,12 +328,8 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		return 0, err
 	}
 
-	if len(fData) != 0 {
-		vals := url.Values{}
-		for k, v := range fData {
-			vals.Set(k, v)
-		}
-		body = strings.NewReader(vals.Encode())
+	if fData != nil {
+		body = strings.NewReader(fData.Encode())
 		headers["Content-Type"] = "application/x-www-form-urlencoded"
 	}
 
@@ -330,12 +337,8 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	if err != nil {
 		return 0, err
 	}
-	if len(qData) != 0 {
-		vals := url.Values{}
-		for k, v := range qData {
-			vals.Set(k, v)
-		}
-		rawQuery = vals.Encode()
+	if qData != nil {
+		rawQuery = qData.Encode()
 	}
 
 	r, err := http.NewRequest(verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
