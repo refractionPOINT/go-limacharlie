@@ -303,6 +303,10 @@ func getStringKV(d interface{}) (*url.Values, error) {
 			for _, e := range l {
 				m.Add(k, e)
 			}
+		} else if l, ok := v.([]interface{}); ok {
+			for _, e := range l {
+				m.Add(k, fmt.Sprintf("%v", e))
+			}
 		} else {
 			// Just the normal value itself.
 			m.Set(k, fmt.Sprintf("%v", v))
