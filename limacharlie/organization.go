@@ -56,6 +56,11 @@ func NewOrganizationFromClientOptions(opt ClientOptions, logger LCLogger) (*Orga
 	return NewOrganization(c)
 }
 
+// Get the OID of the organization.
+func (o Organization) GetOID() string {
+	return o.client.options.OID
+}
+
 // Permission represents the permission granted in LC
 type Permission struct {
 	Name string
