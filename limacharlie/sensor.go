@@ -243,6 +243,46 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 	return m, nil
 }
 
+func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*Sensor, error) {
+	m := map[string]*Sensor{}
+	lastToken := ""
+
+	for {
+		page := sensorListPage{}
+		q := makeDefaultRequest(&page)
+		if lastToken != "" {
+			q = q.withQueryData(Dict{
+				"continuation_token": lastToken,
+				"selector": selector,
+			})
+		} else {
+			q = q.withQueryData(Dict{
+				"selector": selector,
+			})
+		}
+		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
+			return nil, err
+		}
+		for _, s := range page.Sensors {
+			s.Organization = org
+			s.InvestigationID = org.invID
+			if s.DID != "" {
+				s.Device = &Device{
+					DID:          s.DID,
+					Organization: org,
+				}
+			}
+			m[s.SID] = s
+		}
+		if page.ContinuationToken == "" {
+			break
+		}
+		lastToken = page.ContinuationToken
+	}
+
+	return m, nil
+}
+
 func (org *Organization) GetAllTags() ([]string, error) {
 	tags := struct {
 		Tags []string `json:"tags"`
