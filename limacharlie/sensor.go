@@ -190,6 +190,16 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 	return nil
 }
 
+func (s *Sensor) Delete() error {
+	resp := Dict{}
+	req := makeDefaultRequest(&resp)
+	if err := s.Organization.client.reliableRequest(http.MethodDelete, s.SID, req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
 func (org *Organization) GetSensor(SID string) *Sensor {
 	s := &Sensor{
 		OID:             org.client.options.OID,
@@ -253,7 +263,7 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 		if lastToken != "" {
 			q = q.withQueryData(Dict{
 				"continuation_token": lastToken,
-				"selector": selector,
+				"selector":           selector,
 			})
 		} else {
 			q = q.withQueryData(Dict{
