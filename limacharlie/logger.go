@@ -91,6 +91,8 @@ type gcpLogLine struct {
 	Severity   string                 `json:"severity,omitempty"`
 }
 
+var newLine = []byte{'\n'}
+
 type LCLoggerGCP struct {
 	m          sync.Mutex
 	instanceID string
@@ -110,6 +112,7 @@ func (l *LCLoggerGCP) logToStdout(msg string, severity string) {
 	l.m.Lock()
 	defer l.m.Unlock()
 	os.Stdout.Write(b)
+	os.Stderr.Write(newLine)
 }
 
 func (l *LCLoggerGCP) logToStderr(msg string, severity string) {
@@ -125,6 +128,7 @@ func (l *LCLoggerGCP) logToStderr(msg string, severity string) {
 	l.m.Lock()
 	defer l.m.Unlock()
 	os.Stderr.Write(b)
+	os.Stderr.Write(newLine)
 }
 
 func (l *LCLoggerGCP) init() {
