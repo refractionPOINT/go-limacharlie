@@ -309,10 +309,9 @@ func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 		"sids": sids,
 	})
 	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("/online/%s", org.client.options.OID), q); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%#v", test)
 	}
-	fmt.Sprintf("resp::: %#v", test)
-	return list, nil
+	return list, fmt.Errorf("%#v", test)
 }
 
 func (org *Organization) GetSensorsWithTag(tag string) (map[string][]string, error) {
