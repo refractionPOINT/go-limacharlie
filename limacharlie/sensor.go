@@ -304,8 +304,7 @@ func (org *Organization) GetAllTags() ([]string, error) {
 
 func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 	list := map[string]bool{}
-	q := makeDefaultRequest(&list)
-	q = q.withFormData(Dict{
+	q := makeDefaultRequest(&list).withFormData(Dict{
 		"sids": sids,
 	})
 	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("/online/%s", org.client.options.OID), q); err != nil {

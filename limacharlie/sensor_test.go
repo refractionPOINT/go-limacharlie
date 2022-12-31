@@ -263,11 +263,12 @@ func TestActive(t *testing.T) {
 	sid := ""
 	for s := range sensors {
 		sid = s
+		break
 	}
 
 	active, err := org.ActiveSensors([]string{sid})
 	if err != nil {
-		t.Errorf("ActiveSensors: %v", err)
+		t.Errorf("ActiveSensors (expected %s): %v", sid, err)
 	}
 	if len(active) != 1 {
 		t.Errorf("unexpected number of active sensors: %#v", active)
