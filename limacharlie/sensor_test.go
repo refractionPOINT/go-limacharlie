@@ -246,3 +246,30 @@ func TestSearchByTag(t *testing.T) {
 		}
 	}
 }
+
+func TestActive(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	sensors, err := org.ListSensors()
+	if err != nil {
+		t.Errorf("ListSensors: %v", err)
+	}
+	if len(sensors) == 0 {
+		t.Error("no sensors listed")
+		return
+	}
+
+	sid := ""
+	for s := range sensors {
+		sid = s
+	}
+
+	active, err := org.ActiveSensors([]string{sid})
+	if err != nil {
+		t.Errorf("ActiveSensors: %v", err)
+	}
+	if len(active) != 1 {
+		t.Errorf("unexpected number of active sensors: %#v", active)
+	}
+}

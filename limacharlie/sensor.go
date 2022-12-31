@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -306,7 +305,10 @@ func (org *Organization) GetAllTags() ([]string, error) {
 func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 	list := map[string]bool{}
 	q := makeDefaultRequest(&list)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("/online/%s?sids=%s", org.client.options.OID, strings.Join(sids, "&sids=")), q); err != nil {
+	q = q.withFormData(Dict{
+		"sids": sids,
+	})
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("/online/%s", org.client.options.OID), q); err != nil {
 		return nil, err
 	}
 	return list, nil
