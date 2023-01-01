@@ -273,4 +273,7 @@ func TestActive(t *testing.T) {
 	if len(active) != 1 {
 		t.Errorf("unexpected number of active sensors: %#v", active)
 	}
+	if isOnline, err := org.GetSensor(sid).IsOnline(); !isOnline || err != nil {
+		t.Errorf("expected sensor to be online: %v", err)
+	}
 }
