@@ -304,14 +304,13 @@ func (org *Organization) GetAllTags() ([]string, error) {
 
 func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 	list := map[string]bool{}
-	test := map[string]interface{}{}
-	q := makeDefaultRequest(&test).withFormData(Dict{
+	q := makeDefaultRequest(&list).withFormData(Dict{
 		"sids": sids,
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("/online/%s", org.client.options.OID), q); err != nil {
-		return nil, fmt.Errorf("%#v", test)
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("online/%s", org.client.options.OID), q); err != nil {
+		return nil, err
 	}
-	return list, fmt.Errorf("%#v", test)
+	return list, nil
 }
 
 func (org *Organization) GetSensorsWithTag(tag string) (map[string][]string, error) {
