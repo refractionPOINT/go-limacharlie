@@ -199,6 +199,14 @@ func (s *Sensor) Delete() error {
 	return nil
 }
 
+func (s *Sensor) IsOnline() (bool, error) {
+	resp, err := s.Organization.ActiveSensors([]string{s.SID})
+	if err != nil {
+		return false, err
+	}
+	return resp[s.SID], nil
+}
+
 func (org *Organization) GetSensor(SID string) *Sensor {
 	s := &Sensor{
 		OID:             org.client.options.OID,
