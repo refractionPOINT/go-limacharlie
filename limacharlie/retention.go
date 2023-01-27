@@ -77,6 +77,12 @@ func (org *Organization) DetectionStats(start int64, end int64) (DetStats, error
 	return stats, nil
 }
 
+func (org *Organization) GenericGETRequest(path string, query Dict, response interface{}) error {
+	q := makeDefaultRequest(response)
+	q = q.withQueryData(query)
+	return org.client.reliableRequest(http.MethodGet, path, q)
+}
+
 func (org *Organization) EventByAtom(sensorID, atom string) (EventContainer, error) {
 	event := EventContainer{}
 	q := makeDefaultRequest(&event)
