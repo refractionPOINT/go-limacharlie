@@ -38,7 +38,6 @@ type SyncOptions struct {
 	SyncFPRules          bool            `json:"sync_fp"`
 	SyncExfil            bool            `json:"sync_exfil"`
 	SyncArtifacts        bool            `json:"sync_artifacts"`
-	SyncNetPolicies      bool            `json:"sync_net_policies"`
 	SyncOrgValues        bool            `json:"sync_org_values"`
 	SyncHives            map[string]bool `json:"sync_hives"`
 	SyncInstallationKeys bool            `json:"sync_installation_keys"`
@@ -191,7 +190,6 @@ type orgSyncOutputs = map[OutputName]OutputConfig
 type orgSyncIntegrityRules = map[IntegrityRuleName]OrgSyncIntegrityRule
 type orgSyncExfilRules = ExfilRulesType
 type orgSyncArtifacts = map[ArtifactRuleName]OrgSyncArtifactRule
-type orgSyncNetPolicies = NetPoliciesByName
 type orgSyncOrgValues = map[OrgValueName]OrgValue
 type orgSyncHives = map[HiveName]map[HiveKey]SyncHiveData
 type orgSyncInstallationKeys = map[InstallationKeyName]InstallationKey
@@ -210,7 +208,6 @@ type OrgConfig struct {
 	Integrity        orgSyncIntegrityRules   `json:"integrity,omitempty" yaml:"integrity,omitempty"`
 	Exfil            *orgSyncExfilRules      `json:"exfil,omitempty" yaml:"exfil,omitempty"`
 	Artifacts        orgSyncArtifacts        `json:"artifact,omitempty" yaml:"artifact,omitempty"`
-	NetPolicies      orgSyncNetPolicies      `json:"net-policy,omitempty" yaml:"net-policy,omitempty"`
 	OrgValues        orgSyncOrgValues        `json:"org-value,omitempty" yaml:"org-value,omitempty"`
 	Hives            orgSyncHives            `json:"hives,omitempty" yaml:"hives,omitempty"`
 	InstallationKeys orgSyncInstallationKeys `json:"installation_keys,omitempty" yaml:"installation_keys,omitempty"`
@@ -263,7 +260,6 @@ func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.Integrity = o.mergeIntegrity(conf.Integrity)
 	o.Exfil = o.mergeExfil(conf.Exfil)
 	o.Artifacts = o.mergeArtifacts(conf.Artifacts)
-	o.NetPolicies = o.mergeNetPolicies(conf.NetPolicies)
 	o.OrgValues = o.mergeOrgValues(conf.OrgValues)
 	o.Hives = o.mergeHives(conf.Hives)
 	o.InstallationKeys = o.mergeInstallationKeys(conf.InstallationKeys)
@@ -464,20 +460,6 @@ func (a OrgConfig) mergeArtifacts(b orgSyncArtifacts) orgSyncArtifacts {
 	return n
 }
 
-func (a OrgConfig) mergeNetPolicies(b orgSyncNetPolicies) orgSyncNetPolicies {
-	if a.NetPolicies == nil && b == nil {
-		return nil
-	}
-	n := orgSyncNetPolicies{}
-	for k, v := range a.NetPolicies {
-		n[k] = v
-	}
-	for k, v := range b {
-		n[k] = v
-	}
-	return n
-}
-
 func (a OrgConfig) mergeOrgValues(b orgSyncOrgValues) orgSyncOrgValues {
 	if a.OrgValues == nil && b == nil {
 		return nil
@@ -516,7 +498,6 @@ var OrgSyncOperationElementType = struct {
 	ExfilEvent:      "exfil-list",
 	ExfilWatch:      "exfil-watch",
 	Artifact:        "artifact",
-	NetPolicy:       "net-policy",
 	OrgValue:        "org-value",
 	Hives:           "hives",
 	InstallationKey: "installation-key",
@@ -588,12 +569,6 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 			return orgConfig, fmt.Errorf("exfil: %v", err)
 		}
 	}
-	if options.SyncNetPolicies {
-		orgConfig.NetPolicies, err = org.syncFetchNetPolicies()
-		if err != nil {
-			return orgConfig, fmt.Errorf("net-policy: %v", err)
-		}
-	}
 	if options.SyncOrgValues {
 		orgConfig.OrgValues, err = org.syncFetchOrgValues()
 		if err != nil {
@@ -621,21 +596,6 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 
 	orgConfig.Version = OrgConfigLatestVersion
 	return orgConfig, nil
-}
-
-func (org Organization) syncFetchNetPolicies() (orgSyncNetPolicies, error) {
-	orgNetPolicies, err := org.NetPolicies()
-	if err != nil {
-		return nil, err
-	}
-	netPolicies := orgSyncNetPolicies{}
-	for name, policy := range orgNetPolicies {
-		policy.CreatedBy = ""
-		policy.OID = ""
-		policy.Name = ""
-		netPolicies[name] = policy
-	}
-	return netPolicies, nil
 }
 
 func (org Organization) syncFetchOrgValues() (orgSyncOrgValues, error) {
@@ -979,13 +939,6 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 			return ops, fmt.Errorf("exfil: %v", err)
 		}
 	}
-	if options.SyncNetPolicies {
-		newOps, err := org.syncNetPolicies(conf.NetPolicies, options)
-		ops = append(ops, newOps...)
-		if err != nil {
-			return ops, fmt.Errorf("net-policy: %v", err)
-		}
-	}
 	if options.SyncHives != nil || len(options.SyncHives) != 0 {
 		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
@@ -1008,86 +961,6 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		}
 	}
 
-	return ops, nil
-}
-
-func (org Organization) syncNetPolicies(netPolicies orgSyncNetPolicies, options SyncOptions) ([]OrgSyncOperation, error) {
-	if !options.IsForce && len(netPolicies) == 0 {
-		return nil, nil
-	}
-
-	ops := []OrgSyncOperation{}
-	orgNetPolicies, err := org.NetPolicies()
-	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
-		return ops, err
-	}
-
-	for name, policy := range netPolicies {
-		policy = policy.WithName(name)
-		orgPolicy, found := orgNetPolicies[name]
-		if found {
-			if policy.EqualsContent(orgPolicy) {
-				ops = append(ops, OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.NetPolicy,
-					ElementName: name,
-				})
-				continue
-			}
-		}
-		if options.IsDryRun {
-			ops = append(ops, OrgSyncOperation{
-				ElementType: OrgSyncOperationElementType.NetPolicy,
-				ElementName: name,
-				IsAdded:     true,
-			})
-			continue
-		}
-
-		if err := org.NetPolicyAdd(policy); err != nil {
-			return ops, err
-		}
-		ops = append(ops, OrgSyncOperation{
-			ElementType: OrgSyncOperationElementType.NetPolicy,
-			ElementName: name,
-			IsAdded:     true,
-		})
-	}
-
-	if !options.IsForce {
-		return ops, nil
-	}
-
-	// remove non existing in config
-	orgNetPolicies, err = org.NetPolicies()
-	if err != nil && (!IsServiceNotRegisteredError(err) || !options.IsDryRun) {
-		return ops, err
-	}
-
-	for name := range orgNetPolicies {
-		_, found := netPolicies[name]
-		if found {
-			continue
-		}
-
-		if options.IsDryRun {
-			ops = append(ops, OrgSyncOperation{
-				ElementType: OrgSyncOperationElementType.NetPolicy,
-				ElementName: name,
-				IsRemoved:   true,
-			})
-			continue
-		}
-
-		if err := org.NetPolicyDelete(name); err != nil {
-			return ops, err
-		}
-		ops = append(ops, OrgSyncOperation{
-			ElementType: OrgSyncOperationElementType.NetPolicy,
-			ElementName: name,
-			IsRemoved:   true,
-		})
-
-	}
 	return ops, nil
 }
 
