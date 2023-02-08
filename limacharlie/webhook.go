@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -25,7 +26,7 @@ func (o *Organization) NewWebhookSender(hookName string, secretValue string) (*W
 		return nil, errors.New("hook URL not found in org URLs")
 	}
 	return &WebhookSender{
-		url: fmt.Sprintf("https://%s/%s/%s/%s", hookURL, o.GetOID(), hookName, secretValue),
+		url: fmt.Sprintf("https://%s/%s/%s/%s", hookURL, o.GetOID(), url.PathEscape(hookName), url.PathEscape(secretValue)),
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
