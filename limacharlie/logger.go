@@ -112,7 +112,7 @@ func (l *LCLoggerGCP) logToStdout(msg string, severity string) {
 	l.m.Lock()
 	defer l.m.Unlock()
 	os.Stdout.Write(b)
-	os.Stderr.Write(newLine)
+	os.Stdout.Write(newLine)
 }
 
 func (l *LCLoggerGCP) logToStderr(msg string, severity string) {
