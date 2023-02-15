@@ -38,6 +38,24 @@ type Routing struct {
 	This      string   `json:"this"`
 }
 
+type Detect struct {
+	Author    string  `json:"author"`
+	Cat       string  `json:"cat"`
+	Detect    Dict    `json:"detect"`
+	DetectID  string  `json:"detect_id"`
+	DetectMtd Dict    `json:"detect_mtd"`
+	Link      string  `json:"link"`
+	Namespace string  `json:"namespace"`
+	Routing   Routing `json:"routing"`
+	Source    string  `json:"source"`
+	Ts        int64   `json:"ts"`
+}
+
+type HistoricalDetectionsResponse struct {
+	Detects    []Detect `json:"detects"`
+	NextCursor string   `json:"next_cursor"`
+}
+
 func (org *Organization) OnlineStats(start int64, end int64) (Stats, error) {
 	stats := Stats{}
 	q := makeDefaultRequest(&stats)
@@ -120,35 +138,3 @@ func (org Organization) HistoricalDetections(detectionReq HistoricalDetectionsRe
 
 	return results, nil
 }
-
-type HistoricalDetectionsResponse struct {
-	Detects    []Detects `json:"detects"`
-	NextCursor string    `json:"next_cursor"`
-}
-
-type Detect struct {
-	Event   Event   `json:"event"`
-	Routing Routing `json:"routing"`
-}
-type DetectMetadata struct {
-	Author         string   `json:"author"`
-	Description    string   `json:"description"`
-	Falsepositives []string `json:"falsepositives"`
-	Level          string   `json:"level"`
-	References     []string `json:"references"`
-	Tags           []string `json:"tags"`
-}
-
-type Detects struct {
-	Author    string         `json:"author"`
-	Cat       string         `json:"cat"`
-	Detect    Dict         `json:"detect"`
-	DetectID  string         `json:"detect_id"`
-	DetectMtd DetectMetadata `json:"detect_mtd"`
-	Link      string         `json:"link"`
-	Namespace string         `json:"namespace"`
-	Routing   Routing        `json:"routing"`
-	Source    string         `json:"source"`
-	Ts        int64          `json:"ts"`
-}
-
