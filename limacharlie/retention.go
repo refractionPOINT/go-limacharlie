@@ -112,13 +112,7 @@ func (org Organization) HistoricalDetections(detectionReq HistoricalDetectionsRe
 	}
 
 	q := makeDefaultRequest(&results)
-	q = q.withQueryData(Dict{
-		"cat":    detectionReq.Cat,
-		"cursor": detectionReq.Cursor,
-		"start":  detectionReq.Start,
-		"end":    detectionReq.End,
-		"limit":  detectionReq.Limit,
-	})
+	q = q.withQueryData(detectionReq)
 
 	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/detections", org.client.options.OID), q); err != nil {
 		return results, err
@@ -148,7 +142,7 @@ type DetectMetadata struct {
 type Detects struct {
 	Author    string         `json:"author"`
 	Cat       string         `json:"cat"`
-	Detect    Detect         `json:"detect"`
+	Detect    Dict         `json:"detect"`
 	DetectID  string         `json:"detect_id"`
 	DetectMtd DetectMetadata `json:"detect_mtd"`
 	Link      string         `json:"link"`
@@ -158,33 +152,3 @@ type Detects struct {
 	Ts        int64          `json:"ts"`
 }
 
-const NewProcessEventType = "NEW_PROCESS"
-
-type NewProcessEvent struct {
-	BaseAddress     int64  `json:"BASE_ADDRESS"`
-	CommandLine     string `json:"COMMAND_LINE"`
-	FileIsSigned    int    `json:"FILE_IS_SIGNED"`
-	FilePath        string `json:"FILE_PATH"`
-	Hash            string `json:"HASH"`
-	MemoryUsage     int    `json:"MEMORY_USAGE"`
-	Parent          Parent `json:"PARENT"`
-	ParentProcessID int    `json:"PARENT_PROCESS_ID"`
-	ProcessID       int    `json:"PROCESS_ID"`
-	Threads         int    `json:"THREADS"`
-	UserName        string `json:"USER_NAME"`
-}
-
-type Parent struct {
-	CommandLine     string `json:"COMMAND_LINE"`
-	FileIsSigned    int    `json:"FILE_IS_SIGNED"`
-	FilePath        string `json:"FILE_PATH"`
-	Hash            string `json:"HASH"`
-	MemoryUsage     int    `json:"MEMORY_USAGE"`
-	ParentAtom      string `json:"PARENT_ATOM"`
-	ParentProcessID int    `json:"PARENT_PROCESS_ID"`
-	ProcessID       int    `json:"PROCESS_ID"`
-	ThisAtom        string `json:"THIS_ATOM"`
-	Threads         int    `json:"THREADS"`
-	Timestamp       int64  `json:"TIMESTAMP"`
-	UserName        string `json:"USER_NAME"`
-}
