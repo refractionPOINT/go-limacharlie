@@ -236,6 +236,11 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 		if statusCode == http.StatusUnauthorized {
 			// Unauthorized, the JWT may have expired, refresh
 			// it and retry.
+			// If there is no API Key configured, provide the
+			// previous error instead of the refresh.
+			if c.options.APIKey == "" {
+				return err
+			}
 			if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
 				// If we cannot get a new JWT there is no point in
 				// retrying with bad creds.
