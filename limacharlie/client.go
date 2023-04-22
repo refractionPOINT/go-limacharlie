@@ -275,6 +275,25 @@ func (c *Client) serviceRequest(responseData interface{}, serviceName string, se
 	return c.reliableRequest(http.MethodPost, fmt.Sprintf("service/%s/%s", c.options.OID, serviceName), req)
 }
 
+func (c *Client) extensionRequest(responseData interface{}, extensionName string, action string, serviceData Dict, isImpersonate bool) error {
+	bytes, err := json.Marshal(serviceData)
+	if err != nil {
+		return err
+	}
+	encodedData := base64.StdEncoding.EncodeToString(bytes)
+	reqData := Dict{
+		"oid":    c.options.OID,
+		"data":   encodedData,
+		"action": action,
+	}
+	if isImpersonate {
+		reqData["impersonator_jwt"] = c.options.JWT
+	}
+
+	req := makeDefaultRequest(responseData).withFormData(reqData)
+	return c.reliableRequest(http.MethodPost, fmt.Sprintf("extension/request/%s", extensionName), req)
+}
+
 func getStringKV(d interface{}) (*url.Values, error) {
 	b, err := json.Marshal(d)
 	if err != nil {

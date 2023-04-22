@@ -249,6 +249,10 @@ func (o *Organization) ServiceRequest(responseData interface{}, serviceName stri
 	return o.client.serviceRequest(responseData, serviceName, serviceData, isAsync)
 }
 
+func (o *Organization) ExtensionRequest(responseData interface{}, extensionName string, action string, data Dict, isImpersonate bool) error {
+	return o.client.extensionRequest(responseData, extensionName, action, data, isImpersonate)
+}
+
 // AddToGroup Adds this organization to a given group
 func (o *Organization) AddToGroup(gid string) (bool, error) {
 	resp := map[string]bool{}
