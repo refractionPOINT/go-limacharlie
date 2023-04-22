@@ -1,5 +1,15 @@
 package limacharlie
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strings"
+	"time"
+)
+
 type ArtifactRuleName = string
 type ArtifactRule struct {
 	By          string `json:"by"`
@@ -17,6 +27,11 @@ type ArtifactRuleFilter struct {
 	Platforms []string `json:"platforms"`
 }
 type ArtifactRulesByName = map[ArtifactRuleName]ArtifactRule
+
+type artifactExportResp struct {
+	Payload string `json:"payload,omitempty"`
+	Export  string `json:"export,omitempty"`
+}
 
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
@@ -54,4 +69,42 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 		return err
 	}
 	return nil
+}
+
+func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
+	resp := artifactExportResp{}
+	request := makeDefaultRequest(&resp)
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+		return nil, err
+	}
+	if resp.Payload != "" {
+		return ioutil.NopCloser(strings.NewReader(resp.Payload)), nil
+	}
+	c := http.Client{
+		Timeout: 30 * time.Second,
+	}
+	defer c.CloseIdleConnections()
+
+	var httpResp *http.Response
+	for !time.Now().After(deadline) {
+		req, err := http.NewRequest(http.MethodGet, resp.Export, &bytes.Buffer{})
+		if err != nil {
+			return nil, err
+		}
+		httpResp, err = c.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if httpResp.StatusCode == 200 {
+			break
+		}
+		httpResp.Body.Close()
+		if httpResp.StatusCode == 404 {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		return nil, fmt.Errorf("unexpected status: %d", httpResp.StatusCode)
+	}
+
+	return httpResp.Body, nil
 }
