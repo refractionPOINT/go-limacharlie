@@ -304,6 +304,8 @@ func TestSyncPushFPRules(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	defer deleteAllFPRules(org)
 
+	deleteAllFPRules(org)
+
 	rules, err := org.FPRules()
 	a.NoError(err)
 	a.Empty(rules)
