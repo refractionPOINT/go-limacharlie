@@ -1,11 +1,7 @@
 package limacharlie
 
 import (
-	"crypto/sha256"
-	"fmt"
-	"io"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
