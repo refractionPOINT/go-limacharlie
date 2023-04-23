@@ -41,3 +41,22 @@ func TestLoggingAddDelete(t *testing.T) {
 	a.NoError(err)
 	a.Equal(artifactsRulesStartCount, len(artifactsRules))
 }
+
+// func TestArtifactExport(t *testing.T) {
+// 	o, err := NewOrganizationFromClientOptions(ClientOptions{
+// 		OID: "",
+// 		APIKey: "",
+// 	}, nil)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	r, err := o.ExportArtifact("", time.Now().Add(1*time.Minute))
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	b, err := io.ReadAll(r)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	panic(fmt.Sprintf("%x", sha256.Sum256(b)))
+// }
