@@ -2,11 +2,11 @@ package limacharlie
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -78,7 +78,16 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 		return nil, err
 	}
 	if resp.Payload != "" {
-		return ioutil.NopCloser(strings.NewReader(resp.Payload)), nil
+		b64Dec, err := base64.StdEncoding.DecodeString(resp.Payload)
+		if err != nil {
+			return nil, err
+		}
+		gzR, err := gzip.NewReader(bytes.NewBuffer(b64Dec))
+		if err != nil {
+			return nil, err
+		}
+
+		return gzR, nil
 	}
 	c := http.Client{
 		Timeout: 30 * time.Second,
