@@ -280,10 +280,9 @@ func (c *Client) extensionRequest(responseData interface{}, extensionName string
 	if err != nil {
 		return err
 	}
-	encodedData := base64.StdEncoding.EncodeToString(bytes)
 	reqData := Dict{
 		"oid":    c.options.OID,
-		"data":   encodedData,
+		"data":   string(bytes),
 		"action": action,
 	}
 	if isImpersonate {
