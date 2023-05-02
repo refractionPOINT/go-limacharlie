@@ -1494,6 +1494,7 @@ installation_keys:
     tags:
       - t1
       - t2
+    use_public_root_ca: true
   testk2:
     desc: testk2
     tags:
@@ -1543,6 +1544,7 @@ installation_keys:
     tags:
       - t1
       - t2
+    use_public_root_ca: true
   testk4:
     desc: testk4
     tags:
