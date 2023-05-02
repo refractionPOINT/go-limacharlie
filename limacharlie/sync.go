@@ -1534,6 +1534,12 @@ func (org Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, opti
 			continue
 		}
 
+		if key.ID == "" {
+			// The real primary key is the IID, so make sure
+			// we overwrite it if we found a match.
+			key.ID = orgKey.ID
+		}
+
 		if _, err := org.AddInstallationKey(key); err != nil {
 			return ops, err
 		}

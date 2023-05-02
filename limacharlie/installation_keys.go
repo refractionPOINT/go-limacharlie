@@ -15,6 +15,7 @@ type InstallationKey struct {
 	Key         string   `json:"key,omitempty" yaml:"key,omitempty"`
 	JsonKey     string   `json:"json_key,omitempty" yaml:"json_key,omitempty"`
 	Tags        []string `json:"tags,omitempty" yaml:"tags,omitempty"`
+	UsePublicCA bool     `json:"use_public_root_ca,omitempty" yaml:"use_public_root_ca,omitempty"`
 }
 
 type InstallationKeyName = string
@@ -75,6 +76,10 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 		}
 		ik.CreatedAt = t.Unix()
 	}
+
+	if b, ok := d["use_public_root_ca"].(bool); ok {
+		ik.UsePublicCA = b
+	}
 	return nil
 }
 
@@ -82,7 +87,24 @@ func (k InstallationKey) EqualsContent(k2 InstallationKey) bool {
 	if k.Description != k2.Description {
 		return false
 	}
-	// TODO: compare tags when we can update them.
+	if len(k.Tags) != len(k2.Tags) {
+		return false
+	}
+	for _, t1 := range k.Tags {
+		found := false
+		for _, t2 := range k2.Tags {
+			if t1 == t2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	if k.UsePublicCA != k2.UsePublicCA {
+		return false
+	}
 	return true
 }
 
@@ -113,11 +135,15 @@ func (org Organization) InstallationKey(iid string) (*InstallationKey, error) {
 
 func (org Organization) AddInstallationKey(k InstallationKey) (string, error) {
 	resp := Dict{}
-
-	request := makeDefaultRequest(&resp).withFormData(Dict{
-		"tags": k.Tags,
-		"desc": k.Description,
-	})
+	req := Dict{
+		"tags":               k.Tags,
+		"desc":               k.Description,
+		"use_public_root_ca": k.UsePublicCA,
+	}
+	if k.ID != "" {
+		req["iid"] = k.ID
+	}
+	request := makeDefaultRequest(&resp).withFormData(req)
 	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
 		return "", err
 	}

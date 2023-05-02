@@ -1494,16 +1494,19 @@ installation_keys:
     tags:
       - t1
       - t2
+    use_public_root_ca: true
   testk2:
     desc: testk2
     tags:
       - t1
       - t2
+    use_public_root_ca: true
   testk3:
     desc: testk3
     tags:
       - t1
       - t2
+    use_public_root_ca: false
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(orgKeys), &orgConfig))
@@ -1541,10 +1544,12 @@ installation_keys:
     tags:
       - t1
       - t2
+    use_public_root_ca: true
   testk4:
     desc: testk4
     tags:
       - t1
+    use_public_root_ca: true
   testk3:
     desc: testk3
     tags:
