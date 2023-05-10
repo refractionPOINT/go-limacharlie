@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 func (org *Organization) GetIngestionKeys() (Dict, error) {
@@ -35,8 +36,9 @@ func (org Organization) SetIngestionKeys(name string) (Dict, error) {
 func (org Organization) DelIngestionKeys(name string) (Dict, error) {
 	resp := Dict{}
 	req := Dict{}
+	escapedName := url.QueryEscape(name)
 	request := makeDefaultRequest(&resp).withFormData(req)
-	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("insight/%s/ingestion_keys?name=%s", org.GetOID(), name), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("insight/%s/ingestion_keys?name=%s", org.GetOID(), escapedName), request); err != nil {
 		return nil, err
 	}
 	return resp, nil
