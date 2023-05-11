@@ -32,6 +32,7 @@ var Platforms = struct {
 	AzureAD      uint32
 	AzureMonitor uint32
 	CanaryToken  uint32
+	GuardDuty    uint32
 }{
 	Windows:  0x10000000,
 	Linux:    0x20000000,
@@ -64,6 +65,7 @@ var Platforms = struct {
 	AzureAD:      0x0C000000,
 	AzureMonitor: 0x0D000000,
 	CanaryToken:  0x0E000000,
+	GuardDuty:    0x0F000000,
 }
 
 var Architectures = struct {
@@ -122,6 +124,7 @@ var PlatformStrings = map[uint32]string{
 	Platforms.AzureAD:      "azure_ad",
 	Platforms.AzureMonitor: "azure_monitor",
 	Platforms.CanaryToken:  "canary_token",
+	Platforms.GuardDuty:    "guard_duty",
 }
 
 var ArchitectureStrings = map[uint32]string{
@@ -170,6 +173,7 @@ var StringToPlatform = map[string]uint32{
 	"azure_ad":      Platforms.AzureAD,
 	"azure_monitor": Platforms.AzureMonitor,
 	"canary_token":  Platforms.CanaryToken,
+	"guard_duty":    Platforms.GuardDuty,
 }
 
 var StringToArchitecture = map[string]uint32{
