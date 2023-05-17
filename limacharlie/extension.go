@@ -10,7 +10,7 @@ type ExtensionName = string
 func (org Organization) Extensions() ([]ExtensionName, error) {
 	d := Dict{}
 	if err := org.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("org/%s/subscriptions", org.client.options.OID), makeDefaultRequest(&d)); err != nil {
+		fmt.Sprintf("orgs/%s/subscriptions", org.client.options.OID), makeDefaultRequest(&d)); err != nil {
 		return nil, err
 	}
 
@@ -25,7 +25,7 @@ func (org Organization) Extensions() ([]ExtensionName, error) {
 func (org Organization) SubscribeToExtension(name ExtensionName) error {
 	d := Dict{}
 	if err := org.client.reliableRequest(http.MethodPost,
-		fmt.Sprintf("org/%s/subscription/extension/%s", org.client.options.OID, name), makeDefaultRequest(&d)); err != nil {
+		fmt.Sprintf("orgs/%s/subscription/extension/%s", org.client.options.OID, name), makeDefaultRequest(&d)); err != nil {
 		return err
 	}
 	return nil
@@ -34,7 +34,7 @@ func (org Organization) SubscribeToExtension(name ExtensionName) error {
 func (org Organization) UnsubscribeFromExtension(name ExtensionName) error {
 	d := Dict{}
 	if err := org.client.reliableRequest(http.MethodDelete,
-		fmt.Sprintf("org/%s/subscription/extension/%s", org.client.options.OID, name), makeDefaultRequest(&d)); err != nil {
+		fmt.Sprintf("orgs/%s/subscription/extension/%s", org.client.options.OID, name), makeDefaultRequest(&d)); err != nil {
 		return err
 	}
 	return nil
