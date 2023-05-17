@@ -1625,7 +1625,7 @@ func TestSyncOrgExtensions(t *testing.T) {
 
 	yamlValues = `extensions:
   - ext-reliable-tasking
-  - ext-library
+  - library
 `
 	orgConf = OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
@@ -1635,7 +1635,7 @@ func TestSyncOrgExtensions(t *testing.T) {
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-reliable-tasking"},
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-sensor-cull", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-library", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "library", IsAdded: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
 }
