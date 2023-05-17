@@ -88,6 +88,9 @@ func TestSensorIsolation(t *testing.T) {
 	}
 	var sensor *Sensor
 	for _, s := range sensors {
+		if s.Platform != Platforms.Linux {
+			continue
+		}
 		sensor = s
 		break
 	}
@@ -114,6 +117,9 @@ func TestSensorTags(t *testing.T) {
 	}
 	var sensor *Sensor
 	for _, s := range sensors {
+		if s.Platform != Platforms.Linux {
+			continue
+		}
 		sensor = s
 		break
 	}
@@ -185,6 +191,9 @@ func TestSensorTask(t *testing.T) {
 	}
 	var sensor *Sensor
 	for _, s := range sensors {
+		if s.Platform != Platforms.Linux {
+			continue
+		}
 		sensor = s
 		break
 	}
@@ -261,7 +270,10 @@ func TestActive(t *testing.T) {
 	}
 
 	sid := ""
-	for s := range sensors {
+	for s, d := range sensors {
+		if d.Platform != Platforms.Linux {
+			continue
+		}
 		sid = s
 		break
 	}
