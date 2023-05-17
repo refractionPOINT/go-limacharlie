@@ -1597,3 +1597,45 @@ func deleteAllInstallationKeys(org *Organization) {
 	}
 	time.Sleep(1 * time.Second)
 }
+
+func TestSyncOrgExtensions(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	orgExtensions, err := org.Extensions()
+	a.NoError(err)
+	for _, ext := range orgExtensions {
+		a.NoError(org.UnsubscribeFromExtension(ext))
+	}
+
+	yamlValues := `extensions:
+  - ext-reliable-tasking
+  - ext-sensor-cull
+`
+	orgConf := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
+
+	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncExtensions: true})
+	a.NoError(err)
+	expectedOps := sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-reliable-tasking", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-sensor-cull", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+
+	yamlValues = `extensions:
+  - ext-reliable-tasking
+  - library
+`
+	orgConf = OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
+
+	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncExtensions: true})
+	a.NoError(err)
+	expectedOps = sortSyncOps([]OrgSyncOperation{
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-reliable-tasking"},
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-sensor-cull", IsRemoved: true},
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "library", IsAdded: true},
+	})
+	a.Equal(expectedOps, sortSyncOps(ops))
+}

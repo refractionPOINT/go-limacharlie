@@ -34,6 +34,7 @@ type SyncOptions struct {
 	SyncDRRules          bool            `json:"sync_dr"`
 	SyncOutputs          bool            `json:"sync_outputs"`
 	SyncResources        bool            `json:"sync_resources"`
+	SyncExtensions       bool            `json:"sync_extensions"`
 	SyncIntegrity        bool            `json:"sync_integrity"`
 	SyncFPRules          bool            `json:"sync_fp"`
 	SyncExfil            bool            `json:"sync_exfil"`
@@ -184,6 +185,7 @@ func (oar OrgSyncArtifactRule) EqualsContent(artifact ArtifactRule) bool {
 }
 
 type orgSyncResources = map[ResourceName][]string
+type orgSyncExtensions = []ExtensionName
 type orgSyncDRRules = map[DRRuleName]CoreDRRule
 type orgSyncFPRules = map[FPRuleName]OrgSyncFPRule
 type orgSyncOutputs = map[OutputName]OutputConfig
@@ -202,6 +204,7 @@ type OrgConfig struct {
 	Version          int                     `json:"version" yaml:"version"`
 	Includes         []string                `json:"-" yaml:"-"`
 	Resources        orgSyncResources        `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Extensions       orgSyncExtensions       `json:"extensions,omitempty" yaml:"extensions,omitempty"`
 	DRRules          orgSyncDRRules          `json:"rules,omitempty" yaml:"rules,omitempty"`
 	FPRules          orgSyncFPRules          `json:"fps,omitempty" yaml:"fps,omitempty"`
 	Outputs          orgSyncOutputs          `json:"outputs,omitempty" yaml:"outputs,omitempty"`
@@ -254,6 +257,7 @@ func (o *OrgConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 func (o OrgConfig) Merge(conf OrgConfig) OrgConfig {
 	o.Resources = o.mergeResources(conf.Resources)
+	o.Extensions = o.mergeExtensions(conf.Extensions)
 	o.DRRules = o.mergeDRRules(conf.DRRules)
 	o.FPRules = o.mergeFPRules(conf.FPRules)
 	o.Outputs = o.mergeOutputs(conf.Outputs)
@@ -289,6 +293,24 @@ func (a OrgConfig) mergeResources(b orgSyncResources) orgSyncResources {
 		}
 	}
 	return n
+}
+
+func (a OrgConfig) mergeExtensions(b orgSyncExtensions) orgSyncExtensions {
+	if a.Extensions == nil && b == nil {
+		return nil
+	}
+	n := map[string]struct{}{}
+	for _, v := range a.Extensions {
+		n[v] = struct{}{}
+	}
+	for _, v := range b {
+		n[v] = struct{}{}
+	}
+	l := []ExtensionName{}
+	for k := range n {
+		l = append(l, k)
+	}
+	return l
 }
 
 func (a OrgConfig) mergeDRRules(b orgSyncDRRules) orgSyncDRRules {
@@ -479,6 +501,7 @@ var OrgSyncOperationElementType = struct {
 	FPRule          string
 	Output          string
 	Resource        string
+	Extension       string
 	Integrity       string
 	ExfilEvent      string
 	ExfilWatch      string
@@ -494,6 +517,7 @@ var OrgSyncOperationElementType = struct {
 	FPRule:          "fp-rule",
 	Output:          "output",
 	Resource:        "resource",
+	Extension:       "extension",
 	Integrity:       "integrity",
 	ExfilEvent:      "exfil-list",
 	ExfilWatch:      "exfil-watch",
@@ -527,6 +551,12 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		orgConfig.Resources, err = org.syncFetchResources()
 		if err != nil {
 			return orgConfig, fmt.Errorf("resources: %v", err)
+		}
+	}
+	if options.SyncExtensions {
+		orgConfig.Extensions, err = org.syncFetchExtensions()
+		if err != nil {
+			return orgConfig, fmt.Errorf("extensions: %v", err)
 		}
 	}
 	if options.SyncDRRules {
@@ -733,6 +763,14 @@ func (org Organization) syncFetchResources() (orgSyncResources, error) {
 	return resources, nil
 }
 
+func (org Organization) syncFetchExtensions() (orgSyncExtensions, error) {
+	orgExtensions, err := org.Extensions()
+	if err != nil {
+		return nil, err
+	}
+	return orgExtensions, nil
+}
+
 func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules, error) {
 	rules := orgSyncDRRules{}
 	availableNamespaces := org.resolveAvailableNamespaces(who)
@@ -888,6 +926,13 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("resources: %v", err)
+		}
+	}
+	if options.SyncExtensions {
+		newOps, err := org.syncExtensions(conf.Extensions, options)
+		ops = append(ops, newOps...)
+		if err != nil {
+			return ops, fmt.Errorf("extensions: %v", err)
 		}
 	}
 	if options.SyncOrgValues {
@@ -1972,6 +2017,71 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 				IsRemoved:   true,
 			})
 		}
+	}
+
+	return ops, nil
+}
+
+func (org Organization) syncExtensions(extensions orgSyncExtensions, options SyncOptions) ([]OrgSyncOperation, error) {
+	if !options.IsForce && len(extensions) == 0 {
+		return nil, nil
+	}
+
+	ops := []OrgSyncOperation{}
+	oe, err := org.Extensions()
+	if err != nil {
+		return ops, err
+	}
+	orgExtensions := map[ExtensionName]struct{}{}
+	for _, ext := range oe {
+		orgExtensions[ext] = struct{}{}
+	}
+
+	newExtensions := map[ExtensionName]struct{}{}
+	for _, ext := range extensions {
+		newExtensions[ext] = struct{}{}
+	}
+
+	for ext := range newExtensions {
+		_, isFound := orgExtensions[ext]
+		if isFound {
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Extension,
+				ElementName: ext,
+			})
+		} else {
+			if !options.IsDryRun {
+				if err := org.SubscribeToExtension(ext); err != nil {
+					return ops, err
+				}
+			}
+			ops = append(ops, OrgSyncOperation{
+				ElementType: OrgSyncOperationElementType.Extension,
+				ElementName: ext,
+				IsAdded:     true,
+			})
+		}
+	}
+
+	if !options.IsForce {
+		return ops, nil
+	}
+
+	for ext := range orgExtensions {
+		_, isFound := newExtensions[ext]
+		if isFound {
+			continue
+		}
+		if !options.IsDryRun {
+			if err := org.UnsubscribeFromExtension(ext); err != nil {
+				return ops, err
+			}
+		}
+		ops = append(ops, OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Extension,
+			ElementName: ext,
+			IsRemoved:   true,
+		})
 	}
 
 	return ops, nil
