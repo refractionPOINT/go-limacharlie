@@ -1615,7 +1615,7 @@ func TestSyncOrgExtensions(t *testing.T) {
 	orgConf := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
 
-	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
+	ops, err := org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncExtensions: true})
 	a.NoError(err)
 	expectedOps := sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-reliable-tasking", IsAdded: true},
@@ -1630,7 +1630,7 @@ func TestSyncOrgExtensions(t *testing.T) {
 	orgConf = OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
 
-	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncOrgValues: true})
+	ops, err = org.SyncPush(orgConf, SyncOptions{IsForce: true, SyncExtensions: true})
 	a.NoError(err)
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-reliable-tasking"},
