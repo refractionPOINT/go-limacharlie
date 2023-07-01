@@ -271,7 +271,7 @@ func (c *Client) serviceRequest(responseData interface{}, serviceName string, se
 	req := makeDefaultRequest(responseData).withFormData(Dict{
 		"request_data": encodedData,
 		"is_async":     isAsync,
-	})
+	}).withTimeout(10 * time.Minute)
 	return c.reliableRequest(http.MethodPost, fmt.Sprintf("service/%s/%s", c.options.OID, serviceName), req)
 }
 
@@ -289,7 +289,7 @@ func (c *Client) extensionRequest(responseData interface{}, extensionName string
 		reqData["impersonator_jwt"] = c.options.JWT
 	}
 
-	req := makeDefaultRequest(responseData).withFormData(reqData)
+	req := makeDefaultRequest(responseData).withFormData(reqData).withTimeout(10 * time.Minute)
 	return c.reliableRequest(http.MethodPost, fmt.Sprintf("extension/request/%s", extensionName), req)
 }
 
