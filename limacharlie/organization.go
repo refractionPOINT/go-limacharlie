@@ -131,6 +131,11 @@ func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permis
 	return ident, effective, nil
 }
 
+// Get detailed permission information about the current auth used.
+func (org *Organization) WhoAmI() (WhoAmIJsonResponse, error) {
+	return org.client.WhoAmI()
+}
+
 func makeSet(arr []Permission) map[string]struct{} {
 	m := map[string]struct{}{}
 	for _, v := range arr {
