@@ -560,7 +560,7 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 		}
 	}
 	if options.SyncDRRules {
-		who, err := org.client.whoAmI()
+		who, err := org.client.WhoAmI()
 		if err != nil {
 			return orgConfig, fmt.Errorf("dr-rule: %v", err)
 		}
@@ -771,7 +771,7 @@ func (org Organization) syncFetchExtensions() (orgSyncExtensions, error) {
 	return orgExtensions, nil
 }
 
-func (org Organization) syncFetchDRRules(who whoAmIJsonResponse) (orgSyncDRRules, error) {
+func (org Organization) syncFetchDRRules(who WhoAmIJsonResponse) (orgSyncDRRules, error) {
 	rules := orgSyncDRRules{}
 	availableNamespaces := org.resolveAvailableNamespaces(who)
 	orgRules, err := org.drRulesFromNamespaces(availableNamespaces)
@@ -914,7 +914,7 @@ func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
 func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 
-	who, err := org.client.whoAmI()
+	who, err := org.client.WhoAmI()
 	if err != nil {
 		return ops, err
 	}
@@ -1770,16 +1770,16 @@ func (org Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgS
 	return ops, nil
 }
 
-func (org Organization) resolveAvailableNamespaces(who whoAmIJsonResponse) map[string]struct{} {
+func (org Organization) resolveAvailableNamespaces(who WhoAmIJsonResponse) map[string]struct{} {
 	// Check which namespaces we have available.
 	availableNamespaces := map[string]struct{}{}
-	if who.hasPermissionForOrg(org.client.options.OID, "dr.list") {
+	if who.HasPermissionForOrg(org.client.options.OID, "dr.list") {
 		availableNamespaces["general"] = struct{}{}
 	}
-	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.managed") {
+	if who.HasPermissionForOrg(org.client.options.OID, "dr.list.managed") {
 		availableNamespaces["managed"] = struct{}{}
 	}
-	if who.hasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
+	if who.HasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
 		availableNamespaces["replicant"] = struct{}{}
 	}
 	return availableNamespaces
@@ -1804,7 +1804,7 @@ func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (e
 	return existingRules, nil
 }
 
-func (org Organization) syncDRRules(who whoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(rules) == 0 {
 		return nil, nil
 	}

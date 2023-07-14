@@ -92,7 +92,7 @@ func arrayExistsInString(key string, arr []string) bool {
 // Authorize validate requested permissions for the organization
 func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permission, error) {
 	effective := NoPermission()
-	result, err := org.client.whoAmI()
+	result, err := org.client.WhoAmI()
 	if err != nil {
 		return "", effective, fmt.Errorf("Error with WhoAmI request: %s", err)
 	}
