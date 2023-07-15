@@ -422,7 +422,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	return resp.StatusCode, nil
 }
 
-type whoAmIJsonResponse struct {
+type WhoAmIJsonResponse struct {
 	UserPermissions *map[string][]string `json:"user_perms:omitempty"`
 	Organizations   *[]string            `json:"orgs"`
 	Permissions     *[]string            `json:"perms"`
@@ -432,10 +432,10 @@ type whoAmIJsonResponse struct {
 // GenericJSON is the default format for json data
 type GenericJSON = map[string]interface{}
 
-func (c *Client) whoAmI() (whoAmIJsonResponse, error) {
-	who := whoAmIJsonResponse{}
+func (c *Client) WhoAmI() (WhoAmIJsonResponse, error) {
+	who := WhoAmIJsonResponse{}
 	if err := c.reliableRequest(http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
-		return whoAmIJsonResponse{}, err
+		return WhoAmIJsonResponse{}, err
 	}
 	return who, nil
 }
@@ -445,7 +445,7 @@ func (c *Client) GetCurrentJWT() string {
 	return c.options.JWT
 }
 
-func (w whoAmIJsonResponse) hasPermissionForOrg(oid string, permName string) bool {
+func (w WhoAmIJsonResponse) HasPermissionForOrg(oid string, permName string) bool {
 	if w.UserPermissions != nil {
 		if p, ok := (*w.UserPermissions)[oid]; ok {
 			for _, v := range p {
@@ -476,7 +476,7 @@ func (w whoAmIJsonResponse) hasPermissionForOrg(oid string, permName string) boo
 	return false
 }
 
-func (w whoAmIJsonResponse) hasAccessToOrg(oid string) bool {
+func (w WhoAmIJsonResponse) HasAccessToOrg(oid string) bool {
 	if w.UserPermissions != nil {
 		if _, ok := (*w.UserPermissions)[oid]; ok {
 			return true

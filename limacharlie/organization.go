@@ -92,7 +92,7 @@ func arrayExistsInString(key string, arr []string) bool {
 // Authorize validate requested permissions for the organization
 func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permission, error) {
 	effective := NoPermission()
-	result, err := org.client.whoAmI()
+	result, err := org.client.WhoAmI()
 	if err != nil {
 		return "", effective, fmt.Errorf("Error with WhoAmI request: %s", err)
 	}
@@ -129,6 +129,11 @@ func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permis
 		ident = *result.Identity
 	}
 	return ident, effective, nil
+}
+
+// Get detailed permission information about the current auth used.
+func (org *Organization) WhoAmI() (WhoAmIJsonResponse, error) {
+	return org.client.WhoAmI()
 }
 
 func makeSet(arr []Permission) map[string]struct{} {
