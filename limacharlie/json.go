@@ -142,3 +142,15 @@ func (d Dict) UnMarshalToStruct(out interface{}) error {
 	}
 	return nil
 }
+
+func (d *Dict) ImportFromStruct(in interface{}) (Dict, error) {
+	tmp, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(tmp, d); err != nil {
+		return nil, err
+	}
+	return *d, nil
+}
