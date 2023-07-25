@@ -28,8 +28,10 @@ var OutputTypes = struct {
 	Kafka            OutputModuleType
 	AzureStorageBlob OutputModuleType
 	AzureEventHub    OutputModuleType
+	Elastic          OutputModuleType
 	Tines            OutputModuleType
 	Torq             OutputModuleType
+	DataDog          OutputModuleType
 }{
 	S3:               "s3",
 	GCS:              "gcs",
@@ -46,8 +48,10 @@ var OutputTypes = struct {
 	Kafka:            "kafka",
 	AzureStorageBlob: "azure_storage_blog",
 	AzureEventHub:    "azure_event_hub",
+	Elastic:          "elastic",
 	Tines:            "tines",
 	Torq:             "torq",
+	DataDog:          "datadog",
 }
 
 // OutputDataType is the type of data
@@ -138,6 +142,8 @@ type OutputConfig struct {
 	AttachmentText    string `json:"attachment_text,omitempty" yaml:"attachment_text,omitempty"`
 	Message           string `json:"message,omitempty" yaml:"message,omitempty"`
 	Color             string `json:"color,omitempty" yaml:"color,omitempty"`
+	CloudID           string `json:"cloud_id,omitempty" yaml:"cloud_id,omitempty"`
+	Index             string `json:"index,omitempty" yaml:"index,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
