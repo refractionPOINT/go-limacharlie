@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -114,11 +115,22 @@ func unmarshalCleanJSONElement(out interface{}) (interface{}, error) {
 			// No dot component, return as uint64 so
 			// that it gets serialized back to a notation
 			// without a dot in it.
-			i, err := val.Int64()
-			if err != nil {
-				return nil, err
+			if !strings.HasPrefix(original, "-") {
+				// We cannot use val.Int64() because it does not
+				// support Unsigned 64 bit ints.
+				i, err := strconv.ParseUint(original, 10, 64)
+				if err != nil {
+					return nil, err
+				}
+				out = i
+			} else {
+				// Looks like a signed value.
+				i, err := val.Int64()
+				if err != nil {
+					return nil, err
+				}
+				out = i
 			}
-			out = i
 		} else {
 			// There is a dot, assume a float.
 			i, err := val.Float64()
