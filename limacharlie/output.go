@@ -144,6 +144,8 @@ type OutputConfig struct {
 	Color             string `json:"color,omitempty" yaml:"color,omitempty"`
 	CloudID           string `json:"cloud_id,omitempty" yaml:"cloud_id,omitempty"`
 	Index             string `json:"index,omitempty" yaml:"index,omitempty"`
+	Addresses         string `json:"addresses,omitempty" yaml:"addresses,omitempty"`
+	APIKey            string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
