@@ -2030,7 +2030,7 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 	ops := []OrgSyncOperation{}
 	oe, err := org.Extensions()
 	if err != nil {
-		return ops, err
+		return ops, fmt.Errorf("list subscribed extensions: %v", err)
 	}
 	orgExtensions := map[ExtensionName]struct{}{}
 	for _, ext := range oe {
@@ -2052,7 +2052,7 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 		} else {
 			if !options.IsDryRun {
 				if err := org.SubscribeToExtension(ext); err != nil {
-					return ops, err
+					return ops, fmt.Errorf("subscribing to %s: %v", ext, err)
 				}
 			}
 			ops = append(ops, OrgSyncOperation{
@@ -2074,7 +2074,7 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 		}
 		if !options.IsDryRun {
 			if err := org.UnsubscribeFromExtension(ext); err != nil {
-				return ops, err
+				return ops, fmt.Errorf("unsubscribing to %s: %v", ext, err)
 			}
 		}
 		ops = append(ops, OrgSyncOperation{
