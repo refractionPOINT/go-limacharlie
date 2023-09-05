@@ -39,6 +39,11 @@ type OnlineCount struct {
 	Count int64 `json:"count,omitempty"`
 }
 
+type SiteConnectivityInfo struct {
+	URLs  map[string]string `json:"url"`
+	Certs map[string]string `json:"certs"`
+}
+
 // NewOrganization initialize a link to an organization
 func NewOrganization(c *Client) (*Organization, error) {
 	return &Organization{
@@ -155,14 +160,21 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 }
 
 func (o *Organization) GetURLs() (map[string]string, error) {
-	resp := struct {
-		URLs map[string]string `json:"url"`
-	}{}
+	resp := SiteConnectivityInfo{}
 
 	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return nil, err
 	}
 	return resp.URLs, nil
+}
+
+func (o *Organization) GetSiteConnectivityInfo() (*SiteConnectivityInfo, error) {
+	resp := SiteConnectivityInfo{}
+
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 func (o *Organization) GetInfo() (OrganizationInformation, error) {
