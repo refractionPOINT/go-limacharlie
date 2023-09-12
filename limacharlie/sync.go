@@ -47,6 +47,31 @@ type SyncOptions struct {
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
 
+func SyncAll() SyncOptions {
+	return SyncOptions{
+		SyncDRRules:          true,
+		SyncOutputs:          true,
+		SyncResources:        true,
+		SyncExtensions:       true,
+		SyncIntegrity:        true,
+		SyncFPRules:          true,
+		SyncExfil:            true,
+		SyncArtifacts:        true,
+		SyncOrgValues:        true,
+		SyncInstallationKeys: true,
+		SyncYara:             true,
+		SyncHives: map[string]bool{
+			"dr-general":       true,
+			"dr-managed":       true,
+			"dr-service":       true,
+			"fp":               true,
+			"cloud_sensor":     true,
+			"extension_config": true,
+			"yara":             true,
+		},
+	}
+}
+
 type IncludeLoaderCB = func(parentFilePath string, filePathToInclude string) ([]byte, error)
 
 var supportedOrgValues []string = []string{
