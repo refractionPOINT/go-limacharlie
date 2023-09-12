@@ -68,6 +68,8 @@ func SyncAll() SyncOptions {
 			"cloud_sensor":     true,
 			"extension_config": true,
 			"yara":             true,
+			"secret":           true,
+			"lookup":           true,
 		},
 	}
 }
