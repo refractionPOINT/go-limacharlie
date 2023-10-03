@@ -32,6 +32,7 @@ var OutputTypes = struct {
 	Tines            OutputModuleType
 	Torq             OutputModuleType
 	DataDog          OutputModuleType
+	OpenSearch       OutputModuleType
 }{
 	S3:               "s3",
 	GCS:              "gcs",
@@ -52,6 +53,7 @@ var OutputTypes = struct {
 	Tines:            "tines",
 	Torq:             "torq",
 	DataDog:          "datadog",
+	OpenSearch:       "opensearch",
 }
 
 // OutputDataType is the type of data
@@ -146,6 +148,7 @@ type OutputConfig struct {
 	Index             string `json:"index,omitempty" yaml:"index,omitempty"`
 	Addresses         string `json:"addresses,omitempty" yaml:"addresses,omitempty"`
 	APIKey            string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
+	Schema            string `json:"schema,omitempty" yaml:"schema,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
