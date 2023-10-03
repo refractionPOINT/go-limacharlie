@@ -64,6 +64,11 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 	var orgOps []OrgSyncOperation
 	for hiveName, newConfigData := range hiveConfigData {
 
+		// Only sync hives that are specified.
+		if opts.SyncHives != nil || !opts.SyncHives[hiveName] {
+			continue
+		}
+
 		// grab current config data as to determine if update or add needs to be processed
 		currentConfigData, err := org.fetchHiveConfigData(HiveArgs{
 			HiveName:     hiveName,
