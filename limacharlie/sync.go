@@ -1673,6 +1673,16 @@ func (org Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgS
 		return ops, err
 	}
 
+	if yara == nil {
+		yara = &orgSyncYara{}
+	}
+	if yara.Sources == nil {
+		yara.Sources = map[string]YaraSource{}
+	}
+	if yara.Rules == nil {
+		yara.Rules = map[string]YaraRule{}
+	}
+
 	for sourceName, source := range yara.Sources {
 		orgSource, found := orgSources[sourceName]
 		if found {
