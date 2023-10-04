@@ -65,7 +65,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 	for hiveName, newConfigData := range hiveConfigData {
 
 		// Only sync hives that are specified.
-		if opts.SyncHives != nil || !opts.SyncHives[hiveName] {
+		if opts.SyncHives == nil || !opts.SyncHives[hiveName] {
 			continue
 		}
 
