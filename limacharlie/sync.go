@@ -1011,7 +1011,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 			return ops, fmt.Errorf("exfil: %v", err)
 		}
 	}
-	if options.SyncHives != nil || len(options.SyncHives) != 0 {
+	if len(options.SyncHives) != 0 {
 		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
 		if err != nil {
