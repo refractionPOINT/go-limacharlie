@@ -228,10 +228,15 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 		return nil, errors.New("tx function required")
 	}
 	rec, err := h.Get(args)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "RECORD_NOT_FOUND") {
 		return nil, err
 	}
 	for {
+		eTag := ""
+		if rec != nil {
+			eTag = rec.SysMtd.Etag
+		}
+
 		newRec, err := tx(rec)
 		if err != nil {
 			return nil, err
@@ -249,7 +254,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 			Expiry:       &newRec.UsrMtd.Expiry,
 			Enabled:      &newRec.UsrMtd.Enabled,
 			Tags:         newRec.UsrMtd.Tags,
-			ETag:         &rec.SysMtd.Etag,
+			ETag:         &eTag,
 		})
 		if err != nil {
 			if !strings.Contains(err.Error(), "ETAG_MISMATCH") {
