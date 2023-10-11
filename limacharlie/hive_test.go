@@ -26,11 +26,12 @@ func TestHiveClient(t *testing.T) {
 		"list":    hiveListTest,
 		"listMtd": hiveListMtdTest,
 		"update":  hiveUpdate,
+		"tx":      hiveUpdateTx,
 		"remove":  hiveRemove,
 	}
 
 	// ensure test execute in proper order
-	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "remove"}
+	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "remove"}
 	for _, name := range testArray {
 		t.Run(name, tests[name])
 	}
@@ -260,4 +261,99 @@ func randSeq(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func hiveUpdateTx(t *testing.T) {
+	nRan := 0
+
+	r, err := testHiveClient.UpdateTx(HiveArgs{
+		HiveName:     "cloud_sensor",
+		PartitionKey: os.Getenv("_OID"),
+		Key:          testKey,
+	}, func(record *HiveData) (*HiveData, error) {
+		record.UsrMtd.Tags = []string{"test1", "test2", "test4"}
+		nRan++
+
+		// We artificially do an update our of band to trigger a retry.
+		jsonString := `{
+			"s3": {
+			  "access_key": "access key",
+			  "bucket_name": "bucket_name",
+			  "client_options": {
+				"hostname": "syslog-test",
+				"identity": {
+				  "installation_key": "test install key",
+				  "oid": "oid-input"
+				},
+				"platform": "text",
+				"sensor_seed_key": "syslog-test"
+			  },
+			  "prefix": "prefix",
+			  "secret_key": "secret key"
+			},
+			"sensor_type": "s3"
+		  }`
+		jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
+
+		data := Dict{}
+		if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
+			panic(err)
+		}
+		_, err := testHiveClient.Add(HiveArgs{
+			HiveName:     "cloud_sensor",
+			PartitionKey: os.Getenv("_OID"),
+			Key:          testKey,
+			Data:         data,
+			Tags:         []string{"test1", "test3"},
+		})
+
+		// validate test ran correctly
+		if err != nil {
+			t.Errorf("hive update failed, error: %+v \n", err)
+			return nil, err
+		}
+
+		return record, nil
+	})
+
+	if err != nil {
+		t.Errorf("hive update tx failed, error: %+v \n", err)
+		return
+	}
+
+	if r == nil {
+		t.Error("hive update tx failed, update aborted")
+		return
+	}
+
+	if nRan != 2 {
+		t.Errorf("hive update tx failed invalid number of retries, nRan: %d", nRan)
+		return
+	}
+
+	// get newly created data to ensure update processed correctly
+	updateData, err := testHiveClient.Get(HiveArgs{
+		HiveName:     "cloud_sensor",
+		PartitionKey: os.Getenv("_OID"),
+		Key:          testKey,
+	})
+
+	if err != nil {
+		t.Errorf("hive update failiure check, error %+v ", err)
+		return
+	}
+
+	if _, ok := updateData.Data["s3"]; !ok {
+		t.Error("hive update failed missing s3 key data field ")
+		return
+	}
+
+	if updateData.UsrMtd.Tags == nil {
+		t.Errorf("hive update failed tags not set, tags:%s ", []string{"test1", "test2", "test4"})
+		return
+	}
+
+	if len(updateData.UsrMtd.Tags) != 3 {
+		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
+	}
 }

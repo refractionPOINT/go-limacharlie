@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 type HiveClient struct {
@@ -159,7 +160,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	return &hiveResp, nil
 }
 
-func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
+func (h *HiveClient) Update(args HiveArgs) (*HiveResp, error) {
 	if args.Key == "" {
 		return nil, errors.New("key required")
 	}
@@ -211,7 +212,61 @@ func (h *HiveClient) Update(args HiveArgs) (interface{}, error) {
 		return nil, err
 	}
 
-	return updateResp, nil
+	return &updateResp, nil
+}
+
+func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveData, error)) (*HiveResp, error) {
+	// Perform a transactional update of the record
+	// by using the "etag" provided by the API to make
+	// sure we don't overwrite changes made to the
+	// record between a fetch and a set.
+	// The cb function will get called with the record
+	// and expects a modified record to be returned by
+	// it. This may get called more than once with updated
+	// records if the transaction hits changes.
+	if tx == nil {
+		return nil, errors.New("tx function required")
+	}
+	rec, err := h.Get(args)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		newRec, err := tx(rec)
+		if err != nil {
+			return nil, err
+		}
+		if newRec == nil {
+			return nil, nil
+		}
+		rec = newRec
+		// Try to update the record.
+		updResp, err := h.Add(HiveArgs{
+			HiveName:     args.HiveName,
+			PartitionKey: args.PartitionKey,
+			Key:          args.Key,
+			Data:         newRec.Data,
+			Expiry:       &newRec.UsrMtd.Expiry,
+			Enabled:      &newRec.UsrMtd.Enabled,
+			Tags:         newRec.UsrMtd.Tags,
+			ETag:         &rec.SysMtd.Etag,
+		})
+		if err != nil {
+			if !strings.Contains(err.Error(), "ETAG_MISMATCH") {
+				return nil, err
+			}
+			updResp = nil
+		}
+		if updResp != nil {
+			return updResp, nil
+		}
+		// The update failed, the record changed on us.
+		// Fetch the new record and try again.
+		rec, err = h.Get(args)
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
