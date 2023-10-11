@@ -299,7 +299,7 @@ func hiveUpdateTx(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
 			panic(err)
 		}
-		_, err := testHiveClient.Update(HiveArgs{
+		_, err := testHiveClient.Add(HiveArgs{
 			HiveName:     "cloud_sensor",
 			PartitionKey: os.Getenv("_OID"),
 			Key:          testKey,
