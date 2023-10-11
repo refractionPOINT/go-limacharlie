@@ -242,7 +242,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 		}
 		rec = newRec
 		// Try to update the record.
-		updResp, err := h.Update(HiveArgs{
+		updResp, err := h.Add(HiveArgs{
 			HiveName:     args.HiveName,
 			PartitionKey: args.PartitionKey,
 			Key:          args.Key,
@@ -250,6 +250,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 			Expiry:       &newRec.UsrMtd.Expiry,
 			Enabled:      &newRec.UsrMtd.Enabled,
 			Tags:         newRec.UsrMtd.Tags,
+			ETag:         &rec.SysMtd.Etag,
 		})
 		if err != nil {
 			if !strings.Contains(err.Error(), "ETAG_MISMATCH") {
