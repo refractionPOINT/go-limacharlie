@@ -231,7 +231,6 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("GOT %s\n", rec.SysMtd.Etag)
 	for {
 		newRec, err := tx(rec)
 		if err != nil {
@@ -267,7 +266,6 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("GOT AGAIN %s\n", rec.SysMtd.Etag)
 	}
 }
 
