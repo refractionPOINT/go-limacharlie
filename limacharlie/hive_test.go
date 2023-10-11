@@ -266,7 +266,7 @@ func randSeq(n int) string {
 func hiveUpdateTx(t *testing.T) {
 	nRan := 0
 
-	testHiveClient.UpdateTx(HiveArgs{
+	r, err := testHiveClient.UpdateTx(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
@@ -315,6 +315,21 @@ func hiveUpdateTx(t *testing.T) {
 
 		return record, nil
 	})
+
+	if err != nil {
+		t.Errorf("hive update tx failed, error: %+v \n", err)
+		return
+	}
+
+	if r == nil {
+		t.Error("hive update tx failed, update aborted")
+		return
+	}
+
+	if nRan != 2 {
+		t.Errorf("hive update tx failed invalid number of retries, nRan: %d", nRan)
+		return
+	}
 
 	// get newly created data to ensure update processed correctly
 	updateData, err := testHiveClient.Get(HiveArgs{
