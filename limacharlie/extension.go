@@ -40,3 +40,12 @@ func (org Organization) UnsubscribeFromExtension(name ExtensionName) error {
 	}
 	return nil
 }
+
+func (org Organization) ReKeyExtension(name ExtensionName) error {
+	d := Dict{}
+	if err := org.client.reliableRequest(http.MethodPatch,
+		fmt.Sprintf("orgs/%s/subscription/extension/%s", org.client.options.OID, name), makeDefaultRequest(&d).withTimeout(1*time.Minute)); err != nil {
+		return err
+	}
+	return nil
+}
