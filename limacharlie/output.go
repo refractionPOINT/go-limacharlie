@@ -33,6 +33,7 @@ var OutputTypes = struct {
 	Torq             OutputModuleType
 	DataDog          OutputModuleType
 	OpenSearch       OutputModuleType
+	Websocket        OutputModuleType
 }{
 	S3:               "s3",
 	GCS:              "gcs",
@@ -54,6 +55,7 @@ var OutputTypes = struct {
 	Torq:             "torq",
 	DataDog:          "datadog",
 	OpenSearch:       "opensearch",
+	Websocket:        "websocket",
 }
 
 // OutputDataType is the type of data
