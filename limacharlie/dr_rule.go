@@ -63,7 +63,6 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 		return err
 	}
 
-	fmt.Println("made it to make default request")
 	request := makeDefaultRequest(&resp).withFormData(drAddRuleRequest{
 		Name:      name,
 		IsReplace: reqOpt.IsReplace,
@@ -117,14 +116,9 @@ func (org Organization) DRRuleDelete(name string, filters ...DRRuleFilter) error
 
 func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 	if !d.IsInSameNamespace(dr) {
-		fmt.Printf("not in same namespace %s \n", dr.Namespace)
-		fmt.Println("dr namespace ", dr.Namespace)
-		fmt.Println("d  namespace ", d.Namespace)
 		return false
 	}
 	if *d.IsEnabled != *dr.IsEnabled {
-		fmt.Println("dr enabled ", dr.IsEnabled)
-		fmt.Println("d  enabled ", d.IsEnabled)
 		return false
 	}
 	j1, err := json.Marshal(d.Detect)
@@ -136,8 +130,6 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	if string(j1) != string(j2) {
-		fmt.Printf("detect 1 is different \n %s \n", j1)
-		fmt.Printf("detect 2 is different \n %s \n", j2)
 		return false
 	}
 	j1, err = json.Marshal(d.Response)
@@ -149,8 +141,6 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	if string(j1) != string(j2) {
-		fmt.Printf("response 1 is different \n %s \n", j1)
-		fmt.Printf("response 2  is different \n %s \n", j2)
 		return false
 	}
 	return true

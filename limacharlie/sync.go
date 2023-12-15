@@ -1892,15 +1892,12 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 		return nil, nil
 	}
 
-	availableNamespaces := org.resolveAvailableHiveNamespaces(who)
-	fmt.Printf("this is available namespaces %+v \n\n\n\n", availableNamespaces)
-
 	ops := []OrgSyncOperation{}
+	availableNamespaces := org.resolveAvailableHiveNamespaces(who)
 	existingRules, err := org.drRulesFromHiveNamespaces(availableNamespaces)
 	if err != nil {
 		return ops, err
 	}
-
 	fmt.Printf("this is length of existing rules %d \n ", len(existingRules))
 
 	// Start by adding missing rules.
@@ -1928,7 +1925,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 
 			// If this is a DryRun, just report the op and move on.
 			if options.IsDryRun {
-				fmt.Printf("extisting rule %s is different \n", ruleName)
 				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 				continue
 			}
@@ -2014,10 +2010,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 		}
 
 		if options.Tags != nil { // if option tags set then we only want to delete matching tags value
-			fmt.Println("made it to option tags != nil for rule  ", ruleName)
-			if rule.UsrMtd.Tags != nil {
-				fmt.Printf("this rule %s has tags %+v \n", ruleName, rule.UsrMtd.Tags)
-			}
 			if slicesContainSameItems(options.Tags, rule.UsrMtd.Tags) {
 				// If this is a DryRun, report the op and move on.
 				if options.IsDryRun {
