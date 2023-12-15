@@ -2013,13 +2013,17 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 			continue
 		}
-		if err := org.DRRuleDelete(ruleName, WithNamespace(rule.HiveName)); err != nil {
+		if _, err := hc.Remove(HiveArgs{
+			HiveName:     rule.HiveName,
+			PartitionKey: org.GetOID(),
+			Key:          ruleName,
+		}); err != nil {
 			return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 		}
+
 		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 	}
 
-	fmt.Printf("returning opts %+v \n\n\n ", ops)
 	return ops, nil
 }
 
