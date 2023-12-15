@@ -1865,9 +1865,6 @@ func (org Organization) drRulesFromHiveNamespaces(namespaces map[string]struct{}
 	hc := NewHiveClient(&org)
 	existing := make(map[string]HiveDataWithName)
 	for ns := range namespaces {
-		if !strings.HasPrefix(ns, "dr-") {
-			ns = fmt.Sprintf("dr-%s", ns)
-		}
 		listData, err := hc.List(HiveArgs{
 			HiveName:     ns,
 			PartitionKey: org.GetOID(),
@@ -1891,6 +1888,9 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 	if !options.IsForce && len(rules) == 0 {
 		return nil, nil
 	}
+
+	// create hive client
+	hc := NewHiveClient(&org)
 
 	ops := []OrgSyncOperation{}
 	availableNamespaces := org.resolveAvailableHiveNamespaces(who)
@@ -1917,11 +1917,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName})
 				continue
 			}
-			//if existingRule.Equal(rule) {
-			//	ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName})
-			//	// Nothing to do, move on.
-			//	continue
-			//}
 
 			// If this is a DryRun, just report the op and move on.
 			if options.IsDryRun {
@@ -1932,7 +1927,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			// If they are in different namespaces, we must
 			// delete the old one before setting the new one.
 			if existingRule.HiveName != rule.Namespace {
-				hc := NewHiveClient(&org)
 				hc.Remove(HiveArgs{
 					HiveName:     existingRule.HiveName,
 					PartitionKey: org.GetOID(),
@@ -1941,16 +1935,9 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 				if err != nil {
 					return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 				}
-
-				//existingNs := existingRule.Namespace
-				//if existingNs == "" {
-				//	existingNs = "general"
-				//}
-				//if err := org.DRRuleDelete(ruleName, WithNamespace(existingNs)); err != nil {
-				//	return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
-				//}
 			}
 		}
+
 		if options.IsDryRun {
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 			continue
@@ -1965,7 +1952,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			rule.Namespace = fmt.Sprintf("dr-%s", rule.Namespace)
 		}
 
-		hc := NewHiveClient(&org)
 		if _, err := hc.Add(HiveArgs{
 			HiveName:     rule.Namespace,
 			PartitionKey: org.GetOID(),
@@ -1979,16 +1965,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 		}); err != nil {
 			return ops, fmt.Errorf("DRRuleAdd %s: %v ", ruleName, err)
 		}
-
-		//if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
-		//	IsReplace: true,
-		//	Namespace: rule.Namespace,
-		//	IsEnabled: *rule.IsEnabled,
-		//}); err != nil {
-		//	fmt.Printf("rule.detect failed %+v \n", rule.Detect)
-		//	fmt.Printf("rule.response failed %+v \n ", rule.Response)
-		//	return ops, fmt.Errorf("DRRuleAdd %s: %v", ruleName, err)
-		//}
 		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 	}
 
@@ -2009,22 +1985,29 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			continue
 		}
 
-		if options.Tags != nil { // if option tags set then we only want to delete matching tags value
+		if options.Tags != nil || len(options.Tags) != 0 { // if option tags set then we only want to delete matching tags value
 			if slicesContainSameItems(options.Tags, rule.UsrMtd.Tags) {
 				// If this is a DryRun, report the op and move on.
 				if options.IsDryRun {
 					ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 					continue
 				}
-				if err := org.DRRuleDelete(ruleName, WithNamespace(rule.HiveName)); err != nil {
+				hc.Remove(HiveArgs{
+					HiveName:     rule.HiveName,
+					PartitionKey: org.GetOID(),
+					Key:          ruleName,
+				})
+				if err != nil {
 					return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 				}
 				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 				continue
 			}
+			// tags did not match coninue as value should not be removed
 			continue
 		}
 
+		// if you make to this point no options values were passed and syncForce logic continues as it did before
 		// If this is a DryRun, report the op and move on.
 		if options.IsDryRun {
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
