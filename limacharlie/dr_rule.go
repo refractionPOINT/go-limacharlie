@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -31,11 +32,12 @@ type drAddRuleRequest struct {
 }
 
 type CoreDRRule struct {
-	Name      string `json:"name,omitempty" yaml:"name,omitempty"`
-	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Detect    Dict   `json:"detect" yaml:"detect"`
-	Response  List   `json:"respond" yaml:"respond"`
-	IsEnabled *bool  `json:"is_enabled,omitempty" yaml:"is_enabled,omitempty"`
+	Name      string   `json:"name,omitempty" yaml:"name,omitempty"`
+	Namespace string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Detect    Dict     `json:"detect" yaml:"detect"`
+	Response  List     `json:"respond" yaml:"respond"`
+	IsEnabled *bool    `json:"is_enabled,omitempty" yaml:"is_enabled,omitempty"`
+	Tags      []string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization
@@ -57,9 +59,11 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 	}
 	serialResp, err := json.Marshal(response)
 	if err != nil {
+		fmt.Printf("errored out in json.Marshal %+v \n", err)
 		return err
 	}
 
+	fmt.Println("made it to make default request")
 	request := makeDefaultRequest(&resp).withFormData(drAddRuleRequest{
 		Name:      name,
 		IsReplace: reqOpt.IsReplace,
@@ -83,6 +87,7 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error
 		f(req)
 	}
 
+	fmt.Printf("this is req in get drrules %+v \n", req)
 	resp := map[string]Dict{}
 
 	request := makeDefaultRequest(&resp).withQueryData(req)
@@ -112,9 +117,14 @@ func (org Organization) DRRuleDelete(name string, filters ...DRRuleFilter) error
 
 func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 	if !d.IsInSameNamespace(dr) {
+		fmt.Printf("not in same namespace %s \n", dr.Namespace)
+		fmt.Println("dr namespace ", dr.Namespace)
+		fmt.Println("d  namespace ", d.Namespace)
 		return false
 	}
 	if *d.IsEnabled != *dr.IsEnabled {
+		fmt.Println("dr enabled ", dr.IsEnabled)
+		fmt.Println("d  enabled ", d.IsEnabled)
 		return false
 	}
 	j1, err := json.Marshal(d.Detect)
@@ -126,6 +136,8 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	if string(j1) != string(j2) {
+		fmt.Printf("detect 1 is different \n %s \n", j1)
+		fmt.Printf("detect 2 is different \n %s \n", j2)
 		return false
 	}
 	j1, err = json.Marshal(d.Response)
@@ -137,6 +149,8 @@ func (d CoreDRRule) Equal(dr CoreDRRule) bool {
 		return false
 	}
 	if string(j1) != string(j2) {
+		fmt.Printf("response 1 is different \n %s \n", j1)
+		fmt.Printf("response 2  is different \n %s \n", j2)
 		return false
 	}
 	return true
@@ -149,7 +163,19 @@ func (d CoreDRRule) IsInSameNamespace(dr CoreDRRule) bool {
 	if dr.Namespace == "" {
 		dr.Namespace = "general"
 	}
-	return d.Namespace == dr.Namespace
+
+	dNamespace := d.Namespace
+	drNamespace := dr.Namespace
+	if d.Namespace != dr.Namespace {
+		if strings.HasPrefix(d.Namespace, "dr-") {
+			dNamespace = strings.TrimPrefix(dNamespace, "dr-")
+		}
+		if strings.HasPrefix(drNamespace, "dr-") {
+			drNamespace = strings.TrimPrefix(drNamespace, "dr-")
+		}
+	}
+
+	return dNamespace == drNamespace
 }
 
 func WithNamespace(namespace string) func(map[string]string) {

@@ -32,6 +32,13 @@ type HiveData struct {
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
 
+type HiveDataWithName struct {
+	Data     map[string]interface{} `json:"data" yaml:"data,omitempty"`
+	SysMtd   SysMtd                 `json:"sys_mtd" yaml:"sys_mtd"`
+	UsrMtd   UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
+	HiveName string                 `json:"hive_name" yaml:"hive_name"`
+}
+
 type HiveInfo struct {
 	Name      string `json:"name"`
 	Partition string `json:"partition"`
@@ -285,6 +292,54 @@ func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 }
 
 func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
+	err := encodeDecodeHiveData(&hsd.Data)
+	if err != nil {
+		return false, err
+	}
+
+	newData, err := json.Marshal(hsd.Data)
+	if err != nil {
+		return false, err
+	}
+	if string(newData) == "null" {
+		newData = nil
+	}
+
+	currentData, err := json.Marshal(cData.Data)
+	if err != nil {
+		return false, err
+	}
+	if string(currentData) == "null" {
+		currentData = nil
+	}
+	if string(currentData) != string(newData) {
+		return false, nil
+	}
+
+	if len(hsd.UsrMtd.Tags) == 0 {
+		hsd.UsrMtd.Tags = nil
+	}
+	newUsrMTd, err := json.Marshal(hsd.UsrMtd)
+	if err != nil {
+		return false, err
+	}
+
+	if len(cData.UsrMtd.Tags) == 0 {
+		cData.UsrMtd.Tags = nil
+	}
+	curUsrMtd, err := json.Marshal(cData.UsrMtd)
+	if err != nil {
+		return false, err
+	}
+
+	if string(curUsrMtd) != string(newUsrMTd) {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (hsd *HiveData) EqualsCoreDrRule(cData HiveData) (bool, error) {
 	err := encodeDecodeHiveData(&hsd.Data)
 	if err != nil {
 		return false, err
