@@ -1844,7 +1844,6 @@ func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (e
 	existingRules = orgSyncDRRules{}
 	// Get rules from all the namespaces we have access to.
 	for ns := range namespaces {
-		fmt.Println("this is ns in rules from namespaces ", ns)
 		tmpRules, err := org.DRRules(WithNamespace(ns))
 		if err != nil {
 			return existingRules, fmt.Errorf("DRRules %s: %v", ns, err)
@@ -1892,13 +1891,12 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 	// create hive client
 	hc := NewHiveClient(&org)
 
-	ops := []OrgSyncOperation{}
 	availableNamespaces := org.resolveAvailableHiveNamespaces(who)
+	ops := []OrgSyncOperation{}
 	existingRules, err := org.drRulesFromHiveNamespaces(availableNamespaces)
 	if err != nil {
 		return ops, err
 	}
-	fmt.Printf("this is length of existing rules %d \n ", len(existingRules))
 
 	// Start by adding missing rules.
 	for ruleName, rule := range rules {
@@ -1907,17 +1905,14 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			isTrue := true
 			rule.IsEnabled = &isTrue
 		}
-
 		if existingRule, ok := existingRules[ruleName]; ok {
-			fmt.Printf("found existing rule %v \n ", ruleName)
 			// A rule with that name is already there.
 			// Is it the exact same rule?
-
 			if drRulesEqual(rule, existingRule) {
 				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName})
+				// Nothing to do, move on.
 				continue
 			}
-
 			// If this is a DryRun, just report the op and move on.
 			if options.IsDryRun {
 				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
@@ -1926,6 +1921,14 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			// It must be replaced.
 			// If they are in different namespaces, we must
 			// delete the old one before setting the new one.
+			ruleNs := rule.Namespace
+			if !strings.HasPrefix(ruleNs, "dr-") {
+				if ruleNs == "replicant" {
+					ruleNs = "dr-service"
+				} else {
+					ruleNs = fmt.Sprintf("dr-%s", ruleNs)
+				}
+			}
 			if existingRule.HiveName != rule.Namespace {
 				hc.Remove(HiveArgs{
 					HiveName:     existingRule.HiveName,
@@ -1937,7 +1940,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 				}
 			}
 		}
-
 		if options.IsDryRun {
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 			continue
@@ -2223,9 +2225,16 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 }
 
 func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
-
 	if dr.Namespace != d.HiveName {
-		return false
+		drNs := dr.Namespace
+		if drNs == "replicant" {
+			drNs = "dr.service"
+		} else if !strings.HasPrefix(drNs, "dr-") {
+			drNs = fmt.Sprintf("dr-%s", drNs)
+		}
+		if drNs != d.HiveName {
+			return false
+		}
 	}
 
 	if *dr.IsEnabled != d.UsrMtd.Enabled {
@@ -2235,7 +2244,6 @@ func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
 	if _, ok := d.Data["detect"]; ok {
 		j1, err := json.Marshal(d.Data["detect"])
 		if err != nil {
-			fmt.Println("failed detect marshal")
 			return false
 		}
 
@@ -2244,8 +2252,6 @@ func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
 			return false
 		}
 		if string(j1) != string(j2) {
-			fmt.Printf("detect 1 is different \n %s \n", j1)
-			fmt.Printf("detect 2 is different \n %s \n", j2)
 			return false
 		}
 	} else {
@@ -2262,8 +2268,6 @@ func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
 			return false
 		}
 		if string(j1) != string(j2) {
-			fmt.Printf("respond 1 is different \n %s \n", j1)
-			fmt.Printf("respond 2  is different \n %s \n", j2)
 			return false
 		}
 	}
