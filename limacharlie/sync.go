@@ -1921,15 +1921,8 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			// It must be replaced.
 			// If they are in different namespaces, we must
 			// delete the old one before setting the new one.
-			ruleNs := rule.Namespace
-			if !strings.HasPrefix(ruleNs, "dr-") {
-				if ruleNs == "replicant" {
-					ruleNs = "dr-service"
-				} else {
-					ruleNs = fmt.Sprintf("dr-%s", ruleNs)
-				}
-			}
-			if existingRule.HiveName != rule.Namespace {
+			ruleNs := namespaceToHiveName(rule.Namespace)
+			if existingRule.HiveName != ruleNs {
 				hc.Remove(HiveArgs{
 					HiveName:     existingRule.HiveName,
 					PartitionKey: org.GetOID(),
@@ -1945,17 +1938,9 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			continue
 		}
 
-		// ensure proper dr namespace is set
-		if rule.Namespace == "" {
-			rule.Namespace = "dr-general"
-		} else if rule.Namespace == "replicant" {
-			rule.Namespace = "dr-service"
-		} else if !strings.HasPrefix(rule.Namespace, "dr-") {
-			rule.Namespace = fmt.Sprintf("dr-%s", rule.Namespace)
-		}
-
+		ruleNs := namespaceToHiveName(rule.Namespace)
 		if _, err := hc.Add(HiveArgs{
-			HiveName:     rule.Namespace,
+			HiveName:     ruleNs,
 			PartitionKey: org.GetOID(),
 			Enabled:      rule.IsEnabled,
 			Key:          ruleName,
@@ -2224,10 +2209,23 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 	return ops, nil
 }
 
+func namespaceToHiveName(namespace string) string {
+	if namespace == "" {
+		namespace = "dr-general"
+	} else if namespace == "replicant" {
+		namespace = "dr-service"
+	} else if !strings.HasPrefix(namespace, "dr-") {
+		namespace = fmt.Sprintf("dr-%s", namespace)
+	}
+	return namespace
+}
+
 func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
 	if dr.Namespace != d.HiveName {
 		drNs := dr.Namespace
-		if drNs == "replicant" {
+		if drNs == "" {
+			drNs = "dr.general"
+		} else if drNs == "replicant" {
 			drNs = "dr.service"
 		} else if !strings.HasPrefix(drNs, "dr-") {
 			drNs = fmt.Sprintf("dr-%s", drNs)

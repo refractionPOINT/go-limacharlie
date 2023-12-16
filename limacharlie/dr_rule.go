@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -59,7 +58,6 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 	}
 	serialResp, err := json.Marshal(response)
 	if err != nil {
-		fmt.Printf("errored out in json.Marshal %+v \n", err)
 		return err
 	}
 
@@ -86,7 +84,6 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error
 		f(req)
 	}
 
-	fmt.Printf("this is req in get drrules %+v \n", req)
 	resp := map[string]Dict{}
 
 	request := makeDefaultRequest(&resp).withQueryData(req)
@@ -153,19 +150,7 @@ func (d CoreDRRule) IsInSameNamespace(dr CoreDRRule) bool {
 	if dr.Namespace == "" {
 		dr.Namespace = "general"
 	}
-
-	dNamespace := d.Namespace
-	drNamespace := dr.Namespace
-	if d.Namespace != dr.Namespace {
-		if strings.HasPrefix(d.Namespace, "dr-") {
-			dNamespace = strings.TrimPrefix(dNamespace, "dr-")
-		}
-		if strings.HasPrefix(drNamespace, "dr-") {
-			drNamespace = strings.TrimPrefix(drNamespace, "dr-")
-		}
-	}
-
-	return dNamespace == drNamespace
+	return d.Namespace == dr.Namespace
 }
 
 func WithNamespace(namespace string) func(map[string]string) {
