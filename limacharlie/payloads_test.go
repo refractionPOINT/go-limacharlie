@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,9 +12,6 @@ func TestPayloads(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 	unsubReplicantCB, err := findUnsubscribeCallback(org, "api", "insight")
-	if err != nil {
-		fmt.Printf("this is error for payload test  %v \n", err)
-	}
 	a.NoError(err)
 	if unsubReplicantCB != nil {
 		defer unsubReplicantCB()
