@@ -10,11 +10,8 @@ func TestYaraRuleAddDelete(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	//unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
-	//a.NoError(err)
-	//if unsubReplicantCB != nil {
-	//	defer unsubReplicantCB()
-	//}
+	_, err := findUnsubscribeReplicantCallback(org, "yara")
+	a.NoError(err)
 
 	sources, err := org.YaraListSources()
 	a.NoError(err)

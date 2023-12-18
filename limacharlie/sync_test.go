@@ -1324,11 +1324,8 @@ func TestSyncPushYara(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	defer deleteYaraRules(org)
 
-	//unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
-	//a.NoError(err)
-	//if unsubReplicantCB != nil {
-	//	defer unsubReplicantCB()
-	//}
+	_, err := findUnsubscribeReplicantCallback(org, "yara")
+	a.NoError(err)
 
 	rules, err := org.YaraListRules()
 	a.NoError(err)

@@ -50,11 +50,8 @@ func TestIntegrityRuleAddDelete(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	//unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "integrity")
-	//a.NoError(err)
-	//if unsubReplicantCB != nil {
-	//	defer unsubReplicantCB()
-	//}
+	_, err := findUnsubscribeReplicantCallback(org, "integrity")
+	a.NoError(err)
 
 	rules, err := org.IntegrityRules()
 	a.NoError(err)
