@@ -848,7 +848,7 @@ hives:
 		t.Errorf("failed to unsubscribe from yara rule %+v ", err)
 	}
 
-	resetResource(org)
+	//resetResource(org)
 }
 
 func TestHiveMerge(t *testing.T) {
