@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -110,7 +111,7 @@ func TestHiveAddData(t *testing.T) {
 	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// start of actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "dr-general": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true, "dr-general": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -232,6 +233,10 @@ func TestHiveNoUpdate(t *testing.T) {
 	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for testNoUpdate")
 		return
+	}
+
+	for _, orgOp := range orgOps {
+		fmt.Printf("this is orgOp %+v \n", orgOp)
 	}
 
 	syncOpS3, syncOpOffice, syncOpFp := false, false, false
@@ -468,7 +473,7 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push testMultipleDataUpdates %+v", err)
 		return
@@ -485,7 +490,7 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// process actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
