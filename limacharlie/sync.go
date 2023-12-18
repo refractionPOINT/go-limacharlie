@@ -1906,6 +1906,10 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			rule.IsEnabled = &isTrue
 		}
 		if existingRule, ok := existingRules[ruleName]; ok {
+			fmt.Printf("found existing rule %s \n ", ruleName)
+			fmt.Printf("namespace %s \n ", existingRule.HiveName)
+			fmt.Printf("original rule namespace %s \n ", rule.Namespace)
+
 			// A rule with that name is already there.
 			// Is it the exact same rule?
 			if drRulesEqual(rule, existingRule) {
@@ -2222,14 +2226,7 @@ func namespaceToHiveName(namespace string) string {
 
 func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
 	if dr.Namespace != d.HiveName {
-		drNs := dr.Namespace
-		if drNs == "" {
-			drNs = "dr.general"
-		} else if drNs == "replicant" {
-			drNs = "dr.service"
-		} else if !strings.HasPrefix(drNs, "dr-") {
-			drNs = fmt.Sprintf("dr-%s", drNs)
-		}
+		drNs := namespaceToHiveName(dr.Namespace)
 		if drNs != d.HiveName {
 			return false
 		}
