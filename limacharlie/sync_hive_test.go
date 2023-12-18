@@ -20,63 +20,63 @@ func TestHiveAddData(t *testing.T) {
 	testHiveClient = NewHiveClient(org)
 
 	yamlAdd := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-       data:
-         s3:
-           access_key: "test-access-key"
-           bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-           client_options:
-             hostname: cloudtrail
-             identity:
-               installation_key: test-install-key
-               oid: oid-input
-             platform: aws
-             sensor_seed_key: cloudtrail
-           secret_key: secret-key
-         sensor_type: s3
-       usr_mtd:
-         enabled: false
-         expiry: 0
-         tags: null
-   test-office-365-key:
-       data:
-         office365:
-           client_id: test-client-id
-           client_options:
-             hostname: Office 365 test
-             identity:
-               installation_key: test-install-key
-               oid: oid-input
-             platform: office365
-             sensor_seed_key: Office 365 test
-           client_secret: test-secret
-           content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
-           domain: SecurityInfrastructure.onmicrosoft.com
-           endpoint: enterprise
-           publisher_id: test-publisher-id
-           tenant_id: test-tenant-id
-         sensor_type: office365
-       usr_mtd:
-         enabled: false
-         expiry: 0
-         tags: null
- fp:
-   'test-sdk-FP':
-     data:
-       op: and
-       rules:
-       - op: is
-         path: cat
-         value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
-       - case sensitive: false
-         op: is
-         path: detect/event/FILE_PATH
-         value: C:\Windows\System32\svchost.exe
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags:`
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 0
+          tags: null
+    test-office-365-key:
+        data:
+          office365:
+            client_id: test-client-id
+            client_options:
+              hostname: Office 365 test
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: office365
+              sensor_seed_key: Office 365 test
+            client_secret: test-secret
+            content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+            domain: SecurityInfrastructure.onmicrosoft.com
+            endpoint: enterprise
+            publisher_id: test-publisher-id
+            tenant_id: test-tenant-id
+          sensor_type: office365
+        usr_mtd:
+          enabled: false
+          expiry: 0
+          tags: null
+  fp: 
+    'test-sdk-FP':
+      data:
+        op: and
+        rules:
+        - op: is
+          path: cat
+          value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
+        - case sensitive: false
+          op: is
+          path: detect/event/FILE_PATH
+          value: C:\Windows\System32\svchost.exe
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags:`
 	s3TestHiveKey = "hive-sdk-s3-test-" + randSeq(8)
 	office365TestHiveKey = "hive-sdk-office365-test-" + randSeq(8)
 	fpTestHiveKey = "hive-sdk-fp-test-" + randSeq(8)
@@ -134,25 +134,25 @@ func TestHiveDataUpdate(t *testing.T) {
 	testHiveClient = NewHiveClient(org)
 
 	yamlAdd := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-     data:
-       s3:
-         access_key: "test-access-key-update"
-         bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-         client_options:
-           hostname: cloudtrail
-           identity:
-             installation_key: test-install-key-update
-             oid: oid-input
-           platform: aws
-           sensor_seed_key: cloudtrail
-         secret_key: secret-key
-       sensor_type: s3
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags: null`
+  cloud_sensor:
+    test-s3-unique-key:
+      data:
+        s3:
+          access_key: "test-access-key-update"
+          bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+          client_options:
+            hostname: cloudtrail
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: aws
+            sensor_seed_key: cloudtrail
+          secret_key: secret-key
+        sensor_type: s3
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags: null`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 
@@ -332,25 +332,25 @@ func TestHiveUsrMtdUpdate(t *testing.T) {
 	testHiveClient = NewHiveClient(org)
 
 	yamlAdd := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-     data:
-       s3:
-         access_key: "test-access-key-update"
-         bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-         client_options:
-           hostname: cloudtrail
-           identity:
-             installation_key: test-install-key
-             oid: oid-input
-           platform: aws
-           sensor_seed_key: cloudtrail
-         secret_key: secret-key
-       sensor_type: s3
-     usr_mtd:
-       enabled: false
-       expiry: 2663563600000
-       tags: ["test1", "test2", "test3", "test4"]`
+  cloud_sensor:
+    test-s3-unique-key:
+      data:
+        s3:
+          access_key: "test-access-key-update"
+          bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+          client_options:
+            hostname: cloudtrail
+            identity:
+              installation_key: test-install-key
+              oid: oid-input
+            platform: aws
+            sensor_seed_key: cloudtrail
+          secret_key: secret-key
+        sensor_type: s3
+      usr_mtd:
+        enabled: false
+        expiry: 2663563600000
+        tags: ["test1", "test2", "test3", "test4"]`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 
@@ -399,63 +399,63 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 	testHiveClient = NewHiveClient(org)
 
 	yamlAdd := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-       data:
-         s3:
-           access_key: "test-access-key"
-           bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-           client_options:
-             hostname: cloudtrail
-             identity:
-               installation_key: test-install-key
-               oid: oid-input
-             platform: aws
-             sensor_seed_key: cloudtrail
-           secret_key: secret-key
-         sensor_type: s3
-       usr_mtd:
-         enabled: false
-         expiry: 0
-         tags: null
-   test-office-365-key:
-     data:
-       office365:
-         client_id: test-client-id
-         client_options:
-           hostname: Office 365 test host name update
-           identity:
-             installation_key: test-install-key-update
-             oid: oid-input
-           platform: office365
-           sensor_seed_key: Office 365 test update
-         client_secret: test-secret
-         content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
-         domain: SecurityInfrastructure.onmicrosoft.com
-         endpoint: enterprise
-         publisher_id: test-publisher-id
-         tenant_id: test-tenant-id
-       sensor_type: office365
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags: null
- fp:
-   'test-sdk-FP':
-     data:
-       op: and
-       rules:
-       - op: is
-         path: cat
-         value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
-       - case sensitive: true
-         op: is
-         path: detect/event/FILE_PATH
-         value: C:\Windows\System32\svch.exe
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags:`
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 0
+          tags: null
+    test-office-365-key:
+      data:
+        office365:
+          client_id: test-client-id
+          client_options:
+            hostname: Office 365 test host name update
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: office365
+            sensor_seed_key: Office 365 test update
+          client_secret: test-secret
+          content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+          domain: SecurityInfrastructure.onmicrosoft.com
+          endpoint: enterprise
+          publisher_id: test-publisher-id
+          tenant_id: test-tenant-id
+        sensor_type: office365
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags: null
+  fp: 
+    'test-sdk-FP':
+      data:
+        op: and
+        rules:
+        - op: is
+          path: cat
+          value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
+        - case sensitive: true
+          op: is
+          path: detect/event/FILE_PATH
+          value: C:\Windows\System32\svch.exe
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags:`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
@@ -508,63 +508,63 @@ func TestHiveMultipleUsrMtdUpdate(t *testing.T) {
 
 	// yaml data is exactly the same except for changes in mtd data
 	yamlAdd := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-       data:
-         s3:
-           access_key: "test-access-key"
-           bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-           client_options:
-             hostname: cloudtrail
-             identity:
-               installation_key: test-install-key
-               oid: oid-input
-             platform: aws
-             sensor_seed_key: cloudtrail
-           secret_key: secret-key
-         sensor_type: s3
-       usr_mtd:
-         enabled: false
-         expiry: 0
-         tags: ["test1", "test2", "test3"]
-   test-office-365-key:
-     data:
-       office365:
-         client_id: test-client-id
-         client_options:
-           hostname: Office 365 test host name update
-           identity:
-             installation_key: test-install-key-update
-             oid: oid-input
-           platform: office365
-           sensor_seed_key: Office 365 test update
-         client_secret: test-secret
-         content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
-         domain: SecurityInfrastructure.onmicrosoft.com
-         endpoint: enterprise
-         publisher_id: test-publisher-id
-         tenant_id: test-tenant-id
-       sensor_type: office365
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags: ["test1", "test2", "test3"]
- fp:
-   'test-sdk-FP':
-     data:
-       op: and
-       rules:
-       - op: is
-         path: cat
-         value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
-       - case sensitive: true
-         op: is
-         path: detect/event/FILE_PATH
-         value: C:\Windows\System32\svch.exe
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags: ["test1", "test2", "test3"]`
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 0
+          tags: ["test1", "test2", "test3"]
+    test-office-365-key:
+      data:
+        office365:
+          client_id: test-client-id
+          client_options:
+            hostname: Office 365 test host name update
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: office365
+            sensor_seed_key: Office 365 test update
+          client_secret: test-secret
+          content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+          domain: SecurityInfrastructure.onmicrosoft.com
+          endpoint: enterprise
+          publisher_id: test-publisher-id
+          tenant_id: test-tenant-id
+        sensor_type: office365
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags: ["test1", "test2", "test3"]
+  fp: 
+    'test-sdk-FP':
+      data:
+        op: and
+        rules:
+        - op: is
+          path: cat
+          value: '00285-WIN-RDP_Connection_From_Non-RFC-1918_Address'
+        - case sensitive: true
+          op: is
+          path: detect/event/FILE_PATH
+          value: C:\Windows\System32\svch.exe
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags: ["test1", "test2", "test3"]`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-office-365-key", office365TestHiveKey)
@@ -782,13 +782,13 @@ func TestHiveDRService(t *testing.T) {
 
 	yaraRule := `
 hives:
- dr-service:
-   __YaraReplicant___sensor_sync_yara:
-     data: null
-     usr_mtd:
-       enabled: false
-       expiry: 2663563600000
-       tags: ["test1", "test2", "test3"]`
+  dr-service:
+    __YaraReplicant___sensor_sync_yara:
+      data: null
+      usr_mtd:
+        enabled: false
+        expiry: 2663563600000
+        tags: ["test1", "test2", "test3"]`
 
 	orgConfig := OrgConfig{}
 	err = yaml.Unmarshal([]byte(yaraRule), &orgConfig)
@@ -854,47 +854,47 @@ hives:
 func TestHiveMerge(t *testing.T) {
 
 	yamlOne := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-       data:
-         s3:
-           access_key: "test-access-key"
-           bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-           client_options:
-             hostname: cloudtrail
-             identity:
-               installation_key: test-install-key
-               oid: oid-input
-             platform: aws
-             sensor_seed_key: cloudtrail
-           secret_key: secret-key
-         sensor_type: s3
-       usr_mtd:
-         enabled: false
-         expiry: 0
-         tags: null
-   test-office-365-key:
-     data:
-       office365:
-         client_id: test-client-id
-         client_options:
-           hostname: Office 365 test host name update
-           identity:
-             installation_key: test-install-key-update
-             oid: oid-input
-           platform: office365
-           sensor_seed_key: Office 365 test update
-         client_secret: test-secret
-         content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
-         domain: SecurityInfrastructure.onmicrosoft.com
-         endpoint: enterprise
-         publisher_id: test-publisher-id
-         tenant_id: test-tenant-id
-       sensor_type: office365
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags: null`
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 0
+          tags: null
+    test-office-365-key:
+      data:
+        office365:
+          client_id: test-client-id
+          client_options:
+            hostname: Office 365 test host name update
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: office365
+            sensor_seed_key: Office 365 test update
+          client_secret: test-secret
+          content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+          domain: SecurityInfrastructure.onmicrosoft.com
+          endpoint: enterprise
+          publisher_id: test-publisher-id
+          tenant_id: test-tenant-id
+        sensor_type: office365
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags: null`
 	yamlOne = strings.ReplaceAll(yamlOne, "oid-input", os.Getenv("_OID"))
 	yamlOne = strings.ReplaceAll(yamlOne, "test-s3-unique-key", s3TestHiveKey)
 	yamlOne = strings.ReplaceAll(yamlOne, "test-office-365-key", office365TestHiveKey)
@@ -907,64 +907,64 @@ func TestHiveMerge(t *testing.T) {
 	}
 
 	yaml2 := `hives:
- cloud_sensor:
-   test-s3-unique-key:
-       data:
-         s3:
-           access_key: "test-access-key"
-           bucket_name: aws-cloudtrail-logs-005407990505-225b8680
-           client_options:
-             hostname: cloudtrail
-             identity:
-               installation_key: test-install-key
-               oid: oid-input
-             platform: aws
-             sensor_seed_key: cloudtrail
-           secret_key: secret-key
-         sensor_type: s3
-       usr_mtd:
-         enabled: false
-         expiry: 2663563600000
-         tags: ["test1", "test2", "test3"]
-   test-office-365-key:
-     data:
-       office365:
-         client_id: test-client-id
-         client_options:
-           hostname: Office 365 test host name update
-           identity:
-             installation_key: test-install-key-update
-             oid: oid-input
-           platform: office365
-           sensor_seed_key: Office 365 test update
-         client_secret: test-secret
-         content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
-         domain: SecurityInfrastructure.onmicrosoft.com
-         endpoint: enterprise
-         publisher_id: test-publisher-id
-         tenant_id: test-tenant-id
-       sensor_type: office365
-     usr_mtd:
-       enabled: false
-       expiry: 2663563600000
-       tags: ["test1", "test2", "test3"]
-   test-gcpTest-key:
-     data:
-       pubsub:
-         client_options:
-           hostname: gcpTest
-           identity:
-             installation_key: test-intsll-key
-             oid: test-oin
-           platform: gcp
-           sensor_seed_key: gcpTest
-         project_name: adf
-         service_account_creds: "{ gcp }"
-         sub_name: asdf
-     usr_mtd:
-       enabled: false
-       expiry: 0
-       tags:`
+  cloud_sensor:
+    test-s3-unique-key:
+        data:
+          s3:
+            access_key: "test-access-key"
+            bucket_name: aws-cloudtrail-logs-005407990505-225b8680
+            client_options:
+              hostname: cloudtrail
+              identity:
+                installation_key: test-install-key
+                oid: oid-input
+              platform: aws
+              sensor_seed_key: cloudtrail
+            secret_key: secret-key
+          sensor_type: s3
+        usr_mtd:
+          enabled: false
+          expiry: 2663563600000
+          tags: ["test1", "test2", "test3"]
+    test-office-365-key:
+      data:
+        office365:
+          client_id: test-client-id
+          client_options:
+            hostname: Office 365 test host name update
+            identity:
+              installation_key: test-install-key-update
+              oid: oid-input
+            platform: office365
+            sensor_seed_key: Office 365 test update
+          client_secret: test-secret
+          content_types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+          domain: SecurityInfrastructure.onmicrosoft.com
+          endpoint: enterprise
+          publisher_id: test-publisher-id
+          tenant_id: test-tenant-id
+        sensor_type: office365
+      usr_mtd:
+        enabled: false
+        expiry: 2663563600000
+        tags: ["test1", "test2", "test3"]
+    test-gcpTest-key:
+      data:
+        pubsub:
+          client_options:
+            hostname: gcpTest
+            identity:
+              installation_key: test-intsll-key
+              oid: test-oin
+            platform: gcp
+            sensor_seed_key: gcpTest
+          project_name: adf
+          service_account_creds: "{ gcp }"
+          sub_name: asdf
+      usr_mtd:
+        enabled: false
+        expiry: 0
+        tags:`
 	yaml2 = strings.ReplaceAll(yaml2, "oid-input", os.Getenv("_OID"))
 	yaml2 = strings.ReplaceAll(yaml2, "test-s3-unique-key", s3TestHiveKey)
 	yaml2 = strings.ReplaceAll(yaml2, "test-office-365-key", office365TestHiveKey)
