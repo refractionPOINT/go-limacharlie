@@ -1,9 +1,8 @@
 package limacharlie
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestYaraRuleAddDelete(t *testing.T) {
