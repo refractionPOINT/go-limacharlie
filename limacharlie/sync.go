@@ -1906,10 +1906,6 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			rule.IsEnabled = &isTrue
 		}
 		if existingRule, ok := existingRules[ruleName]; ok {
-			fmt.Printf("found existing rule %s \n ", ruleName)
-			fmt.Printf("namespace %s \n ", existingRule.HiveName)
-			fmt.Printf("original rule namespace %s \n ", rule.Namespace)
-
 			// A rule with that name is already there.
 			// Is it the exact same rule?
 			if drRulesEqual(rule, existingRule) {

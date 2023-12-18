@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -18,7 +17,6 @@ func TestHiveAddData(t *testing.T) {
 
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	fmt.Printf("this is org %s \n", org.GetOID())
 	testHiveClient = NewHiveClient(org)
 
 	yamlAdd := `hives:
@@ -234,10 +232,6 @@ func TestHiveNoUpdate(t *testing.T) {
 	if len(orgOps) == 0 {
 		t.Errorf("error no orgOps for testNoUpdate")
 		return
-	}
-
-	for _, orgOp := range orgOps {
-		fmt.Printf("this is orgOp %+v \n", orgOp)
 	}
 
 	syncOpS3, syncOpOffice, syncOpFp := false, false, false
