@@ -1,16 +1,20 @@
 package limacharlie
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestYaraRuleAddDelete(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	_, err := findUnsubscribeReplicantCallback(org, "yara")
+	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
 	a.NoError(err)
+	if unsubReplicantCB != nil {
+		defer unsubReplicantCB()
+	}
 
 	sources, err := org.YaraListSources()
 	a.NoError(err)
