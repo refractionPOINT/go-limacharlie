@@ -9,7 +9,7 @@ import (
 )
 
 type InstallationKey struct {
-	CreatedAt   int64    `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatedAt   uint64   `json:"created,omitempty" yaml:"created,omitempty"`
 	Description string   `json:"desc,omitempty" yaml:"desc,omitempty"`
 	ID          string   `json:"iid,omitempty" yaml:"iid,omitempty"`
 	Key         string   `json:"key,omitempty" yaml:"key,omitempty"`
@@ -64,7 +64,7 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 
 	s, ok = d["created"].(string)
 	if !ok {
-		i, ok := d["created"].(int64)
+		i, ok := d["created"].(uint64)
 		if !ok {
 			return fmt.Errorf("invalid field created: %#v (%T)", d["created"], d["created"])
 		}
@@ -74,7 +74,7 @@ func (ik *InstallationKey) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
-		ik.CreatedAt = t.Unix()
+		ik.CreatedAt = uint64(t.Unix())
 	}
 
 	if b, ok := d["use_public_root_ca"].(bool); ok {
