@@ -11,11 +11,6 @@ import (
 func TestPayloads(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	//unsubReplicantCB, err := findUnsubscribeCallback(org, "api", "insight")
-	//a.NoError(err)
-	//if unsubReplicantCB != nil {
-	//	defer unsubReplicantCB()
-	//}
 	testName := uuid.NewString()
 	testData := []byte("thisisatestpayload")
 
