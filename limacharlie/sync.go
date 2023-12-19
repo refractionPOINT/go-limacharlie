@@ -1825,21 +1825,6 @@ func (org Organization) resolveAvailableNamespaces(who WhoAmIJsonResponse) map[s
 	return availableNamespaces
 }
 
-func (org Organization) resolveAvailableHiveNamespaces(who WhoAmIJsonResponse) map[string]struct{} {
-	// Check which namespaces we have available.
-	availableNamespaces := map[string]struct{}{}
-	if who.HasPermissionForOrg(org.client.options.OID, "dr.list") {
-		availableNamespaces["dr-general"] = struct{}{}
-	}
-	if who.HasPermissionForOrg(org.client.options.OID, "dr.list.managed") {
-		availableNamespaces["dr-managed"] = struct{}{}
-	}
-	if who.HasPermissionForOrg(org.client.options.OID, "dr.list.replicant") {
-		availableNamespaces["dr-service"] = struct{}{}
-	}
-	return availableNamespaces
-}
-
 func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (existingRules orgSyncDRRules, err error) {
 	existingRules = orgSyncDRRules{}
 	// Get rules from all the namespaces we have access to.
@@ -1859,41 +1844,14 @@ func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (e
 	return existingRules, nil
 }
 
-func (org Organization) drRulesFromHiveNamespaces(namespaces map[string]struct{}) (map[string]HiveDataWithName, error) {
-
-	hc := NewHiveClient(&org)
-	existing := make(map[string]HiveDataWithName)
-	for ns := range namespaces {
-		listData, err := hc.List(HiveArgs{
-			HiveName:     ns,
-			PartitionKey: org.GetOID(),
-		})
-		if err != nil {
-			return nil, err
-		}
-		for ruleName, hiveData := range listData {
-			existing[ruleName] = HiveDataWithName{
-				HiveName: ns,
-				SysMtd:   hiveData.SysMtd,
-				UsrMtd:   hiveData.UsrMtd,
-				Data:     hiveData.Data,
-			}
-		}
-	}
-	return existing, nil
-}
-
 func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(rules) == 0 {
 		return nil, nil
 	}
 
-	// create hive client
-	hc := NewHiveClient(&org)
-
-	availableNamespaces := org.resolveAvailableHiveNamespaces(who)
+	availableNamespaces := org.resolveAvailableNamespaces(who)
 	ops := []OrgSyncOperation{}
-	existingRules, err := org.drRulesFromHiveNamespaces(availableNamespaces)
+	existingRules, err := org.drRulesFromNamespaces(availableNamespaces)
 	if err != nil {
 		return ops, err
 	}
@@ -1908,7 +1866,7 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 		if existingRule, ok := existingRules[ruleName]; ok {
 			// A rule with that name is already there.
 			// Is it the exact same rule?
-			if drRulesEqual(rule, existingRule) {
+			if existingRule.Equal(rule) {
 				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName})
 				// Nothing to do, move on.
 				continue
@@ -1921,14 +1879,12 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			// It must be replaced.
 			// If they are in different namespaces, we must
 			// delete the old one before setting the new one.
-			ruleNs := namespaceToHiveName(rule.Namespace)
-			if existingRule.HiveName != ruleNs {
-				hc.Remove(HiveArgs{
-					HiveName:     existingRule.HiveName,
-					PartitionKey: org.GetOID(),
-					Key:          ruleName,
-				})
-				if err != nil {
+			if !existingRule.IsInSameNamespace(rule) {
+				existingNs := existingRule.Namespace
+				if existingNs == "" {
+					existingNs = "general"
+				}
+				if err := org.DRRuleDelete(ruleName, WithNamespace(existingNs)); err != nil {
 					return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 				}
 			}
@@ -1937,20 +1893,12 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 			continue
 		}
-
-		ruleNs := namespaceToHiveName(rule.Namespace)
-		if _, err := hc.Add(HiveArgs{
-			HiveName:     ruleNs,
-			PartitionKey: org.GetOID(),
-			Enabled:      rule.IsEnabled,
-			Key:          ruleName,
-			Tags:         rule.Tags,
-			Data: Dict{
-				"detect":  rule.Detect,
-				"respond": rule.Response,
-			},
+		if err := org.DRRuleAdd(ruleName, rule.Detect, rule.Response, NewDRRuleOptions{
+			IsReplace: true,
+			Namespace: rule.Namespace,
+			IsEnabled: *rule.IsEnabled,
 		}); err != nil {
-			return ops, fmt.Errorf("DRRuleAdd %s: %v ", ruleName, err)
+			return ops, fmt.Errorf("DRRuleAdd %s: %v", ruleName, err)
 		}
 		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsAdded: true})
 	}
@@ -1966,48 +1914,18 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 			// Ignore legacy special service rules.
 			continue
 		}
-
 		if _, ok := rules[ruleName]; ok {
 			// Still there.
 			continue
 		}
-
-		if options.Tags != nil || len(options.Tags) != 0 { // if option tags set then we only want to delete matching tags value
-			if slicesContainSameItems(options.Tags, rule.UsrMtd.Tags) {
-				// If this is a DryRun, report the op and move on.
-				if options.IsDryRun {
-					ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
-					continue
-				}
-				hc.Remove(HiveArgs{
-					HiveName:     rule.HiveName,
-					PartitionKey: org.GetOID(),
-					Key:          ruleName,
-				})
-				if err != nil {
-					return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
-				}
-				ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
-				continue
-			}
-			// tags did not match coninue as value should not be removed
-			continue
-		}
-
-		// if you make to this point no options values were passed and syncForce logic continues as it did before
 		// If this is a DryRun, report the op and move on.
 		if options.IsDryRun {
 			ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 			continue
 		}
-		if _, err := hc.Remove(HiveArgs{
-			HiveName:     rule.HiveName,
-			PartitionKey: org.GetOID(),
-			Key:          ruleName,
-		}); err != nil {
+		if err := org.DRRuleDelete(ruleName, WithNamespace(rule.Namespace)); err != nil {
 			return ops, fmt.Errorf("DRDelRule %s: %v", ruleName, err)
 		}
-
 		ops = append(ops, OrgSyncOperation{ElementType: OrgSyncOperationElementType.DRRule, ElementName: ruleName, IsRemoved: true})
 	}
 
@@ -2207,63 +2125,6 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 	}
 
 	return ops, nil
-}
-
-func namespaceToHiveName(namespace string) string {
-	if namespace == "" {
-		namespace = "dr-general"
-	} else if namespace == "replicant" {
-		namespace = "dr-service"
-	} else if !strings.HasPrefix(namespace, "dr-") {
-		namespace = fmt.Sprintf("dr-%s", namespace)
-	}
-	return namespace
-}
-
-func drRulesEqual(dr CoreDRRule, d HiveDataWithName) bool {
-	if dr.Namespace != d.HiveName {
-		drNs := namespaceToHiveName(dr.Namespace)
-		if drNs != d.HiveName {
-			return false
-		}
-	}
-
-	if *dr.IsEnabled != d.UsrMtd.Enabled {
-		return false
-	}
-
-	if _, ok := d.Data["detect"]; ok {
-		j1, err := json.Marshal(d.Data["detect"])
-		if err != nil {
-			return false
-		}
-
-		j2, err := json.Marshal(dr.Detect)
-		if err != nil {
-			return false
-		}
-		if string(j1) != string(j2) {
-			return false
-		}
-	} else {
-		return false
-	}
-
-	if _, ok := d.Data["respond"]; ok {
-		j1, err := json.Marshal(d.Data["respond"])
-		if err != nil {
-			return false
-		}
-		j2, err := json.Marshal(dr.Response)
-		if err != nil {
-			return false
-		}
-		if string(j1) != string(j2) {
-			return false
-		}
-	}
-
-	return true
 }
 
 func slicesContainSameItems(slice1, slice2 []string) bool {

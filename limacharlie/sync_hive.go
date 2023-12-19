@@ -153,6 +153,15 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 					IsAdded:     false,
 					IsRemoved:   true,
 				}
+
+				// If tags are passed ensure all tags match before removing
+				if opts.Tags != nil && len(opts.Tags) != 0 {
+					if !slicesContainSameItems(currentConfigData[k].UsrMtd.Tags, opts.Tags) {
+						continue // tags do not match do not remove
+					}
+					orgOps = append(orgOps, op)
+				}
+
 				if opts.IsDryRun {
 					orgOps = append(orgOps, op)
 					continue
