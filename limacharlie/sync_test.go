@@ -560,12 +560,6 @@ func TestSyncPushIntegrity(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	defer deleteIntegrityRules(org)
 
-	//unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "integrity")
-	//a.NoError(err)
-	//if unsubReplicantCB != nil {
-	//	defer unsubReplicantCB()
-	//}
-
 	rules, err := org.IntegrityRules()
 	a.NoError(err)
 	a.Empty(rules)
@@ -1324,11 +1318,8 @@ func TestSyncPushYara(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	defer deleteYaraRules(org)
 
-	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
+	_, err := findUnsubscribeReplicantCallback(org, "yara")
 	a.NoError(err)
-	if unsubReplicantCB != nil {
-		defer unsubReplicantCB()
-	}
 
 	rules, err := org.YaraListRules()
 	a.NoError(err)

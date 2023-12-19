@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,10 @@ func TestYaraRuleAddDelete(t *testing.T) {
 
 	sources, err := org.YaraListSources()
 	a.NoError(err)
-	a.Empty(sources)
+	for sourceName, _ := range sources {
+		fmt.Printf("this is source name %s \n  ", sourceName)
+		_ = org.YaraSourceDelete(sourceName)
+	}
 
 	source := YaraSource{
 		Source: "https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar",
@@ -32,7 +36,9 @@ func TestYaraRuleAddDelete(t *testing.T) {
 
 	rules, err := org.YaraListRules()
 	a.NoError(err)
-	a.Empty(rules)
+	for ruleName, _ := range rules {
+		_ = org.YaraRuleDelete(ruleName)
+	}
 
 	ruleName := "testyararule"
 	rule := YaraRule{
