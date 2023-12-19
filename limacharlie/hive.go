@@ -32,13 +32,6 @@ type HiveData struct {
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
 
-type HiveDataWithName struct {
-	Data     map[string]interface{} `json:"data" yaml:"data,omitempty"`
-	SysMtd   SysMtd                 `json:"sys_mtd" yaml:"sys_mtd"`
-	UsrMtd   UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
-	HiveName string                 `json:"hive_name" yaml:"hive_name"`
-}
-
 type HiveInfo struct {
 	Name      string `json:"name"`
 	Partition string `json:"partition"`
