@@ -1,7 +1,6 @@
 package limacharlie
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +19,6 @@ func TestYaraRuleAddDelete(t *testing.T) {
 	sources, err := org.YaraListSources()
 	a.NoError(err)
 	for sourceName, _ := range sources {
-		fmt.Printf("this is source name %s \n  ", sourceName)
 		_ = org.YaraSourceDelete(sourceName)
 	}
 

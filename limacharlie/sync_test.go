@@ -34,11 +34,11 @@ func TestSyncPushResources(t *testing.T) {
 
 	resourcesConfig := `
 resources:
- api:
-   - ip-geo
-   - vt
- replicant:
-   - exfil
+  api:
+    - ip-geo
+    - vt
+  replicant:
+    - exfil
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(resourcesConfig), &orgConfig))
@@ -90,6 +90,7 @@ resources:
 	resources, err = org.Resources()
 	a.NoError(err)
 	a.Equal(postForce, resources)
+
 }
 
 func TestSyncPushDRRules(t *testing.T) {
