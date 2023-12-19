@@ -31,12 +31,11 @@ type drAddRuleRequest struct {
 }
 
 type CoreDRRule struct {
-	Name      string   `json:"name,omitempty" yaml:"name,omitempty"`
-	Namespace string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Detect    Dict     `json:"detect" yaml:"detect"`
-	Response  List     `json:"respond" yaml:"respond"`
-	IsEnabled *bool    `json:"is_enabled,omitempty" yaml:"is_enabled,omitempty"`
-	Tags      []string `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Name      string `json:"name,omitempty" yaml:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Detect    Dict   `json:"detect" yaml:"detect"`
+	Response  List   `json:"respond" yaml:"respond"`
+	IsEnabled *bool  `json:"is_enabled,omitempty" yaml:"is_enabled,omitempty"`
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization
