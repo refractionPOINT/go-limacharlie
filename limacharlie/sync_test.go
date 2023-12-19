@@ -32,6 +32,11 @@ func TestSyncPushResources(t *testing.T) {
 	a.NoError(err)
 	defer resetResource(org)
 
+	err = org.ResourceUnsubscribe("yara", "replicant")
+	if err != nil {
+		t.Errorf("failed to unsubscribe from yara rule %+v ", err)
+	}
+
 	resourcesConfig := `
 resources:
   api:
