@@ -2,21 +2,22 @@ package limacharlie
 
 import (
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"path/filepath"
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 )
 
 func resetResource(org *Organization) {
 	orgResources, _ := org.Resources()
 	for orgResCat, orgResNames := range orgResources {
 		for orgResName := range orgResNames {
-			org.ResourceUnsubscribe(orgResName, orgResCat)
+			if orgResCat != "insight" && orgResName != "api" {
+				org.ResourceUnsubscribe(orgResName, orgResCat)
+			}
 		}
 	}
 }
@@ -30,6 +31,11 @@ func TestSyncPushResources(t *testing.T) {
 
 	a.NoError(err)
 	defer resetResource(org)
+
+	err = org.ResourceUnsubscribe("yara", "replicant")
+	if err != nil {
+		t.Errorf("failed to unsubscribe from yara rule %+v ", err)
+	}
 
 	resourcesConfig := `
 resources:
@@ -1324,11 +1330,8 @@ func TestSyncPushYara(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	defer deleteYaraRules(org)
 
-	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "yara")
+	_, err := findUnsubscribeReplicantCallback(org, "yara")
 	a.NoError(err)
-	if unsubReplicantCB != nil {
-		defer unsubReplicantCB()
-	}
 
 	rules, err := org.YaraListRules()
 	a.NoError(err)
@@ -1625,7 +1628,7 @@ func TestSyncOrgExtensions(t *testing.T) {
 
 	yamlValues = `extensions:
   - ext-reliable-tasking
-  - library
+  - binlib
 `
 	orgConf = OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(yamlValues), &orgConf))
@@ -1635,7 +1638,7 @@ func TestSyncOrgExtensions(t *testing.T) {
 	expectedOps = sortSyncOps([]OrgSyncOperation{
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-reliable-tasking"},
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "ext-sensor-cull", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "library", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "binlib", IsAdded: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
 }

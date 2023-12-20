@@ -9,11 +9,7 @@ import (
 func TestInsightObjects(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-	unsubReplicantCB, err := findUnsubscribeCallback(org, "api", "insight")
-	a.NoError(err)
-	if unsubReplicantCB != nil {
-		defer unsubReplicantCB()
-	}
+
 	resp, err := org.InsightObjects(InsightObjectsRequest{
 		IndicatorName:  "%google%",
 		ObjectType:     InsightObjectTypes.Domain,

@@ -110,7 +110,7 @@ func TestHiveAddData(t *testing.T) {
 	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// start of actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "dr-general": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "dr-general": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -468,7 +468,7 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 		return
 	}
 
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push testMultipleDataUpdates %+v", err)
 		return
@@ -485,7 +485,7 @@ func TestHiveMultipleDataUpdates(t *testing.T) {
 	a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps))
 
 	// process actual run
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true}})
+	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"cloud_sensor": true, "fp": true}})
 	if err != nil {
 		t.Errorf("error hive sync push %+v", err)
 		return
@@ -847,8 +847,6 @@ hives:
 	if err != nil {
 		t.Errorf("failed to unsubscribe from yara rule %+v ", err)
 	}
-
-	resetResource(org)
 }
 
 func TestHiveMerge(t *testing.T) {

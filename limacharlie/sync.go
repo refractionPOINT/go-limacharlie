@@ -31,6 +31,9 @@ type SyncOptions struct {
 	// Only simulate changes to the Org.
 	IsDryRun bool `json:"is_dry_run"`
 
+	// Tags used with isForce if tags set force delete will only delete rules with matched tags
+	Tags []string `json:"tags"`
+
 	SyncDRRules          bool            `json:"sync_dr"`
 	SyncOutputs          bool            `json:"sync_outputs"`
 	SyncResources        bool            `json:"sync_resources"`
@@ -2122,6 +2125,25 @@ func (org Organization) syncExtensions(extensions orgSyncExtensions, options Syn
 	}
 
 	return ops, nil
+}
+
+func slicesContainSameItems(slice1, slice2 []string) bool {
+	if len(slice1) != len(slice2) {
+		return false
+	}
+
+	elementExists := make(map[string]bool)
+	for _, item := range slice1 {
+		elementExists[item] = true
+	}
+
+	for _, item := range slice2 {
+		if !elementExists[item] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func mergeStringSets(a []string, b []string) []string {
