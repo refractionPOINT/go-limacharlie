@@ -22,13 +22,6 @@ const (
 	currentAPIVersion = "v1"
 	getJWTURL         = "https://jwt.limacharlie.io"
 
-	defaultConfigFileLocation = "~/.limacharlie"
-	environmentNameEnvVar     = "LC_CURRENT_ENV"
-	oidEnvVar                 = "LC_OID"
-	uidEnvVar                 = "LC_UID"
-	keyEnvVar                 = "LC_API_KEY"
-	credsEnvVar               = "LC_CREDS_FILE"
-
 	restRetries          = 3
 	restTimeout          = 5 * time.Second
 	restCreateOrgTimeout = 35 * time.Second
