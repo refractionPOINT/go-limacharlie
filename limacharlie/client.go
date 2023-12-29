@@ -186,7 +186,10 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	r.Header.Set("User-Agent", "limacharlie-sdk")
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := getHTTPClient(10 * time.Second).Do(r)
+	httpClient := getHTTPClient(10 * time.Second)
+	defer httpClient.CloseIdleConnections()
+
+	resp, err := httpClient.Do(r)
 	if err != nil {
 		return "", err
 	}
@@ -379,7 +382,10 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		r.URL.RawQuery = rawQuery
 	}
 
-	resp, err := getHTTPClient(request.timeout).Do(r)
+	httpClient := getHTTPClient(request.timeout)
+	defer httpClient.CloseIdleConnections()
+
+	resp, err := httpClient.Do(r)
 	if err != nil {
 		return 0, err
 	}
