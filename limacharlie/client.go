@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -29,8 +30,9 @@ const (
 
 // Client makes raw request to LC cloud
 type Client struct {
-	options ClientOptions
-	logger  LCLogger
+	options    ClientOptions
+	logger     LCLogger
+	httpClient *http.Client
 }
 
 // ClientOptions holds all options for Client
@@ -94,7 +96,7 @@ func isEmpty(s string) bool {
 // Will return a valid client as soon as one loader returns valid requirements
 func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...ClientOptionLoader) (*Client, error) {
 	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
-		return &Client{options: inOpt, logger: logger}, nil
+		return &Client{options: inOpt, logger: logger, httpClient: getHTTPClient()}, nil
 	}
 
 	loaderCount := len(optsLoaders)
@@ -121,8 +123,9 @@ func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...Cl
 	}
 
 	return &Client{
-		options: opt,
-		logger:  logger,
+		options:    opt,
+		logger:     logger,
+		httpClient: getHTTPClient(),
 	}, nil
 }
 
@@ -171,7 +174,9 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 		authData.Set("perms", strings.Join(c.options.Permissions, ","))
 	}
 
-	r, err := http.NewRequest(http.MethodPost, getJWTURL, strings.NewReader(authData.Encode()))
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, getJWTURL, strings.NewReader(authData.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -179,10 +184,7 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	r.Header.Set("User-Agent", "limacharlie-sdk")
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	httpClient := getHTTPClient(10 * time.Second)
-	defer httpClient.CloseIdleConnections()
-
-	resp, err := httpClient.Do(r)
+	resp, err := c.httpClient.Do(r)
 	if err != nil {
 		return "", err
 	}
@@ -207,9 +209,8 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	return c.options.JWT, nil
 }
 
-func getHTTPClient(timeout time.Duration) *http.Client {
+func getHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: timeout,
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
 				Timeout: 10 * time.Second,
@@ -360,7 +361,9 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		rawQuery = qData.Encode()
 	}
 
-	r, err := http.NewRequest(verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
+	ctx, _ := context.WithTimeout(context.Background(), request.timeout)
+
+	r, err := http.NewRequestWithContext(ctx, verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
 	if err != nil {
 		return 0, err
 	}
@@ -375,10 +378,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		r.URL.RawQuery = rawQuery
 	}
 
-	httpClient := getHTTPClient(request.timeout)
-	defer httpClient.CloseIdleConnections()
-
-	resp, err := httpClient.Do(r)
+	resp, err := c.httpClient.Do(r)
 	if err != nil {
 		return 0, err
 	}
