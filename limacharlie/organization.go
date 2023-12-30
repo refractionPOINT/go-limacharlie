@@ -284,3 +284,7 @@ func (o *Organization) AddToGroup(gid string) (bool, error) {
 	}
 	return false, nil
 }
+
+func (org *Organization) Close() {
+	org.client.httpClient.CloseIdleConnections()
+}
