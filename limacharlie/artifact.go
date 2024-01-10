@@ -71,9 +71,14 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
+func (org Organization) ExportArtifact(artifactID string, deadline time.Time, optParams *interface{}) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
-	request := makeDefaultRequest(&resp)
+	var request restRequest
+	if optParams != nil {
+		request = makeDefaultRequest(&resp).withQueryData(optParams)
+	} else {
+		request = makeDefaultRequest(&resp)
+	}
 	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return nil, err
 	}
