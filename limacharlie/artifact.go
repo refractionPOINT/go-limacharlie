@@ -71,7 +71,7 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) ExportArtifact(artifactID string, deadline time.Time, optParams Dict{}) (io.ReadCloser, error) {
+func (org Organization) ExportArtifact(artifactID string, deadline time.Time, optParams Dict) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
 	var request restRequest
 	if optParams != nil {
