@@ -75,7 +75,7 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time, op
 	resp := artifactExportResp{}
 	var request restRequest
 	if optParams != nil {
-		request = makeDefaultRequest(&resp).withQueryData(interface{}(optParams))
+		request = makeDefaultRequest(&resp).withQueryData(optParams)
 	} else {
 		request = makeDefaultRequest(&resp)
 	}
