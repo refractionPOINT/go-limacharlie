@@ -13,6 +13,7 @@ import (
 
 type WebhookSender struct {
 	url    string
+	secret string
 	client *http.Client
 }
 
@@ -26,7 +27,8 @@ func (o *Organization) NewWebhookSender(hookName string, secretValue string) (*W
 		return nil, errors.New("hook URL not found in org URLs")
 	}
 	return &WebhookSender{
-		url: fmt.Sprintf("https://%s/%s/%s/%s", hookURL, o.GetOID(), url.PathEscape(hookName), url.PathEscape(secretValue)),
+		url:    fmt.Sprintf("https://%s/%s/%s", hookURL, o.GetOID(), url.PathEscape(hookName)),
+		secret: secretValue,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -52,6 +54,7 @@ func (w *WebhookSender) Send(data interface{}) error {
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Content-Encoding", "gzip")
 	r.Header.Set("User-Agent", "lc-sdk-webhook")
+	r.Header.Set("lc-secret", w.secret)
 
 	resp, err := w.client.Do(r)
 	if err != nil {
