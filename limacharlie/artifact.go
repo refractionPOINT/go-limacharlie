@@ -117,7 +117,10 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time, op
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		return nil, fmt.Errorf("unexpected status: %d", httpResp.StatusCode)
+		// Read all the data from the body in case it includes
+		// a relevant error to return.
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("unexpected status getting data (%d): %s", httpResp.StatusCode, string(body))
 	}
 
 	return httpResp.Body, nil
