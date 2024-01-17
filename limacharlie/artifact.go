@@ -3,11 +3,16 @@ package limacharlie
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
+
+	"cloud.google.com/go/storage"
 )
 
 type ArtifactRuleName = string
@@ -71,14 +76,10 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) ExportArtifact(artifactID string, deadline time.Time, optParams Dict) (io.ReadCloser, error) {
+func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
 	var request restRequest
-	if optParams != nil {
-		request = makeDefaultRequest(&resp).withQueryData(optParams)
-	} else {
-		request = makeDefaultRequest(&resp)
-	}
+	request = makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return nil, err
 	}
@@ -124,4 +125,50 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time, op
 	}
 
 	return httpResp.Body, nil
+}
+
+func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient storage.Client) (io.ReadCloser, error) {
+	resp := artifactExportResp{}
+	var request restRequest
+	request = makeDefaultRequest(&resp).withQueryData(Dict{
+		"dest_bucket": bucketName,
+		"svc_creds":   writeCreds,
+	})
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+		return nil, err
+	}
+	if resp.Payload != "" {
+		b64Dec, err := base64.StdEncoding.DecodeString(resp.Payload)
+		if err != nil {
+			return nil, err
+		}
+		gzR, err := gzip.NewReader(bytes.NewBuffer(b64Dec))
+		if err != nil {
+			return nil, err
+		}
+
+		return gzR, nil
+	}
+
+	u, err := url.Parse(resp.Export)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse export URL: %v", err)
+	}
+	bucket := readClient.Bucket(bucketName)
+	objPath := strings.SplitN(strings.TrimLeft(u.Path, "/"), "/", 2)[1]
+
+	var r io.ReadCloser
+	for !time.Now().After(deadline) {
+		r, err = bucket.Object(objPath).NewReader(ctx)
+		if err == storage.ErrObjectNotExist {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to get object reader: %v", err)
+		}
+		break
+	}
+
+	return r, nil
 }
