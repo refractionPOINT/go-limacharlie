@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type HiveClient struct {
@@ -169,7 +170,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	}
 
 	var hiveResp HiveResp
-	req := makeDefaultRequest(&hiveResp).withFormData(reqDict)
+	req := makeDefaultRequest(&hiveResp).withFormData(reqDict).withTimeout(30 * time.Second)
 	if err := h.Organization.client.reliableRequest(http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
