@@ -1,6 +1,9 @@
 package limacharlie
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -141,8 +144,23 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 		userMtd.Tags = args.Tags
 	}
 
+	// Compress and encode the data since we're
+	// likely to handle large amounts of it.
+	zDat := &bytes.Buffer{}
+	b64 := base64.NewEncoder(base64.StdEncoding, zDat)
+	z := gzip.NewWriter(b64)
+	if err := json.NewEncoder(z).Encode(args.Data); err != nil {
+		return nil, err
+	}
+	if err := z.Close(); err != nil {
+		return nil, err
+	}
+	if err := b64.Close(); err != nil {
+		return nil, err
+	}
+
 	reqDict := Dict{
-		"data":    args.Data,
+		"gzdata":  zDat.String(),
 		"usr_mtd": userMtd,
 	}
 
