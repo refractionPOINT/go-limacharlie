@@ -109,7 +109,7 @@ func (org Organization) CreateArtifactFromReader(name ArtifactName, data io.Read
 	resp := artifactPutPointer{}
 	orgUrl, _ := org.GetUploadUrl(org.GetOID())
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", &orgUrl), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", orgUrl), request); err != nil {
 		return err
 	}
 	c := &http.Client{}
