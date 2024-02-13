@@ -38,6 +38,18 @@ type artifactExportResp struct {
 	Export  string `json:"export,omitempty"`
 }
 
+type orgUrls struct {
+	Certs map[string]string `json:"certs"`
+	URL   map[string]string `json:"url"`
+}
+
+type ArtifactName = string
+type artifactPutPointer struct {
+	URL string `json:"put_url"`
+}
+
+const MAX_UPLOAD_PART_SIZE = 1024 * 1024
+
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
@@ -72,6 +84,48 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	resp := Dict{}
 	if err := org.artifact(&resp, "remove_rule", Dict{"name": ruleName}); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (org Organization) GetUploadUrl(oid string) (string, error) {
+
+	resp := orgUrls{}
+	var request restRequest
+	request = makeDefaultRequest(&resp)
+
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", org.GetOID()), request); err != nil {
+		fmt.Println("Error making GET request:", err)
+		return "", nil
+	}
+
+	logsUrl := resp.URL
+	return logsUrl["logs"], nil
+}
+
+func (org Organization) CreateArtifactFromBytes(name ArtifactName, data []byte) error {
+	return org.CreateArtifactFromReader(name, bytes.NewBuffer(data))
+}
+
+func (org Organization) CreateArtifactFromReader(name ArtifactName, data io.Reader) error {
+	resp := artifactPutPointer{}
+	orgUrl, _ := org.GetUploadUrl(org.GetOID())
+	request := makeDefaultRequest(&resp)
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", &orgUrl), request); err != nil {
+		return err
+	}
+	c := &http.Client{}
+	req, err := http.NewRequest(http.MethodPut, resp.URL, data)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	httpResp, err := c.Do(req)
+	if err != nil {
+		return err
+	}
+	if httpResp.StatusCode != 200 {
+		return fmt.Errorf("failed to PUT artifact, http status: %d", httpResp.StatusCode)
 	}
 	return nil
 }
