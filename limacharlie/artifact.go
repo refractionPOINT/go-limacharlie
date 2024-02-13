@@ -48,8 +48,6 @@ type artifactPutPointer struct {
 	URL string `json:"put_url"`
 }
 
-const MAX_UPLOAD_PART_SIZE = 1024 * 1024
-
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
