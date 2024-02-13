@@ -5,12 +5,16 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"cloud.google.com/go/storage"
 )
@@ -38,15 +42,7 @@ type artifactExportResp struct {
 	Export  string `json:"export,omitempty"`
 }
 
-type orgUrls struct {
-	Certs map[string]string `json:"certs"`
-	URL   map[string]string `json:"url"`
-}
-
-type ArtifactName = string
-type artifactPutPointer struct {
-	URL string `json:"put_url"`
-}
+const MAX_UPLOAD_PART_SIZE = 1024 * 1024
 
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
@@ -86,46 +82,92 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) GetUploadUrl(oid string) (string, error) {
-
-	resp := orgUrls{}
-	var request restRequest
-	request = makeDefaultRequest(&resp)
-
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", org.GetOID()), request); err != nil {
-		fmt.Println("Error making GET request:", err)
-		return "", nil
-	}
-
-	logsUrl := resp.URL
-	return logsUrl["logs"], nil
+func (org Organization) CreateArtifactFromBytes(name string, data []byte) error {
+	file := bytes.NewBuffer(data)
+	size := int64(file.Len())
+	return org.UploadArtifact(file, size, "txt", name, "", "", 30)
 }
 
-func (org Organization) CreateArtifactFromBytes(name ArtifactName, data []byte) error {
-	return org.CreateArtifactFromReader(name, bytes.NewBuffer(data))
-}
+func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int) error {
 
-func (org Organization) CreateArtifactFromReader(name ArtifactName, data io.Reader) error {
-	resp := artifactPutPointer{}
-	orgUrl, _ := org.GetUploadUrl(org.GetOID())
-	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", orgUrl), request); err != nil {
-		return err
+	// Assemble headers
+	headers := map[string]string{}
+	headers["lc-source"] = source
+	headers["lc-hint"] = hint
+	if artifactId != "" {
+		headers["lc-artifact-id"] = artifactId
+	} else {
+		headers["lc-artifact-id"] = uuid.New().String()
 	}
-	c := &http.Client{}
-	req, err := http.NewRequest(http.MethodPut, resp.URL, data)
+	if originalPath != "" {
+		absolutePath, _ := filepath.Abs(originalPath)
+		headers["lc-path"] = base64.StdEncoding.EncodeToString([]byte(absolutePath))
+	}
+	headers["lc-retention-days"] = fmt.Sprint(nDaysRetention)
+
+	// Get artifacts URL
+	urls, err := org.GetURLs()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed resolving org URLs: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-	httpResp, err := c.Do(req)
-	if err != nil {
-		return err
+	uploadUrl, ok := urls["artifacts"]
+	if !ok {
+		return errors.New("artifacts URL not found in org URLs")
 	}
-	if httpResp.StatusCode != 200 {
-		return fmt.Errorf("failed to PUT artifact, http status: %d", httpResp.StatusCode)
+
+	fileSize := size
+
+	// Build request
+	resp := Dict{}
+	fileData := FileData{}
+
+	if MAX_UPLOAD_PART_SIZE > fileSize {
+		// Simple single-chunk upload.
+		fileData.File = data
+		fileData.Headers = headers
+		request := makeDefaultRequest(&resp)
+		if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), request, fileData); err != nil {
+			return err
+		}
+
+		return nil
+
+	} else {
+		// Multi-part upload.
+		partId := 0
+		if artifactId == "" {
+			headers["lc-artifact-id"] = uuid.New().String()
+		}
+
+		for {
+			chunk := make([]byte, MAX_UPLOAD_PART_SIZE)
+			n, err := data.Read(chunk)
+			if err != nil && err != io.EOF {
+				return err
+			}
+			if n == 0 {
+				break
+			}
+			chunk = chunk[:n]
+			readerChunk := bytes.NewReader(chunk)
+
+			if n < MAX_UPLOAD_PART_SIZE {
+				headers["lc-part"] = "done"
+			} else {
+				headers["lc-part"] = fmt.Sprintf("%d", partId)
+			}
+
+			fileData.File = readerChunk
+			fileData.Headers = headers
+			request := makeDefaultRequest(&resp)
+			if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), request, fileData); err != nil {
+				return err
+			}
+
+			partId++
+		}
 	}
-	return nil
+	return err
 }
 
 func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
