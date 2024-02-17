@@ -11,9 +11,16 @@ func TestArtifactUpload(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
+	var ingestion_key string
+	ingestion_keys, _ := org.GetIngestionKeys()
+	for k, v := range ingestion_keys {
+		if k == "__lc_sensor_artifact" {
+			ingestion_key = v.(string)
+		}
+	}
 	testName := uuid.NewString()
 	testData := []byte("thisisatestartifact")
-	a.NoError(org.CreateArtifactFromBytes(testName, testData))
+	a.NoError(org.CreateArtifactFromBytes(testName, testData, ingestion_key))
 }
 
 func TestLoggingAddDelete(t *testing.T) {

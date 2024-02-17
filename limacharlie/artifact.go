@@ -82,13 +82,13 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) CreateArtifactFromBytes(name string, data []byte) error {
+func (org Organization) CreateArtifactFromBytes(name string, data []byte, ingestion_key string) error {
 	file := bytes.NewBuffer(data)
 	size := int64(file.Len())
-	return org.UploadArtifact(file, size, "txt", name, "", "", 30)
+	return org.UploadArtifact(file, size, "txt", name, "", "", 30, ingestion_key)
 }
 
-func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int) error {
+func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestion_key string) error {
 
 	// Assemble headers
 	headers := map[string]string{}
@@ -118,16 +118,32 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	fileSize := size
 
 	// Build request
-	resp := Dict{}
-	fileData := FileData{}
+	combined := fmt.Sprintf("%s:%s", org.GetOID(), ingestion_key)
+	base64_encoded_ingestion_key := base64.StdEncoding.EncodeToString([]byte(combined))
 
 	if MAX_UPLOAD_PART_SIZE > fileSize {
 		// Simple single-chunk upload.
-		fileData.File = data
-		fileData.Headers = headers
-		request := makeDefaultRequest(&resp)
-		if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), request, fileData); err != nil {
+		headers = headers
+
+		c := &http.Client{}
+
+		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), data)
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Authorization", fmt.Sprintf("Basic %s", base64_encoded_ingestion_key))
+		if err != nil {
 			return err
+		}
+
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		httpResp, err := c.Do(req)
+		if err != nil {
+			return err
+		}
+		if httpResp.StatusCode != 200 {
+			return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
 		}
 
 		return nil
@@ -157,11 +173,26 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 				headers["lc-part"] = fmt.Sprintf("%d", partId)
 			}
 
-			fileData.File = readerChunk
-			fileData.Headers = headers
-			request := makeDefaultRequest(&resp)
-			if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), request, fileData); err != nil {
+			c := &http.Client{}
+			data = readerChunk
+
+			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), data)
+			req.Header.Set("Content-Type", "application/octet-stream")
+			req.Header.Set("Authorization", fmt.Sprintf("Basic %s", base64_encoded_ingestion_key))
+			if err != nil {
 				return err
+			}
+
+			for k, v := range headers {
+				req.Header.Set(k, v)
+			}
+
+			httpResp, err := c.Do(req)
+			if err != nil {
+				return err
+			}
+			if httpResp.StatusCode != 200 {
+				return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
 			}
 
 			partId++
