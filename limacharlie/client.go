@@ -46,11 +46,6 @@ type ClientOptions struct {
 	JWTExpiryTime time.Duration
 }
 
-type FileData struct {
-	File    io.Reader
-	Headers map[string]string
-}
-
 type jwtResponse struct {
 	JWT string `json:"jwt"`
 }
@@ -225,15 +220,11 @@ func getHTTPClient() *http.Client {
 	}
 }
 
-func (c *Client) reliableRequest(verb string, path string, request restRequest, fileData ...FileData) (err error) {
+func (c *Client) reliableRequest(verb string, path string, request restRequest) (err error) {
 	request.nRetries++
 	for request.nRetries > 0 {
 		var statusCode int
-		if len(fileData) > 0 {
-			statusCode, err = c.request(verb, path, request, fileData[0])
-		} else {
-			statusCode, err = c.request(verb, path, request)
-		}
+		statusCode, err = c.request(verb, path, request)
 		if err == nil && statusCode == http.StatusOK {
 			break
 		}
@@ -347,7 +338,7 @@ func getStringKV(d interface{}) (*url.Values, error) {
 	return m, nil
 }
 
-func (c *Client) request(verb string, path string, request restRequest, fileData ...FileData) (int, error) {
+func (c *Client) request(verb string, path string, request restRequest) (int, error) {
 	headers := map[string]string{}
 	var body io.Reader
 	rawQuery := ""
@@ -360,12 +351,6 @@ func (c *Client) request(verb string, path string, request restRequest, fileData
 	if fData != nil {
 		body = strings.NewReader(fData.Encode())
 		headers["Content-Type"] = "application/x-www-form-urlencoded"
-	} else if fileData != nil {
-		body = fileData[0].File
-		headers["Content-Type"] = "application/x-www-form-urlencoded"
-		for k, v := range fileData[0].Headers {
-			headers[k] = v
-		}
 	}
 
 	qData, err := getStringKV(request.queryData)
@@ -378,12 +363,7 @@ func (c *Client) request(verb string, path string, request restRequest, fileData
 
 	ctx, _ := context.WithTimeout(context.Background(), request.timeout)
 
-	var r *http.Request
-	if strings.Contains(path, "https://") {
-		r, err = http.NewRequestWithContext(ctx, verb, path, body)
-	} else {
-		r, err = http.NewRequestWithContext(ctx, verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
-	}
+	r, err := http.NewRequestWithContext(ctx, verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
 	if err != nil {
 		return 0, err
 	}
@@ -397,6 +377,7 @@ func (c *Client) request(verb string, path string, request restRequest, fileData
 	if rawQuery != "" {
 		r.URL.RawQuery = rawQuery
 	}
+
 	resp, err := c.httpClient.Do(r)
 	if err != nil {
 		return 0, err
