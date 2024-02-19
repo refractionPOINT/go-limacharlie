@@ -83,31 +83,30 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func getContentReader(dataOrFilePath string) (io.Reader, int64, error) {
+func getContentReader(dataOrFilePath string) (io.Reader, string, int64, error) {
 	// Check if the input is a file path
 	if fileInfo, err := os.Stat(dataOrFilePath); err == nil {
 		// If it's a file, read its content
 		file, err := os.Open(dataOrFilePath)
 		if err != nil {
-			return nil, 0, err
+			return nil, "", 0, err
 		}
-		return file, fileInfo.Size(), nil
+		return file, dataOrFilePath, fileInfo.Size(), nil
 	}
 
 	// If it's not a file path, assume it's a string of data
 	data := bytes.NewBufferString(dataOrFilePath)
-	return data, int64(data.Len()), nil
+	return data, "", int64(data.Len()), nil
 }
 
-func (org Organization) CreateArtifact(name string, fileData string, ingestion_key string) error {
-	var size int64
+func (org Organization) CreateArtifact(name string, fileData string, nDaysRetention int, ingestion_key string) error {
 
-	file, size, err := getContentReader(fileData)
+	file, filePath, size, err := getContentReader(fileData)
 	if err != nil {
 		fmt.Println("Error getting file contents:", err)
 	}
 
-	return org.UploadArtifact(file, size, "txt", name, "", "", 30, ingestion_key)
+	return org.UploadArtifact(file, size, "txt", name, "", filePath, nDaysRetention, ingestion_key)
 }
 
 func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestion_key string) error {

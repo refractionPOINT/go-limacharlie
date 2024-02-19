@@ -20,7 +20,7 @@ func TestArtifactUpload(t *testing.T) {
 	}
 	testName := uuid.NewString()
 	testData := "thisisatestartifact"
-	a.NoError(org.CreateArtifact(testName, testData, ingestion_key))
+	a.NoError(org.CreateArtifact(testName, testData, 30, ingestion_key))
 }
 
 func TestLoggingAddDelete(t *testing.T) {
