@@ -19,8 +19,8 @@ func TestArtifactUpload(t *testing.T) {
 		}
 	}
 	testName := uuid.NewString()
-	testData := []byte("thisisatestartifact")
-	a.NoError(org.CreateArtifactFromBytes(testName, testData, ingestion_key))
+	testData := "thisisatestartifact"
+	a.NoError(org.CreateArtifact(testName, testData, ingestion_key))
 }
 
 func TestLoggingAddDelete(t *testing.T) {

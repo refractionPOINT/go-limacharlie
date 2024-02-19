@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -82,9 +83,30 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) CreateArtifactFromBytes(name string, data []byte, ingestion_key string) error {
-	file := bytes.NewBuffer(data)
-	size := int64(file.Len())
+func getContentReader(dataOrFilePath string) (io.Reader, int64, error) {
+	// Check if the input is a file path
+	if fileInfo, err := os.Stat(dataOrFilePath); err == nil {
+		// If it's a file, read its content
+		file, err := os.Open(dataOrFilePath)
+		if err != nil {
+			return nil, 0, err
+		}
+		return file, fileInfo.Size(), nil
+	}
+
+	// If it's not a file path, assume it's a string of data
+	data := bytes.NewBufferString(dataOrFilePath)
+	return data, int64(data.Len()), nil
+}
+
+func (org Organization) CreateArtifact(name string, fileData string, ingestion_key string) error {
+	var size int64
+
+	file, size, err := getContentReader(fileData)
+	if err != nil {
+		fmt.Println("Error getting file contents:", err)
+	}
+
 	return org.UploadArtifact(file, size, "txt", name, "", "", 30, ingestion_key)
 }
 
@@ -103,7 +125,7 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		absolutePath, _ := filepath.Abs(originalPath)
 		headers["lc-path"] = base64.StdEncoding.EncodeToString([]byte(absolutePath))
 	}
-	headers["lc-retention-days"] = fmt.Sprint(nDaysRetention)
+	headers["lc-retention-days"] = fmt.Sprintf("%d", nDaysRetention)
 
 	// Get artifacts URL
 	urls, err := org.GetURLs()
@@ -114,91 +136,64 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	if !ok {
 		return errors.New("artifacts URL not found in org URLs")
 	}
-
-	fileSize := size
+	reqUrl := fmt.Sprintf("https://%s/ingest", uploadUrl)
 
 	// Build request
 	combined := fmt.Sprintf("%s:%s", org.GetOID(), ingestion_key)
-	base64_encoded_ingestion_key := base64.StdEncoding.EncodeToString([]byte(combined))
+	creds := base64.StdEncoding.EncodeToString([]byte(combined))
+	c := &http.Client{}
+	defer c.CloseIdleConnections()
+	partId := 0
+	endOffset := int64(0)
 
-	if MAX_UPLOAD_PART_SIZE > fileSize {
-		// Simple single-chunk upload.
-		headers = headers
+	for {
+		// Read from the data in chunks of MAX_UPLOAD_PART_SIZE so we can
+		// upload in parts if the file is too big.
+		chunk := make([]byte, MAX_UPLOAD_PART_SIZE)
+		n, err := data.Read(chunk)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if n == 0 {
+			break
+		}
+		chunk = chunk[:n]
 
-		c := &http.Client{}
+		// If this is the last chunk, set the part to "done".
+		endOffset += int64(n)
+		if endOffset > size {
+			return fmt.Errorf("got more data (%d bytes) than expected (%d bytes)", endOffset, size)
+		}
+		if endOffset != size {
+			headers["lc-part"] = fmt.Sprintf("%d", partId)
+		}
 
-		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), data)
-		req.Header.Set("Content-Type", "application/octet-stream")
-		req.Header.Set("Authorization", fmt.Sprintf("Basic %s", base64_encoded_ingestion_key))
+		// Prepare the request.
+		req, err := http.NewRequest(http.MethodPost, reqUrl, bytes.NewBuffer(chunk))
 		if err != nil {
 			return err
 		}
 
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Authorization", fmt.Sprintf("Basic %s", creds))
+		// Add the dynamic headers.
 		for k, v := range headers {
 			req.Header.Set(k, v)
 		}
 
+		// Send the request.
 		httpResp, err := c.Do(req)
 		if err != nil {
 			return err
 		}
+
+		// Check if the API liked it.
 		if httpResp.StatusCode != 200 {
 			return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
 		}
-
-		return nil
-
-	} else {
-		// Multi-part upload.
-		partId := 0
-		if artifactId == "" {
-			headers["lc-artifact-id"] = uuid.New().String()
-		}
-
-		for {
-			chunk := make([]byte, MAX_UPLOAD_PART_SIZE)
-			n, err := data.Read(chunk)
-			if err != nil && err != io.EOF {
-				return err
-			}
-			if n == 0 {
-				break
-			}
-			chunk = chunk[:n]
-			readerChunk := bytes.NewReader(chunk)
-
-			if n < MAX_UPLOAD_PART_SIZE {
-				headers["lc-part"] = "done"
-			} else {
-				headers["lc-part"] = fmt.Sprintf("%d", partId)
-			}
-
-			c := &http.Client{}
-			data = readerChunk
-
-			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://%s/ingest", uploadUrl), data)
-			req.Header.Set("Content-Type", "application/octet-stream")
-			req.Header.Set("Authorization", fmt.Sprintf("Basic %s", base64_encoded_ingestion_key))
-			if err != nil {
-				return err
-			}
-
-			for k, v := range headers {
-				req.Header.Set(k, v)
-			}
-
-			httpResp, err := c.Do(req)
-			if err != nil {
-				return err
-			}
-			if httpResp.StatusCode != 200 {
-				return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
-			}
-
-			partId++
-		}
+		partId++
 	}
-	return err
+	return nil
 }
 
 func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
