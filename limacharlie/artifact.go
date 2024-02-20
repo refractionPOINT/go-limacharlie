@@ -116,9 +116,9 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	headers["lc-source"] = source
 	headers["lc-hint"] = hint
 	if artifactId != "" {
-		headers["lc-artifact-id"] = artifactId
+		headers["lc-payload-id"] = artifactId
 	} else {
-		headers["lc-artifact-id"] = uuid.New().String()
+		headers["lc-payload-id"] = uuid.New().String()
 	}
 	if originalPath != "" {
 		absolutePath, _ := filepath.Abs(originalPath)
