@@ -163,8 +163,12 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		if endOffset > size {
 			return fmt.Errorf("got more data (%d bytes) than expected (%d bytes)", endOffset, size)
 		}
-		if endOffset != size {
+		if size <= MAX_UPLOAD_PART_SIZE {
+			// If the file is small enough, we can upload it in one go.
+		} else if endOffset != size {
 			headers["lc-part"] = fmt.Sprintf("%d", partId)
+		} else {
+			headers["lc-part"] = "done"
 		}
 
 		// Prepare the request.
