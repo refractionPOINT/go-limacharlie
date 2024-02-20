@@ -3,8 +3,25 @@ package limacharlie
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestArtifactUpload(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// create ingestion key
+	resp, _ := org.SetIngestionKeys("__test_key")
+	ingestion_key := resp["key"]
+
+	testName := uuid.NewString()
+	testData := "thisisatestartifact"
+	a.NoError(org.CreateArtifact(testName, testData, 30, ingestion_key.(string)))
+
+	// delete ingestion key
+	resp, _ = org.DelIngestionKeys("__test_key")
+}
 
 func TestLoggingAddDelete(t *testing.T) {
 	a := assert.New(t)

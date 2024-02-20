@@ -5,12 +5,17 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"cloud.google.com/go/storage"
 )
@@ -37,6 +42,8 @@ type artifactExportResp struct {
 	Payload string `json:"payload,omitempty"`
 	Export  string `json:"export,omitempty"`
 }
+
+const MAX_UPLOAD_PART_SIZE = 1024 * 1024
 
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
@@ -72,6 +79,122 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	resp := Dict{}
 	if err := org.artifact(&resp, "remove_rule", Dict{"name": ruleName}); err != nil {
 		return err
+	}
+	return nil
+}
+
+func getContentReader(dataOrFilePath string) (io.Reader, string, int64, error) {
+	// Check if the input is a file path
+	if fileInfo, err := os.Stat(dataOrFilePath); err == nil {
+		// If it's a file, read its content
+		file, err := os.Open(dataOrFilePath)
+		if err != nil {
+			return nil, "", 0, err
+		}
+		return file, dataOrFilePath, fileInfo.Size(), nil
+	}
+
+	// If it's not a file path, assume it's a string of data
+	data := bytes.NewBufferString(dataOrFilePath)
+	return data, "", int64(data.Len()), nil
+}
+
+func (org Organization) CreateArtifact(name string, fileData string, nDaysRetention int, ingestion_key string) error {
+
+	file, filePath, size, err := getContentReader(fileData)
+	if err != nil {
+		fmt.Println("Error getting file contents:", err)
+	}
+
+	return org.UploadArtifact(file, size, "txt", name, "", filePath, nDaysRetention, ingestion_key)
+}
+
+func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestion_key string) error {
+
+	// Assemble headers
+	headers := map[string]string{}
+	headers["lc-source"] = source
+	headers["lc-hint"] = hint
+	if artifactId != "" {
+		headers["lc-artifact-id"] = artifactId
+	} else {
+		headers["lc-artifact-id"] = uuid.New().String()
+	}
+	if originalPath != "" {
+		absolutePath, _ := filepath.Abs(originalPath)
+		headers["lc-path"] = base64.StdEncoding.EncodeToString([]byte(absolutePath))
+	}
+	headers["lc-retention-days"] = fmt.Sprintf("%d", nDaysRetention)
+
+	// Get artifacts URL
+	urls, err := org.GetURLs()
+	if err != nil {
+		return fmt.Errorf("failed resolving org URLs: %v", err)
+	}
+	uploadUrl, ok := urls["artifacts"]
+	if !ok {
+		return errors.New("artifacts URL not found in org URLs")
+	}
+	reqUrl := fmt.Sprintf("https://%s/ingest", uploadUrl)
+
+	// Build request
+	combined := fmt.Sprintf("%s:%s", org.GetOID(), ingestion_key)
+	creds := base64.StdEncoding.EncodeToString([]byte(combined))
+	c := &http.Client{}
+	defer c.CloseIdleConnections()
+	partId := 0
+	endOffset := int64(0)
+
+	for {
+		// Read from the data in chunks of MAX_UPLOAD_PART_SIZE so we can
+		// upload in parts if the file is too big.
+		chunk := make([]byte, MAX_UPLOAD_PART_SIZE)
+		n, err := data.Read(chunk)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if n == 0 {
+			break
+		}
+		chunk = chunk[:n]
+
+		// If this is the last chunk, set the part to "done".
+		endOffset += int64(n)
+		if endOffset > size {
+			return fmt.Errorf("got more data (%d bytes) than expected (%d bytes)", endOffset, size)
+		}
+		if size <= MAX_UPLOAD_PART_SIZE {
+			// If the file is small enough, we can upload it in one go.
+		} else if endOffset != size {
+			headers["lc-part"] = fmt.Sprintf("%d", partId)
+		} else {
+			headers["lc-part"] = "done"
+		}
+
+		// Prepare the request.
+		req, err := http.NewRequest(http.MethodPost, reqUrl, bytes.NewBuffer(chunk))
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Authorization", fmt.Sprintf("Basic %s", creds))
+		// Add the dynamic headers.
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		// Send the request.
+		httpResp, err := c.Do(req)
+		if err != nil {
+			return err
+		}
+
+		// Check if the API liked it.
+		if httpResp.StatusCode != 200 {
+			return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
+		}
+		partId++
 	}
 	return nil
 }

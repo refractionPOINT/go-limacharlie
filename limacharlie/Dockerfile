@@ -11,4 +11,3 @@ ADD limacharlie.test .
 ADD tests ./tests
 
 CMD ["./limacharlie.test", "-test.v", "-test.run", "^.*$"]
-
