@@ -13,11 +13,11 @@ func TestArtifactUpload(t *testing.T) {
 
 	// create ingestion key
 	resp, _ := org.SetIngestionKeys("__test_key")
-	ingestion_key := resp["key"]
+	ingestionKey := resp["key"]
 
 	testName := uuid.NewString()
 	testData := "thisisatestartifact"
-	a.NoError(org.CreateArtifact(testName, testData, 30, ingestion_key.(string)))
+	a.NoError(org.CreateArtifact(testName, testData, "txt", 30, ingestionKey.(string)))
 
 	// delete ingestion key
 	resp, _ = org.DelIngestionKeys("__test_key")
