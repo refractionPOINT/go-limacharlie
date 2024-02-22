@@ -99,17 +99,17 @@ func getContentReader(dataOrFilePath string) (io.Reader, string, int64, error) {
 	return data, "", int64(data.Len()), nil
 }
 
-func (org Organization) CreateArtifact(name string, fileData string, nDaysRetention int, ingestion_key string) error {
+func (org Organization) CreateArtifact(name string, fileData string, fileType string, nDaysRetention int, ingestionKey string) error {
 
 	file, filePath, size, err := getContentReader(fileData)
 	if err != nil {
 		fmt.Println("Error getting file contents:", err)
 	}
 
-	return org.UploadArtifact(file, size, "txt", name, "", filePath, nDaysRetention, ingestion_key)
+	return org.UploadArtifact(file, size, fileType, name, "", filePath, nDaysRetention, ingestionKey)
 }
 
-func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestion_key string) error {
+func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestionKey string) error {
 
 	// Assemble headers
 	headers := map[string]string{}
@@ -138,7 +138,7 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	reqUrl := fmt.Sprintf("https://%s/ingest", uploadUrl)
 
 	// Build request
-	combined := fmt.Sprintf("%s:%s", org.GetOID(), ingestion_key)
+	combined := fmt.Sprintf("%s:%s", org.GetOID(), ingestionKey)
 	creds := base64.StdEncoding.EncodeToString([]byte(combined))
 	c := &http.Client{}
 	defer c.CloseIdleConnections()
