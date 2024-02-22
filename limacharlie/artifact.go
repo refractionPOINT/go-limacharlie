@@ -99,14 +99,14 @@ func getContentReader(dataOrFilePath string) (io.Reader, string, int64, error) {
 	return data, "", int64(data.Len()), nil
 }
 
-func (org Organization) CreateArtifact(name string, fileData string, fileType string, nDaysRetention int, ingestionKey string) error {
+func (org Organization) CreateArtifact(name string, fileData string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
 
 	file, filePath, size, err := getContentReader(fileData)
 	if err != nil {
 		fmt.Println("Error getting file contents:", err)
 	}
 
-	return org.UploadArtifact(file, size, fileType, name, "", filePath, nDaysRetention, ingestionKey)
+	return org.UploadArtifact(file, size, fileType, name, artifactId, filePath, nDaysRetention, ingestionKey)
 }
 
 func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestionKey string) error {
