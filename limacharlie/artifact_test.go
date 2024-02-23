@@ -17,7 +17,7 @@ func TestArtifactUpload(t *testing.T) {
 
 	testName := uuid.NewString()
 	testData := "thisisatestartifact"
-	a.NoError(org.CreateArtifact(testName, testData, "txt", 30, ingestionKey.(string)))
+	a.NoError(org.CreateArtifact(testName, testData, "txt", uuid.New().String(), 30, ingestionKey.(string)))
 
 	// delete ingestion key
 	resp, _ = org.DelIngestionKeys("__test_key")
