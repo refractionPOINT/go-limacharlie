@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 
 	"cloud.google.com/go/storage"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type ArtifactRuleName = string
@@ -43,7 +45,9 @@ type artifactExportResp struct {
 	Export  string `json:"export,omitempty"`
 }
 
-const MAX_UPLOAD_PART_SIZE = 1024 * 1024
+var maxUploadFilePartSize = int64(1024 * 1024)
+
+const concurrentUploads = 1
 
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
@@ -83,34 +87,25 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func getContentReader(dataOrFilePath string) (io.Reader, string, int64, error) {
-	// Check if the input is a file path
-	if fileInfo, err := os.Stat(dataOrFilePath); err == nil {
-		// If it's a file, read its content
-		file, err := os.Open(dataOrFilePath)
-		if err != nil {
-			return nil, "", 0, err
-		}
-		return file, dataOrFilePath, fileInfo.Size(), nil
-	}
-
-	// If it's not a file path, assume it's a string of data
-	data := bytes.NewBufferString(dataOrFilePath)
-	return data, "", int64(data.Len()), nil
+func (org Organization) CreateArtifactFromBytes(name string, fileData []byte, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
+	return org.UploadArtifact(bytes.NewBuffer(fileData), int64(len(fileData)), fileType, name, artifactId, "", nDaysRetention, ingestionKey)
 }
 
-func (org Organization) CreateArtifact(name string, fileData string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
-
-	file, filePath, size, err := getContentReader(fileData)
+func (org Organization) CreateArtifactFromFile(name string, fileName string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
+	fileInfo, err := os.Stat(fileName)
 	if err != nil {
-		fmt.Println("Error getting file contents:", err)
+		return err
+	}
+	// If it's a file, read its content
+	file, err := os.Open(fileName)
+	if err != nil {
+		return err
 	}
 
-	return org.UploadArtifact(file, size, fileType, name, artifactId, filePath, nDaysRetention, ingestionKey)
+	return org.UploadArtifact(file, fileInfo.Size(), fileType, name, artifactId, fileName, nDaysRetention, ingestionKey)
 }
 
 func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestionKey string) error {
-
 	// Assemble headers
 	headers := map[string]string{}
 	headers["lc-source"] = source
@@ -144,11 +139,13 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	defer c.CloseIdleConnections()
 	partId := 0
 	endOffset := int64(0)
+	eg := errgroup.Group{}
+	eg.SetLimit(concurrentUploads)
 
 	for {
 		// Read from the data in chunks of MAX_UPLOAD_PART_SIZE so we can
 		// upload in parts if the file is too big.
-		chunk := make([]byte, MAX_UPLOAD_PART_SIZE)
+		chunk := make([]byte, maxUploadFilePartSize)
 		n, err := data.Read(chunk)
 		if err != nil && err != io.EOF {
 			return err
@@ -163,12 +160,21 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		if endOffset > size {
 			return fmt.Errorf("got more data (%d bytes) than expected (%d bytes)", endOffset, size)
 		}
-		if size <= MAX_UPLOAD_PART_SIZE {
+		if size <= maxUploadFilePartSize {
 			// If the file is small enough, we can upload it in one go.
 		} else if endOffset != size {
 			headers["lc-part"] = fmt.Sprintf("%d", partId)
 		} else {
 			headers["lc-part"] = "done"
+			// If this is the last part, we must ensure that all the
+			// other parts were done uploading since LC triggers the
+			// processing of the artifact upon receiving the last part.
+			if err := eg.Wait(); err != nil {
+				return err
+			}
+			// Now reset the error group so we can keep the same
+			// code path as usual.
+			eg = errgroup.Group{}
 		}
 
 		// Prepare the request.
@@ -184,19 +190,25 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 			req.Header.Set(k, v)
 		}
 
-		// Send the request.
-		httpResp, err := c.Do(req)
-		if err != nil {
-			return err
-		}
+		eg.Go(func() error {
+			// Send the request.
+			httpResp, err := c.Do(req)
+			if err != nil {
+				return err
+			}
 
-		// Check if the API liked it.
-		if httpResp.StatusCode != 200 {
-			return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
-		}
+			// Check if the API liked it.
+			if httpResp.StatusCode != 200 {
+				// Read the first 1KB of the response as it can contain details.
+				body := make([]byte, 1024)
+				httpResp.Body.Read(body)
+				return fmt.Errorf("failed to POST artifact, http status: %d (%s)", httpResp.StatusCode, string(body))
+			}
+			return nil
+		})
 		partId++
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
