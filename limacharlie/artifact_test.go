@@ -16,8 +16,12 @@ func TestArtifactUpload(t *testing.T) {
 	ingestionKey := resp["key"]
 
 	testName := uuid.NewString()
-	testData := []byte("thisisatestartifact")
-	a.NoError(org.CreateArtifactFromBytes(testName, testData, "txt", uuid.New().String(), 30, ingestionKey.(string)))
+	testData := []byte("thisisatestartifactthisisatestartifactthisisatestartifactthisisatestartifactthisisatestartifactthisisatestartifact")
+
+	// Tweak the artifact part size to make sure we test the multipart upload.
+	maxUploadFilePartSize = 15
+
+	a.NoError(org.CreateArtifactFromBytes(testName, testData, "txt", uuid.New().String(), 1, ingestionKey.(string)))
 
 	// delete ingestion key
 	resp, _ = org.DelIngestionKeys("__test_key")
