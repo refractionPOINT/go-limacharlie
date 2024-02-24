@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 
 	"cloud.google.com/go/storage"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type ArtifactRuleName = string
@@ -144,6 +146,8 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	defer c.CloseIdleConnections()
 	partId := 0
 	endOffset := int64(0)
+	eg := errgroup.Group{}
+	eg.SetLimit(10)
 
 	for {
 		// Read from the data in chunks of MAX_UPLOAD_PART_SIZE so we can
@@ -169,6 +173,15 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 			headers["lc-part"] = fmt.Sprintf("%d", partId)
 		} else {
 			headers["lc-part"] = "done"
+			// If this is the last part, we must ensure that all the
+			// other parts were done uploading since LC triggers the
+			// processing of the artifact upon receiving the last part.
+			if err := eg.Wait(); err != nil {
+				return err
+			}
+			// Now reset the error group so we can keep the same
+			// code path as usual.
+			eg = errgroup.Group{}
 		}
 
 		// Prepare the request.
@@ -184,19 +197,22 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 			req.Header.Set(k, v)
 		}
 
-		// Send the request.
-		httpResp, err := c.Do(req)
-		if err != nil {
-			return err
-		}
+		eg.Go(func() error {
+			// Send the request.
+			httpResp, err := c.Do(req)
+			if err != nil {
+				return err
+			}
 
-		// Check if the API liked it.
-		if httpResp.StatusCode != 200 {
-			return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
-		}
+			// Check if the API liked it.
+			if httpResp.StatusCode != 200 {
+				return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
+			}
+			return nil
+		})
 		partId++
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
