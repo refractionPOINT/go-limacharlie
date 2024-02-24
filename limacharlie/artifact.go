@@ -85,34 +85,25 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func getContentReader(dataOrFilePath string) (io.Reader, string, int64, error) {
-	// Check if the input is a file path
-	if fileInfo, err := os.Stat(dataOrFilePath); err == nil {
-		// If it's a file, read its content
-		file, err := os.Open(dataOrFilePath)
-		if err != nil {
-			return nil, "", 0, err
-		}
-		return file, dataOrFilePath, fileInfo.Size(), nil
-	}
-
-	// If it's not a file path, assume it's a string of data
-	data := bytes.NewBufferString(dataOrFilePath)
-	return data, "", int64(data.Len()), nil
+func (org Organization) CreateArtifactFromBytes(name string, fileData []byte, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
+	return org.UploadArtifact(bytes.NewBuffer(fileData), int64(len(fileData)), fileType, name, artifactId, "", nDaysRetention, ingestionKey)
 }
 
-func (org Organization) CreateArtifact(name string, fileData string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
-
-	file, filePath, size, err := getContentReader(fileData)
+func (org Organization) CreateArtifactFromFile(name string, fileName string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
+	fileInfo, err := os.Stat(fileName)
 	if err != nil {
-		fmt.Println("Error getting file contents:", err)
+		return err
+	}
+	// If it's a file, read its content
+	file, err := os.Open(fileName)
+	if err != nil {
+		return err
 	}
 
-	return org.UploadArtifact(file, size, fileType, name, artifactId, filePath, nDaysRetention, ingestionKey)
+	return org.UploadArtifact(file, fileInfo.Size(), fileType, name, artifactId, fileName, nDaysRetention, ingestionKey)
 }
 
 func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestionKey string) error {
-
 	// Assemble headers
 	headers := map[string]string{}
 	headers["lc-source"] = source
