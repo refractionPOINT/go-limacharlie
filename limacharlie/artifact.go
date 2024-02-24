@@ -47,6 +47,8 @@ type artifactExportResp struct {
 
 var maxUploadFilePartSize = int64(1024 * 1024)
 
+const concurrentUploads = 1
+
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
@@ -138,7 +140,7 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	partId := 0
 	endOffset := int64(0)
 	eg := errgroup.Group{}
-	eg.SetLimit(10)
+	eg.SetLimit(concurrentUploads)
 
 	for {
 		// Read from the data in chunks of MAX_UPLOAD_PART_SIZE so we can
@@ -197,7 +199,10 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 
 			// Check if the API liked it.
 			if httpResp.StatusCode != 200 {
-				return fmt.Errorf("failed to POST artifact, http status: %d", httpResp.StatusCode)
+				// Read the first 1KB of the response as it can contain details.
+				body := make([]byte, 1024)
+				httpResp.Body.Read(body)
+				return fmt.Errorf("failed to POST artifact, http status: %d (%s)", httpResp.StatusCode, string(body))
 			}
 			return nil
 		})
