@@ -10,29 +10,30 @@ var Platforms = struct {
 	VPN      uint32
 
 	// USP Formats
-	Text         uint32
-	JSON         uint32
-	GCP          uint32
-	AWS          uint32
-	CarbonBlack  uint32
-	OnePassword  uint32
-	Office365    uint32
-	Sophos       uint32
-	Crowdstrike  uint32
-	Xml          uint32
-	Wel          uint32
-	MsDefender   uint32
-	Duo          uint32
-	Okta         uint32
-	SentinelOne  uint32
-	GitHub       uint32
-	Slack        uint32
-	CEF          uint32
-	LCEvent      uint32
-	AzureAD      uint32
-	AzureMonitor uint32
-	CanaryToken  uint32
-	GuardDuty    uint32
+	Text              uint32
+	JSON              uint32
+	GCP               uint32
+	AWS               uint32
+	CarbonBlack       uint32
+	OnePassword       uint32
+	Office365         uint32
+	Sophos            uint32
+	MacUnifiedLogging uint32
+	Crowdstrike       uint32
+	Xml               uint32
+	Wel               uint32
+	MsDefender        uint32
+	Duo               uint32
+	Okta              uint32
+	SentinelOne       uint32
+	GitHub            uint32
+	Slack             uint32
+	CEF               uint32
+	LCEvent           uint32
+	AzureAD           uint32
+	AzureMonitor      uint32
+	CanaryToken       uint32
+	GuardDuty         uint32
 }{
 	Windows:  0x10000000,
 	Linux:    0x20000000,
@@ -43,29 +44,30 @@ var Platforms = struct {
 	VPN:      0x70000000,
 
 	// USP Formats
-	Text:         0x80000000,
-	JSON:         0x90000000,
-	GCP:          0xA0000000,
-	AWS:          0xB0000000,
-	CarbonBlack:  0xC0000000,
-	OnePassword:  0xD0000000,
-	Office365:    0xE0000000,
-	Sophos:       0xF0000000,
-	Crowdstrike:  0x01000000,
-	Xml:          0x02000000,
-	Wel:          0x03000000,
-	MsDefender:   0x04000000,
-	Duo:          0x05000000,
-	Okta:         0x06000000,
-	SentinelOne:  0x07000000,
-	GitHub:       0x08000000,
-	Slack:        0x09000000,
-	CEF:          0x0A000000,
-	LCEvent:      0x0B000000,
-	AzureAD:      0x0C000000,
-	AzureMonitor: 0x0D000000,
-	CanaryToken:  0x0E000000,
-	GuardDuty:    0x0F000000,
+	Text:              0x80000000,
+	JSON:              0x90000000,
+	GCP:               0xA0000000,
+	AWS:               0xB0000000,
+	CarbonBlack:       0xC0000000,
+	OnePassword:       0xD0000000,
+	Office365:         0xE0000000,
+	Sophos:            0xF0000000,
+	MacUnifiedLogging: 0x14000000,
+	Crowdstrike:       0x01000000,
+	Xml:               0x02000000,
+	Wel:               0x03000000,
+	MsDefender:        0x04000000,
+	Duo:               0x05000000,
+	Okta:              0x06000000,
+	SentinelOne:       0x07000000,
+	GitHub:            0x08000000,
+	Slack:             0x09000000,
+	CEF:               0x0A000000,
+	LCEvent:           0x0B000000,
+	AzureAD:           0x0C000000,
+	AzureMonitor:      0x0D000000,
+	CanaryToken:       0x0E000000,
+	GuardDuty:         0x0F000000,
 }
 
 var Architectures = struct {
@@ -102,29 +104,30 @@ var PlatformStrings = map[uint32]string{
 	Platforms.VPN:      "vpn",
 
 	// USP Formats
-	Platforms.Text:         "text",
-	Platforms.JSON:         "json",
-	Platforms.GCP:          "gcp",
-	Platforms.AWS:          "aws",
-	Platforms.CarbonBlack:  "carbon_black",
-	Platforms.OnePassword:  "1password",
-	Platforms.Office365:    "office365",
-	Platforms.Sophos:       "sophos",
-	Platforms.Crowdstrike:  "crowdstrike",
-	Platforms.Xml:          "xml",
-	Platforms.Wel:          "wel",
-	Platforms.MsDefender:   "msdefender",
-	Platforms.Duo:          "duo",
-	Platforms.Okta:         "okta",
-	Platforms.SentinelOne:  "sentinel_one",
-	Platforms.GitHub:       "github",
-	Platforms.Slack:        "slack",
-	Platforms.CEF:          "cef",
-	Platforms.LCEvent:      "lc_event",
-	Platforms.AzureAD:      "azure_ad",
-	Platforms.AzureMonitor: "azure_monitor",
-	Platforms.CanaryToken:  "canary_token",
-	Platforms.GuardDuty:    "guard_duty",
+	Platforms.Text:              "text",
+	Platforms.JSON:              "json",
+	Platforms.GCP:               "gcp",
+	Platforms.AWS:               "aws",
+	Platforms.CarbonBlack:       "carbon_black",
+	Platforms.OnePassword:       "1password",
+	Platforms.Office365:         "office365",
+	Platforms.Sophos:            "sophos",
+	Platforms.MacUnifiedLogging: "mac_unified_logging",
+	Platforms.Crowdstrike:       "crowdstrike",
+	Platforms.Xml:               "xml",
+	Platforms.Wel:               "wel",
+	Platforms.MsDefender:        "msdefender",
+	Platforms.Duo:               "duo",
+	Platforms.Okta:              "okta",
+	Platforms.SentinelOne:       "sentinel_one",
+	Platforms.GitHub:            "github",
+	Platforms.Slack:             "slack",
+	Platforms.CEF:               "cef",
+	Platforms.LCEvent:           "lc_event",
+	Platforms.AzureAD:           "azure_ad",
+	Platforms.AzureMonitor:      "azure_monitor",
+	Platforms.CanaryToken:       "canary_token",
+	Platforms.GuardDuty:         "guard_duty",
 }
 
 var ArchitectureStrings = map[uint32]string{
@@ -151,29 +154,30 @@ var StringToPlatform = map[string]uint32{
 	"vpn":     Platforms.VPN,
 
 	// USP Formats
-	"text":          Platforms.Text,
-	"json":          Platforms.JSON,
-	"gcp":           Platforms.GCP,
-	"aws":           Platforms.AWS,
-	"carbon_black":  Platforms.CarbonBlack,
-	"1password":     Platforms.OnePassword,
-	"office365":     Platforms.Office365,
-	"sophos":        Platforms.Sophos,
-	"crowdstrike":   Platforms.Crowdstrike,
-	"xml":           Platforms.Xml,
-	"wel":           Platforms.Wel,
-	"msdefender":    Platforms.MsDefender,
-	"duo":           Platforms.Duo,
-	"okta":          Platforms.Okta,
-	"sentinel_one":  Platforms.SentinelOne,
-	"github":        Platforms.GitHub,
-	"slack":         Platforms.Slack,
-	"cef":           Platforms.CEF,
-	"lc_event":      Platforms.LCEvent,
-	"azure_ad":      Platforms.AzureAD,
-	"azure_monitor": Platforms.AzureMonitor,
-	"canary_token":  Platforms.CanaryToken,
-	"guard_duty":    Platforms.GuardDuty,
+	"text":                Platforms.Text,
+	"json":                Platforms.JSON,
+	"gcp":                 Platforms.GCP,
+	"aws":                 Platforms.AWS,
+	"carbon_black":        Platforms.CarbonBlack,
+	"1password":           Platforms.OnePassword,
+	"office365":           Platforms.Office365,
+	"sophos":              Platforms.Sophos,
+	"mac_unified_logging": Platforms.MacUnifiedLogging,
+	"crowdstrike":         Platforms.Crowdstrike,
+	"xml":                 Platforms.Xml,
+	"wel":                 Platforms.Wel,
+	"msdefender":          Platforms.MsDefender,
+	"duo":                 Platforms.Duo,
+	"okta":                Platforms.Okta,
+	"sentinel_one":        Platforms.SentinelOne,
+	"github":              Platforms.GitHub,
+	"slack":               Platforms.Slack,
+	"cef":                 Platforms.CEF,
+	"lc_event":            Platforms.LCEvent,
+	"azure_ad":            Platforms.AzureAD,
+	"azure_monitor":       Platforms.AzureMonitor,
+	"canary_token":        Platforms.CanaryToken,
+	"guard_duty":          Platforms.GuardDuty,
 }
 
 var StringToArchitecture = map[string]uint32{
