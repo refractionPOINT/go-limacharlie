@@ -18,6 +18,9 @@ var Platforms = struct {
 	OnePassword       uint32
 	Office365         uint32
 	Sophos            uint32
+	ITGlue            uint32
+	K8sPods           uint32
+	Zeek              uint32
 	MacUnifiedLogging uint32
 	Crowdstrike       uint32
 	Xml               uint32
@@ -52,6 +55,9 @@ var Platforms = struct {
 	OnePassword:       0xD0000000,
 	Office365:         0xE0000000,
 	Sophos:            0xF0000000,
+	ITGlue:            0x11000000,
+	K8sPods:           0x12000000,
+	Zeek:              0x13000000,
 	MacUnifiedLogging: 0x14000000,
 	Crowdstrike:       0x01000000,
 	Xml:               0x02000000,
@@ -112,6 +118,9 @@ var PlatformStrings = map[uint32]string{
 	Platforms.OnePassword:       "1password",
 	Platforms.Office365:         "office365",
 	Platforms.Sophos:            "sophos",
+	Platforms.ITGlue:            "itglue",
+	Platforms.K8sPods:           "k8spods",
+	Platforms.Zeek:              "zeek",
 	Platforms.MacUnifiedLogging: "mac_unified_logging",
 	Platforms.Crowdstrike:       "crowdstrike",
 	Platforms.Xml:               "xml",
@@ -162,6 +171,9 @@ var StringToPlatform = map[string]uint32{
 	"1password":           Platforms.OnePassword,
 	"office365":           Platforms.Office365,
 	"sophos":              Platforms.Sophos,
+	"itglue":              Platforms.ITGlue,
+	"k8spods":             Platforms.K8sPods,
+	"zeek":                Platforms.Zeek,
 	"mac_unified_logging": Platforms.MacUnifiedLogging,
 	"crowdstrike":         Platforms.Crowdstrike,
 	"xml":                 Platforms.Xml,
