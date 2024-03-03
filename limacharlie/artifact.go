@@ -230,6 +230,10 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 
 		return gzR, nil
 	}
+	// If the data contains an inline payload, just return it.
+	if resp.Payload != "" {
+		return io.NopCloser(base64.NewDecoder(base64.StdEncoding, strings.NewReader(resp.Payload))), nil
+	}
 	c := http.Client{
 		Timeout: 30 * time.Second,
 	}

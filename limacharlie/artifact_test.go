@@ -30,7 +30,9 @@ func TestArtifactUpload(t *testing.T) {
 
 	// Download the artifact to make sure it's there.
 	r, err := org.ExportArtifact("", time.Now().Add(1*time.Minute))
-	a.NoError(err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b, err := io.ReadAll(r)
 	a.NoError(err)
 	if string(b) != string(testData) {
