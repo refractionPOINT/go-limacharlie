@@ -47,7 +47,7 @@ type artifactExportResp struct {
 
 var maxUploadFilePartSize = int64(1024 * 1024)
 
-const concurrentUploads = 1
+const concurrentUploads = 10
 
 func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req

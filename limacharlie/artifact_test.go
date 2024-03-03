@@ -1,7 +1,9 @@
 package limacharlie
 
 import (
+	"io"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +27,15 @@ func TestArtifactUpload(t *testing.T) {
 
 	// delete ingestion key
 	resp, _ = org.DelIngestionKeys("__test_key")
+
+	// Download the artifact to make sure it's there.
+	r, err := org.ExportArtifact("", time.Now().Add(1*time.Minute))
+	a.NoError(err)
+	b, err := io.ReadAll(r)
+	a.NoError(err)
+	if string(b) != string(testData) {
+		t.Fatalf("artifact data mismatch: %s != %s", string(b), string(testData))
+	}
 }
 
 func TestLoggingAddDelete(t *testing.T) {
