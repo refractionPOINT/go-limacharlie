@@ -266,7 +266,7 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 	return httpResp.Body, nil
 }
 
-func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient storage.Client) (io.ReadCloser, error) {
+func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
 	var request restRequest
 	request = makeDefaultRequest(&resp).withQueryData(Dict{
