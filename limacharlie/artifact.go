@@ -268,8 +268,7 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 
 func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
-	var request restRequest
-	request = makeDefaultRequest(&resp).withQueryData(Dict{
+	request := makeDefaultRequest(&resp).withQueryData(Dict{
 		"dest_bucket": bucketName,
 		"svc_creds":   writeCreds,
 	})
@@ -310,4 +309,42 @@ func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID
 	}
 
 	return r, nil
+}
+
+func (org Organization) ExportArtifactToGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (string, error) {
+	resp := artifactExportResp{}
+	request := makeDefaultRequest(&resp).withQueryData(Dict{
+		"dest_bucket": bucketName,
+		"svc_creds":   writeCreds,
+	})
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+		return "", err
+	}
+	if resp.Payload != "" {
+		// This should not happen as LC will always use the bucket if present in the request.
+		return "", errors.New("payload is embedded in the response, not in GCS")
+	}
+
+	u, err := url.Parse(resp.Export)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse export URL: %v", err)
+	}
+	bucket := readClient.Bucket(bucketName)
+	objPath := strings.SplitN(strings.TrimLeft(u.Path, "/"), "/", 2)[1]
+
+	var r io.ReadCloser
+	for !time.Now().After(deadline) {
+		r, err = bucket.Object(objPath).NewReader(ctx)
+		if err == storage.ErrObjectNotExist {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to get object reader: %v", err)
+		}
+		r.Close()
+		break
+	}
+
+	return objPath, nil
 }
