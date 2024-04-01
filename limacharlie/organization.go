@@ -157,8 +157,8 @@ func (org *Organization) GetCurrentJWT() string {
 }
 
 // RefreshJWT returns the refreshed JWT of the client
-func (org *Organization) RefreshJWT() string {
-	jwt, _ := org.client.RefreshJWT(time.Hour)
+func (org *Organization) RefreshJWT(duration time.Duration) string {
+	jwt, _ := org.client.RefreshJWT(duration)
 	return jwt
 }
 
