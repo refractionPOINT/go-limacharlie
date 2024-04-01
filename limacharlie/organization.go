@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -157,7 +158,7 @@ func (org *Organization) GetCurrentJWT() string {
 
 // RefreshJWT returns the refreshed JWT of the client
 func (org *Organization) RefreshJWT() string {
-	jwt, _ := org.client.RefreshJWT()
+	jwt, _ := org.client.RefreshJWT(time.Hour)
 	return jwt
 }
 
