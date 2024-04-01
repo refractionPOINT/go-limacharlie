@@ -2,8 +2,9 @@ package limacharlie
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"net/http"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Organization holds a connection to the LC cloud organization
@@ -152,6 +153,12 @@ func makeSet(arr []Permission) map[string]struct{} {
 // GetCurrentJWT returns the JWT of the client
 func (org *Organization) GetCurrentJWT() string {
 	return org.client.GetCurrentJWT()
+}
+
+// RefreshJWT returns the refreshed JWT of the client
+func (org *Organization) RefreshJWT() string {
+	jwt, _ := org.client.RefreshJWT()
+	return jwt
 }
 
 func (org *Organization) WithInvestigationID(invID string) *Organization {
