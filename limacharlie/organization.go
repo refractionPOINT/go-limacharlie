@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -13,6 +14,9 @@ type Organization struct {
 	client *Client
 	logger LCLogger
 	invID  string
+
+	mCachedUrls sync.RWMutex
+	cachedURLs  *SiteConnectivityInfo
 }
 
 // OrganizationInformation has the information about the organization
@@ -168,20 +172,49 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 }
 
 func (o *Organization) GetURLs() (map[string]string, error) {
+	o.mCachedUrls.RLock()
+	if o.cachedURLs != nil {
+		urls := o.cachedURLs.URLs
+		o.mCachedUrls.RUnlock()
+		return urls, nil
+	}
+	o.mCachedUrls.RUnlock()
+
+	o.mCachedUrls.Lock()
+	defer o.mCachedUrls.Unlock()
+	if o.cachedURLs != nil {
+		return o.cachedURLs.URLs, nil
+	}
+
 	resp := SiteConnectivityInfo{}
 
 	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return nil, err
 	}
+	o.cachedURLs = &resp
 	return resp.URLs, nil
 }
 
 func (o *Organization) GetSiteConnectivityInfo() (*SiteConnectivityInfo, error) {
+	o.mCachedUrls.RLock()
+	if o.cachedURLs != nil {
+		urls := o.cachedURLs
+		o.mCachedUrls.RUnlock()
+		return urls, nil
+	}
+	o.mCachedUrls.RUnlock()
+
+	o.mCachedUrls.Lock()
+	defer o.mCachedUrls.Unlock()
+	if o.cachedURLs != nil {
+		return o.cachedURLs, nil
+	}
 	resp := SiteConnectivityInfo{}
 
 	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return nil, err
 	}
+	o.cachedURLs = &resp
 	return &resp, nil
 }
 
