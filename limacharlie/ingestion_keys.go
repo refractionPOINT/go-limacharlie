@@ -9,7 +9,6 @@ import (
 func (org *Organization) GetIngestionKeys() (Dict, error) {
 	resp := map[string]Dict{}
 	request := makeDefaultRequest(&resp)
-	fmt.Println("this is orgID ", org.GetOID())
 	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/ingestion_keys", org.GetOID()), request); err != nil {
 		return nil, err
 	}
