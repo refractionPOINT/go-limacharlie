@@ -48,18 +48,20 @@ type HiveResp struct {
 }
 
 type SysMtd struct {
-	CreatedBy   string `json:"created_by" yaml:"created_by"`
 	Etag        string `json:"etag" yaml:"etag"`
-	GUID        string `json:"guid" yaml:"guid"`
+	CreatedBy   string `json:"created_by" yaml:"created_by"`
+	CreatedAt   int64  `json:"created_at" yaml:"created_at"`
 	LastAuthor  string `json:"last_author" yaml:"last_author"`
+	LastMod     int64  `json:"last_mod" yaml:"last_mod"`
+	GUID        string `json:"guid" yaml:"guid"`
 	LastError   string `json:"last_error" yaml:"last_error"`
 	LastErrorTs int64  `json:"last_error_ts" yaml:"last_error_ts"`
-	LastMod     int64  `json:"last_mod" yaml:"last_mod"`
 }
 type UsrMtd struct {
 	Enabled bool     `json:"enabled" yaml:"enabled"`
 	Expiry  int64    `json:"expiry" yaml:"expiry"`
 	Tags    []string `json:"tags" yaml:"tags"`
+	Comment string   `json:"comment" yaml:"comment"`
 }
 
 type HiveName = string
