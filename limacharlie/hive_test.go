@@ -114,6 +114,10 @@ func hiveGetTest(t *testing.T) {
 	if hiveData.UsrMtd.Tags != nil {
 		t.Errorf("hive get failed UsrMtd tags should be null invalidTags: %s ", hiveData.UsrMtd.Tags)
 	}
+
+	if hiveData.UsrMtd.Comment != "" {
+		t.Errorf("hive get failed UsrMtd comment should be empty: %s ", hiveData.UsrMtd.Comment)
+	}
 }
 
 func hiveGetMtdTest(t *testing.T) {
@@ -200,12 +204,14 @@ func hiveUpdate(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
 		panic(err)
 	}
+	testComment := "test comment"
 	_, err := testHiveClient.Update(HiveArgs{
 		HiveName:     "cloud_sensor",
 		PartitionKey: os.Getenv("_OID"),
 		Key:          testKey,
 		Data:         data,
 		Tags:         []string{"test1", "test2"},
+		Comment:      &testComment,
 	})
 
 	// validate test ran correctly
@@ -237,6 +243,10 @@ func hiveUpdate(t *testing.T) {
 
 	if len(updateData.UsrMtd.Tags) != 2 {
 		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
+	}
+
+	if updateData.UsrMtd.Comment != testComment {
+		t.Errorf("hive update failed invalid comment, comment:%s ", testComment)
 	}
 }
 

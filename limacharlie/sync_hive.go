@@ -2,8 +2,9 @@ package limacharlie
 
 import (
 	"encoding/json"
-	"gopkg.in/yaml.v3"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
 type SyncHiveConfigData map[string]SyncHiveData
@@ -192,6 +193,7 @@ func (org Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, 
 				Enabled: v.UsrMtd.Enabled,
 				Expiry:  v.UsrMtd.Expiry,
 				Tags:    v.UsrMtd.Tags,
+				Comment: v.UsrMtd.Comment,
 			},
 		}
 	}
@@ -208,7 +210,8 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error
 
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
-	Tags := hd.UsrMtd.Tags
+	tags := hd.UsrMtd.Tags
+	comment := hd.UsrMtd.Comment
 	args := HiveArgs{
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
@@ -216,7 +219,8 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error
 		Data:         hd.Data,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
-		Tags:         Tags,
+		Tags:         tags,
+		Comment:      &comment,
 	}
 
 	_, err = hiveClient.Update(args) // run actual update call
@@ -236,7 +240,8 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
-	Tags := hd.UsrMtd.Tags
+	tags := hd.UsrMtd.Tags
+	comment := hd.UsrMtd.Comment
 	args := HiveArgs{
 		Key:          ha.Key,
 		PartitionKey: ha.PartitionKey,
@@ -244,7 +249,8 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		Data:         hd.Data,
 		Enabled:      &enabled,
 		Expiry:       &expiry,
-		Tags:         Tags,
+		Tags:         tags,
+		Comment:      &comment,
 	}
 
 	_, err = hiveClient.Add(args)
