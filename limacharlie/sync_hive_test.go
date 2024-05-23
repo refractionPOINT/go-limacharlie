@@ -39,7 +39,7 @@ func TestHiveAddData(t *testing.T) {
           enabled: false
           expiry: 0
           tags: null
-		  comment: something
+          comment: something
     test-office-365-key:
         data:
           office365:
@@ -153,7 +153,7 @@ func TestHiveDataUpdate(t *testing.T) {
       usr_mtd:
         enabled: false
         expiry: 0
-		comment: else
+        comment: else
         tags: null`
 	yamlAdd = strings.ReplaceAll(yamlAdd, "oid-input", os.Getenv("_OID"))
 	yamlAdd = strings.ReplaceAll(yamlAdd, "test-s3-unique-key", s3TestHiveKey)
