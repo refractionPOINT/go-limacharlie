@@ -26,6 +26,7 @@ type HiveArgs struct {
 	Enabled      *bool
 	Tags         []string
 	ETag         *string
+	Comment      *string
 }
 
 type HiveConfigData map[string]HiveData
@@ -146,6 +147,9 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	if args.Tags != nil {
 		userMtd.Tags = args.Tags
 	}
+	if args.Comment != nil {
+		userMtd.Comment = *args.Comment
+	}
 
 	// Compress and encode the data since we're
 	// likely to handle large amounts of it.
@@ -214,6 +218,9 @@ func (h *HiveClient) Update(args HiveArgs) (*HiveResp, error) {
 	if args.Tags != nil {
 		usrMtd.Tags = args.Tags
 	}
+	if args.Comment != nil {
+		usrMtd.Comment = *args.Comment
+	}
 
 	// empty data request only update with usr_mtd and etag
 	reqData := Dict{}
@@ -276,6 +283,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 			Enabled:      &newRec.UsrMtd.Enabled,
 			Tags:         newRec.UsrMtd.Tags,
 			ETag:         &eTag,
+			Comment:      &newRec.UsrMtd.Comment,
 		})
 		if err != nil {
 			if !strings.Contains(err.Error(), "ETAG_MISMATCH") {
