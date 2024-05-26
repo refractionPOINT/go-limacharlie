@@ -78,6 +78,7 @@ var OutputType = struct {
 	Deployment OutputDataType
 	Artifact   OutputDataType
 	Tailored   OutputDataType
+	Billing    OutputDataType
 }{
 	Event:      "event",
 	Detect:     "detect",
@@ -85,6 +86,7 @@ var OutputType = struct {
 	Deployment: "deployment",
 	Artifact:   "artifact",
 	Tailored:   "tailored",
+	Billing:    "billing",
 }
 
 // OutputConfig hold all the possible options used to configure an output
