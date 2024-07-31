@@ -313,6 +313,30 @@ func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 	return delResp, nil
 }
 
+// Rename renames a record in the Hive
+func (h *HiveClient) Rename(args HiveArgs, newName string) (*HiveResp, error) {
+	if args.Key == "" {
+		return nil, errors.New("key required")
+	}
+
+	if newName == "" {
+		return nil, errors.New("new name required")
+	}
+
+	target := "rename"
+	params := url.Values{}
+	params.Add("new_name", url.PathEscape(newName))
+
+	var hiveResp HiveResp
+	req := makeDefaultRequest(&hiveResp).withFormData(params).withTimeout(30 * time.Second)
+	if err := h.Organization.client.reliableRequest(http.MethodPost,
+		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
+		return nil, err
+	}
+
+	return &hiveResp, nil
+}
+
 func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	err := encodeDecodeHiveData(&hsd.Data)
 	if err != nil {
