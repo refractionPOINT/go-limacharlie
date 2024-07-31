@@ -323,7 +323,7 @@ func (h *HiveClient) Rename(args HiveArgs, newName string) (*HiveResp, error) {
 		return nil, errors.New("new name required")
 	}
 
-	target := "re-name"
+	target := "rename"
 	params := url.Values{}
 	params.Add("new_name", url.PathEscape(newName))
 
