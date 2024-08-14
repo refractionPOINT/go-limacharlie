@@ -27,6 +27,7 @@ type HiveArgs struct {
 	Tags         []string
 	ETag         *string
 	Comment      *string
+	ARL          string
 }
 
 type HiveConfigData map[string]HiveData
@@ -133,7 +134,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	}
 
 	target := "mtd" // if no data set default to target type mtd
-	if len(args.Data) != 0 {
+	if len(args.Data) != 0 || args.ARL != "" {
 		target = "data"
 	}
 
@@ -173,6 +174,10 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 
 	if args.ETag != nil {
 		reqDict["etag"] = args.ETag
+	}
+
+	if args.ARL != "" {
+		reqDict["arl"] = args.ARL
 	}
 
 	var hiveResp HiveResp
