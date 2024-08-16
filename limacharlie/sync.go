@@ -73,6 +73,7 @@ func SyncAll() SyncOptions {
 			"yara":             true,
 			"secret":           true,
 			"lookup":           true,
+			"query":            true,
 		},
 	}
 }
