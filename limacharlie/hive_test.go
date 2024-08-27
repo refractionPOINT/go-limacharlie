@@ -373,13 +373,6 @@ func hiveBatchTest(t *testing.T) {
 	// Perform the same test as we did for Get and Set but in a batch
 	// and check we get the same results.
 	batch := testHiveClient.NewBatchOperations()
-	batch.GetRecord(RecordID{
-		Hive: HiveID{
-			Name:      "cloud_sensor",
-			Partition: PartitionID(os.Getenv("_OID")),
-		},
-		Name: RecordName(testKey),
-	})
 	batch.SetRecord(RecordID{
 		Hive: HiveID{
 			Name:      "cloud_sensor",
@@ -416,9 +409,117 @@ func hiveBatchTest(t *testing.T) {
 		t.Errorf("Batch failed: %+v", err)
 		return
 	}
-	if len(responses) != 3 {
-		t.Errorf("Batch failed: expected 3 responses, got %d", len(responses))
+	if len(responses) != 2 {
+		t.Errorf("Batch failed: expected 2 responses, got %d", len(responses))
+		return
+	}
+	if responses[0].Error != "" {
+		t.Errorf("Batch 1 failed: %s", responses[0].Error)
+		return
+	}
+	if responses[1].Error != "" {
+		t.Errorf("Batch 2 failed: %s", responses[1].Error)
 		return
 	}
 	t.Errorf("Batch responses: %#v", responses)
+
+	// Now fetch both records in a batch and also delete them in the same batch.
+	// Finally fetch the deleted records to ensure they are gone.
+	batch = testHiveClient.NewBatchOperations()
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	})
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	})
+	batch.DelRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	})
+	batch.DelRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	})
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	})
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	})
+
+	responses, err = batch.Execute()
+	if err != nil {
+		t.Errorf("Batch failed: %+v", err)
+		return
+	}
+
+	t.Errorf("Batch responses: %#v", responses)
+
+	// Check the responses.
+	if len(responses) != 6 {
+		t.Errorf("Batch failed: expected 6 responses, got %d", len(responses))
+		return
+	}
+	if responses[0].Error != "" {
+		t.Errorf("Batch 1 failed: %s", responses[0].Error)
+		return
+	}
+	if responses[1].Error != "" {
+		t.Errorf("Batch 2 failed: %s", responses[1].Error)
+		return
+	}
+	if responses[2].Error != "" {
+		t.Errorf("Batch 3 failed: %s", responses[2].Error)
+		return
+	}
+	if responses[3].Error != "" {
+		t.Errorf("Batch 4 failed: %s", responses[3].Error)
+		return
+	}
+	if responses[4].Error != "" {
+		t.Errorf("Batch 5 failed: %s", responses[4].Error)
+		return
+	}
+	if responses[5].Error != "" {
+		t.Errorf("Batch 6 failed: %s", responses[5].Error)
+		return
+	}
+	if responses[0].Data == nil {
+		t.Errorf("Batch 1 failed: missing data")
+		return
+	}
+	if responses[1].Data == nil {
+		t.Errorf("Batch 2 failed: missing data")
+		return
+	}
+	if responses[4].Data != nil {
+		t.Errorf("Batch 5 failed: data should not be nil")
+		return
+	}
+	if responses[5].Data != nil {
+		t.Errorf("Batch 6 failed: data should not be nil")
+		return
+	}
 }

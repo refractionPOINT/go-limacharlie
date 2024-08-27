@@ -121,8 +121,12 @@ type ConfigRecordMutation struct {
 	ARL    string  `json:"arl,omitempty" yaml:"arl,omitempty"`
 }
 
-type hiveBatchResponse struct {
-	Responses []interface{} `json:"responses"`
+type hiveBatchResponses struct {
+	Responses []BatchResponse `json:"responses"`
+}
+type BatchResponse struct {
+	Data  Dict   `json:"data"`
+	Error string `json:"error"`
 }
 
 func NewHiveClient(org *Organization) *HiveClient {
@@ -479,7 +483,7 @@ func (b *HiveBatch) DelRecord(record RecordID) {
 	})
 }
 
-func (b *HiveBatch) Execute() ([]interface{}, error) {
+func (b *HiveBatch) Execute() ([]BatchResponse, error) {
 	reqs := url.Values{}
 	for _, req := range b.requests {
 		d, err := json.Marshal(req)
@@ -488,7 +492,7 @@ func (b *HiveBatch) Execute() ([]interface{}, error) {
 		}
 		reqs.Add("request", string(d))
 	}
-	resp := hiveBatchResponse{}
+	resp := hiveBatchResponses{}
 	req := makeDefaultRequest(&resp).withURLValues(reqs).withTimeout(5 * time.Minute)
 	if err := b.h.Organization.client.reliableRequest(http.MethodPost, "hive", req); err != nil {
 		return nil, err
