@@ -28,6 +28,7 @@ func TestHiveClient(t *testing.T) {
 		"update":  hiveUpdate,
 		"tx":      hiveUpdateTx,
 		"remove":  hiveRemove,
+		"batch":   hiveBatchTest,
 	}
 
 	// ensure test execute in proper order
@@ -366,4 +367,58 @@ func hiveUpdateTx(t *testing.T) {
 	if len(updateData.UsrMtd.Tags) != 3 {
 		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
 	}
+}
+
+func hiveBatchTest(t *testing.T) {
+	// Perform the same test as we did for Get and Set but in a batch
+	// and check we get the same results.
+	batch := testHiveClient.NewBatchOperations()
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: RecordName(testKey),
+	})
+	batch.SetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	}, ConfigRecordMutation{
+		Data: Dict{
+			"test": "test",
+		},
+		UsrMtd: &UsrMtd{
+			Tags:    []string{"test"},
+			Enabled: true,
+		},
+	})
+	batch.SetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	}, ConfigRecordMutation{
+		Data: Dict{
+			"test3": "test3",
+		},
+		UsrMtd: &UsrMtd{
+			Tags:    []string{"test3"},
+			Enabled: true,
+		},
+	})
+
+	responses, err := batch.Execute()
+	if err != nil {
+		t.Errorf("Batch failed: %+v", err)
+		return
+	}
+	if len(responses) != 3 {
+		t.Errorf("Batch failed: expected 3 responses, got %d", len(responses))
+		return
+	}
+	t.Errorf("Batch responses: %#v", responses)
 }
