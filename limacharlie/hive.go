@@ -70,6 +70,61 @@ type HiveName = string
 
 type HiveKey = string
 
+type HiveBatch struct {
+	h        *HiveClient
+	requests []Dict
+}
+
+type GetRecordRequest struct {
+	Record RecordID `json:"record_id" yaml:"record_id"`
+}
+
+type MutationRequest struct {
+	Record RecordID             `json:"record_id" yaml:"record_id"`
+	Config ConfigRecordMutation `json:"record" yaml:"record"`
+}
+
+type MtdMutationRequest struct {
+	Record RecordID `json:"record_id" yaml:"record_id"`
+	UsrMtd UsrMtd   `json:"usr_mtd" yaml:"usr_mtd"`
+	SysMtd SysMtd   `json:"sys_mtd" yaml:"sys_mtd"`
+}
+
+type MutationRenameRequest struct {
+	Record  RecordID `json:"record_id" yaml:"record_id"`
+	NewName string   `json:"new_name" yaml:"new_name"`
+}
+
+type DelRecordRequest struct {
+	Record RecordID `json:"record_id" yaml:"record_id"`
+}
+
+type RecordName string
+type GlobalID string
+type PartitionID string
+
+type HiveID struct {
+	Name      HiveName    `json:"name" datastore:"name" yaml:"name"`
+	Partition PartitionID `json:"partition" datastore:"partition" yaml:"partition"`
+}
+
+type RecordID struct {
+	Hive HiveID     `json:"hive" datastore:"hive,flatten" yaml:"hive"`
+	Name RecordName `json:"name" datastore:"name" yaml:"name"`
+	GUID GlobalID   `json:"guid" datastore:"guid" yaml:"guid"`
+}
+
+type ConfigRecordMutation struct {
+	SysMtd *SysMtd `json:"sys_mtd" yaml:"sys_mtd"`
+	UsrMtd *UsrMtd `json:"usr_mtd" yaml:"usr_mtd"`
+	Data   Dict    `json:"data" yaml:"data"`
+	ARL    string  `json:"arl,omitempty" yaml:"arl,omitempty"`
+}
+
+type hiveBatchResponse struct {
+	Responses []interface{} `json:"responses"`
+}
+
 func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}
 }
@@ -388,4 +443,56 @@ func (hsd *HiveData) Equals(cData HiveData) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (h *HiveClient) NewBatchOperations() *HiveBatch {
+	return &HiveBatch{h: h, requests: []Dict{}}
+}
+
+func (b *HiveBatch) GetRecord(record RecordID) {
+	b.requests = append(b.requests, Dict{
+		"get_record": GetRecordRequest{Record: record},
+	})
+}
+
+func (b *HiveBatch) GetRecordMtd(record RecordID) {
+	b.requests = append(b.requests, Dict{
+		"get_record_mtd": GetRecordRequest{Record: record},
+	})
+}
+
+func (b *HiveBatch) SetRecord(record RecordID, config ConfigRecordMutation) {
+	b.requests = append(b.requests, Dict{
+		"set_record": MutationRequest{Record: record, Config: config},
+	})
+}
+
+func (b *HiveBatch) SetRecordMtd(record RecordID, usrMtd UsrMtd, sysMtd SysMtd) {
+	b.requests = append(b.requests, Dict{
+		"set_record_mtd": MtdMutationRequest{Record: record, UsrMtd: usrMtd, SysMtd: sysMtd},
+	})
+}
+
+func (b *HiveBatch) DelRecord(record RecordID) {
+	b.requests = append(b.requests, Dict{
+		"delete_record": DelRecordRequest{Record: record},
+	})
+}
+
+func (b *HiveBatch) Execute() ([]interface{}, error) {
+	reqs := url.Values{}
+	for _, req := range b.requests {
+		d, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+		reqs.Add("request", string(d))
+	}
+	resp := hiveBatchResponse{}
+	req := makeDefaultRequest(&resp).withURLValues(reqs).withTimeout(5 * time.Minute)
+	if err := b.h.Organization.client.reliableRequest(http.MethodPost, "hive", req); err != nil {
+		return nil, err
+	}
+
+	return resp.Responses, nil
 }
