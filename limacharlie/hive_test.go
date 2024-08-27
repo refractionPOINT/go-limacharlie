@@ -32,7 +32,7 @@ func TestHiveClient(t *testing.T) {
 	}
 
 	// ensure test execute in proper order
-	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "remove"}
+	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "remove", "batch"}
 	for _, name := range testArray {
 		t.Run(name, tests[name])
 	}
