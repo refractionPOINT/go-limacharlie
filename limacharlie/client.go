@@ -55,6 +55,7 @@ type restRequest struct {
 	timeout   time.Duration
 	queryData interface{}
 	formData  interface{}
+	urlValues url.Values
 	response  interface{}
 	urlRoot   string
 }
@@ -80,6 +81,11 @@ func (r restRequest) withFormData(formData interface{}) restRequest {
 
 func (r restRequest) withQueryData(queryData interface{}) restRequest {
 	r.queryData = queryData
+	return r
+}
+
+func (r restRequest) withURLValues(urlValues url.Values) restRequest {
+	r.urlValues = urlValues
 	return r
 }
 
@@ -343,9 +349,15 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	var body io.Reader
 	rawQuery := ""
 
-	fData, err := getStringKV(request.formData)
-	if err != nil {
-		return 0, err
+	var fData *url.Values
+	var err error
+	if request.urlValues != nil {
+		fData = &request.urlValues
+	} else {
+		fData, err = getStringKV(request.formData)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	if fData != nil {

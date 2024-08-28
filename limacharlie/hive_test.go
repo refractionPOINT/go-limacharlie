@@ -28,10 +28,11 @@ func TestHiveClient(t *testing.T) {
 		"update":  hiveUpdate,
 		"tx":      hiveUpdateTx,
 		"remove":  hiveRemove,
+		"batch":   hiveBatchTest,
 	}
 
 	// ensure test execute in proper order
-	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "remove"}
+	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "remove", "batch"}
 	for _, name := range testArray {
 		t.Run(name, tests[name])
 	}
@@ -365,5 +366,179 @@ func hiveUpdateTx(t *testing.T) {
 
 	if len(updateData.UsrMtd.Tags) != 3 {
 		t.Errorf("hive update failed invalid tag length of %d", len(updateData.UsrMtd.Tags))
+	}
+}
+
+func hiveBatchTest(t *testing.T) {
+	// Build a dummy record.
+	jsonString := `{
+		"s3": {
+		  "access_key": "access key",
+		  "bucket_name": "bucket_name",
+		  "client_options": {
+			"hostname": "syslog-test",
+			"identity": {
+			  "installation_key": "test install key",
+			  "oid": "oid-input"
+			},
+			"platform": "text",
+			"sensor_seed_key": "syslog-test"
+		  },
+		  "prefix": "prefix",
+		  "secret_key": "secret key"
+		},
+		"sensor_type": "s3"
+	  }`
+	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
+
+	data := Dict{}
+	if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
+		panic(err)
+	}
+
+	// Perform the same test as we did for Get and Set but in a batch
+	// and check we get the same results.
+	batch := testHiveClient.NewBatchOperations()
+	batch.SetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	}, ConfigRecordMutation{
+		Data: data,
+		UsrMtd: &UsrMtd{
+			Tags:    []string{"test"},
+			Enabled: true,
+		},
+	})
+	batch.SetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	}, ConfigRecordMutation{
+		Data: data,
+		UsrMtd: &UsrMtd{
+			Tags:    []string{"test3"},
+			Enabled: true,
+		},
+	})
+
+	responses, err := batch.Execute()
+	if err != nil {
+		t.Errorf("Batch failed: %+v", err)
+		return
+	}
+	if len(responses) != 2 {
+		t.Errorf("Batch failed: expected 2 responses, got %d", len(responses))
+		return
+	}
+	if responses[0].Error != "" {
+		t.Errorf("Batch 1 failed: %s", responses[0].Error)
+		return
+	}
+	if responses[1].Error != "" {
+		t.Errorf("Batch 2 failed: %s", responses[1].Error)
+		return
+	}
+
+	// Now fetch both records in a batch and also delete them in the same batch.
+	// Finally fetch the deleted records to ensure they are gone.
+	batch = testHiveClient.NewBatchOperations()
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	})
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	})
+	batch.DelRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	})
+	batch.DelRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	})
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test2",
+	})
+	batch.GetRecord(RecordID{
+		Hive: HiveID{
+			Name:      "cloud_sensor",
+			Partition: PartitionID(os.Getenv("_OID")),
+		},
+		Name: "test3",
+	})
+
+	responses, err = batch.Execute()
+	if err != nil {
+		t.Errorf("Batch failed: %+v", err)
+		return
+	}
+
+	// Check the responses.
+	if len(responses) != 6 {
+		t.Errorf("Batch failed: expected 6 responses, got %d", len(responses))
+		return
+	}
+	if responses[0].Error != "" {
+		t.Errorf("Batch 1 failed: %s", responses[0].Error)
+		return
+	}
+	if responses[1].Error != "" {
+		t.Errorf("Batch 2 failed: %s", responses[1].Error)
+		return
+	}
+	if responses[2].Error != "" {
+		t.Errorf("Batch 3 failed: %s", responses[2].Error)
+		return
+	}
+	if responses[3].Error != "" {
+		t.Errorf("Batch 4 failed: %s", responses[3].Error)
+		return
+	}
+	if !strings.Contains(responses[4].Error, "RECORD_NOT_FOUND") {
+		t.Errorf("Batch 5 failed: %s", responses[4].Error)
+		return
+	}
+	if !strings.Contains(responses[5].Error, "RECORD_NOT_FOUND") {
+		t.Errorf("Batch 6 failed: %s", responses[5].Error)
+		return
+	}
+	if responses[0].Data == nil {
+		t.Errorf("Batch 1 failed: missing data")
+		return
+	}
+	if responses[1].Data == nil {
+		t.Errorf("Batch 2 failed: missing data")
+		return
+	}
+	if len(responses[4].Data) != 0 {
+		t.Errorf("Batch 5 failed: data should not be nil")
+		return
+	}
+	if len(responses[5].Data) != 0 {
+		t.Errorf("Batch 6 failed: data should not be nil")
+		return
 	}
 }
