@@ -520,11 +520,11 @@ func hiveBatchTest(t *testing.T) {
 		t.Errorf("Batch 4 failed: %s", responses[3].Error)
 		return
 	}
-	if responses[4].Error != "" {
+	if !strings.Contains(responses[4].Error, "RECORD_NOT_FOUND") {
 		t.Errorf("Batch 5 failed: %s", responses[4].Error)
 		return
 	}
-	if responses[5].Error != "" {
+	if !strings.Contains(responses[5].Error, "RECORD_NOT_FOUND") {
 		t.Errorf("Batch 6 failed: %s", responses[5].Error)
 		return
 	}
@@ -536,11 +536,11 @@ func hiveBatchTest(t *testing.T) {
 		t.Errorf("Batch 2 failed: missing data")
 		return
 	}
-	if responses[4].Data != nil {
+	if len(responses[4].Data) != 0 {
 		t.Errorf("Batch 5 failed: data should not be nil")
 		return
 	}
-	if responses[5].Data != nil {
+	if len(responses[5].Data) != 0 {
 		t.Errorf("Batch 6 failed: data should not be nil")
 		return
 	}
