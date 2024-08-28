@@ -370,6 +370,32 @@ func hiveUpdateTx(t *testing.T) {
 }
 
 func hiveBatchTest(t *testing.T) {
+	// Build a dummy record.
+	jsonString := `{
+		"s3": {
+		  "access_key": "access key",
+		  "bucket_name": "bucket_name",
+		  "client_options": {
+			"hostname": "syslog-test",
+			"identity": {
+			  "installation_key": "test install key",
+			  "oid": "oid-input"
+			},
+			"platform": "text",
+			"sensor_seed_key": "syslog-test"
+		  },
+		  "prefix": "prefix",
+		  "secret_key": "secret key"
+		},
+		"sensor_type": "s3"
+	  }`
+	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
+
+	data := Dict{}
+	if err := json.Unmarshal([]byte(jsonString), &data); err != nil {
+		panic(err)
+	}
+
 	// Perform the same test as we did for Get and Set but in a batch
 	// and check we get the same results.
 	batch := testHiveClient.NewBatchOperations()
@@ -380,9 +406,7 @@ func hiveBatchTest(t *testing.T) {
 		},
 		Name: "test2",
 	}, ConfigRecordMutation{
-		Data: Dict{
-			"test": "test",
-		},
+		Data: data,
 		UsrMtd: &UsrMtd{
 			Tags:    []string{"test"},
 			Enabled: true,
@@ -395,9 +419,7 @@ func hiveBatchTest(t *testing.T) {
 		},
 		Name: "test3",
 	}, ConfigRecordMutation{
-		Data: Dict{
-			"test3": "test3",
-		},
+		Data: data,
 		UsrMtd: &UsrMtd{
 			Tags:    []string{"test3"},
 			Enabled: true,
