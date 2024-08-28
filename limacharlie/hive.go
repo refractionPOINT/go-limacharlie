@@ -500,3 +500,7 @@ func (b *HiveBatch) Execute() ([]BatchResponse, error) {
 
 	return resp.Responses, nil
 }
+
+func (b *HiveBatch) GetNumOperations() int {
+	return len(b.requests)
+}
