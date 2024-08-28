@@ -443,7 +443,6 @@ func hiveBatchTest(t *testing.T) {
 		t.Errorf("Batch 2 failed: %s", responses[1].Error)
 		return
 	}
-	t.Errorf("Batch responses: %#v", responses)
 
 	// Now fetch both records in a batch and also delete them in the same batch.
 	// Finally fetch the deleted records to ensure they are gone.
@@ -496,8 +495,6 @@ func hiveBatchTest(t *testing.T) {
 		t.Errorf("Batch failed: %+v", err)
 		return
 	}
-
-	t.Errorf("Batch responses: %#v", responses)
 
 	// Check the responses.
 	if len(responses) != 6 {
