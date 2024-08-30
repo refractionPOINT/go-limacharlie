@@ -3,12 +3,13 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -87,6 +88,12 @@ var supportedOrgValues []string = []string{
 	"shodan",
 	"pagerduty",
 	"twilio",
+	"socprime",
+	"alphamountain",
+	"pangea",
+	"hybrid-analysis",
+	"echotrail",
+	"greynoise",
 }
 
 type DRRuleName = string
