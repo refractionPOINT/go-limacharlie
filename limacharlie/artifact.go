@@ -317,7 +317,7 @@ func (org Organization) ExportArtifactToGCS(ctx context.Context, artifactID stri
 		"dest_bucket": bucketName,
 		"svc_creds":   writeCreds,
 	})
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return "", err
 	}
 	if resp.Payload != "" {
