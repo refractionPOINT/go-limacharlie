@@ -44,6 +44,7 @@ resources:
     - vt
   replicant:
     - exfil
+	- logging
 `
 	orgConfig := OrgConfig{}
 	a.NoError(yaml.Unmarshal([]byte(resourcesConfig), &orgConfig))
@@ -55,6 +56,7 @@ resources:
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsAdded: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsAdded: true},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/logging", IsAdded: false},
 	})
 	a.Equal(sortSyncOps(expectedOps), sortSyncOps(ops))
 	resources, err := org.Resources()
@@ -84,6 +86,7 @@ resources:
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo"},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsRemoved: true},
 		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil"},
+		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/logging", IsAdded: false},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
 	a.Equal(expectedResources, resources)
