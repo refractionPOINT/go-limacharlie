@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -64,6 +65,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 
 	var orgOps []OrgSyncOperation
 	for hiveName, newConfigData := range hiveConfigData {
+		org.logger.Info(fmt.Sprintf("Syncing hive: %s %s", hiveName, org.GetOID()))
 
 		// Only sync hives that are specified.
 		if opts.SyncHives == nil || !opts.SyncHives[hiveName] {

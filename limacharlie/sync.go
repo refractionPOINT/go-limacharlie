@@ -960,88 +960,112 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 	// Order matters to minimize issues
 	// of dependance between components.
 	if options.SyncResources {
+		org.logger.Info(fmt.Sprintf("Syncing resources: %s", org.GetOID()))
 		newOps, err := org.syncResources(conf.Resources, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("resources: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Resources synced: %s", org.GetOID()))
 	}
 	if options.SyncExtensions {
+		org.logger.Info(fmt.Sprintf("Syncing extensions: %s", org.GetOID()))
 		newOps, err := org.syncExtensions(conf.Extensions, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("extensions: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Extensions synced: %s", org.GetOID()))
 	}
 	if options.SyncOrgValues {
+		org.logger.Info(fmt.Sprintf("Syncing org values: %s", org.GetOID()))
 		newOps, err := org.syncOrgValues(conf.OrgValues, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("org-value: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Org values synced: %s", org.GetOID()))
 	}
 	if options.SyncDRRules {
+		org.logger.Info(fmt.Sprintf("Syncing detection rules: %s", org.GetOID()))
 		newOps, err := org.syncDRRules(who, conf.DRRules, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("dr-rules: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Detection rules synced: %s", org.GetOID()))
 	}
 	if options.SyncFPRules {
+		org.logger.Info(fmt.Sprintf("Syncing false positive rules: %s", org.GetOID()))
 		newOps, err := org.syncFPRules(conf.FPRules, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("fp-rules: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("False positive rules synced: %s", org.GetOID()))
 	}
 	if options.SyncOutputs {
+		org.logger.Info(fmt.Sprintf("Syncing outputs: %s", org.GetOID()))
 		newOps, err := org.syncOutputs(conf.Outputs, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("outputs: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Outputs synced: %s", org.GetOID()))
 	}
 	if options.SyncIntegrity {
+		org.logger.Info(fmt.Sprintf("Syncing integrity rules: %s", org.GetOID()))
 		newOps, err := org.syncIntegrity(conf.Integrity, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("integrity: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Integrity rules synced: %s", org.GetOID()))
 	}
 	if options.SyncArtifacts {
+		org.logger.Info(fmt.Sprintf("Syncing artifacts: %s", org.GetOID()))
 		newOps, err := org.syncArtifacts(conf.Artifacts, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("artifact: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Artifacts synced: %s", org.GetOID()))
 	}
 	if options.SyncExfil {
+		org.logger.Info(fmt.Sprintf("Syncing exfil rules: %s", org.GetOID()))
 		newOps, err := org.syncExfil(conf.Exfil, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("exfil: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Exfil rules synced: %s", org.GetOID()))
 	}
 	if len(options.SyncHives) != 0 {
+		org.logger.Info(fmt.Sprintf("Syncing hives: %s", org.GetOID()))
 		newOps, err := org.syncHive(conf.Hives, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("sync_hives: %+v ", err)
 		}
+		org.logger.Info(fmt.Sprintf("Hives synced: %s", org.GetOID()))
 	}
 	if options.SyncInstallationKeys {
+		org.logger.Info(fmt.Sprintf("Syncing installation keys: %s", org.GetOID()))
 		newOps, err := org.syncInstallationKeys(conf.InstallationKeys, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("installation_keys: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Installation keys synced: %s", org.GetOID()))
 	}
 	if options.SyncYara {
+		org.logger.Info(fmt.Sprintf("Syncing yara rules: %s", org.GetOID()))
 		newOps, err := org.syncYara(conf.Yara, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("yara: %v", err)
 		}
+		org.logger.Info(fmt.Sprintf("Yara rules synced: %s", org.GetOID()))
 	}
 
 	return ops, nil
