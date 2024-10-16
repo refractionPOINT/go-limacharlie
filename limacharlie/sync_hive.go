@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -14,7 +15,7 @@ type SyncHiveData struct {
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
 
-func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
+func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
@@ -57,13 +58,16 @@ func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive
 	}
 }
 
-func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) ([]OrgSyncOperation, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
 	}
 
 	var orgOps []OrgSyncOperation
+	var mOps sync.Mutex
+	eg := errgroup.Group{}
+	eg.SetLimit(10)
 	for hiveName, newConfigData := range hiveConfigData {
 		org.logger.Info(fmt.Sprintf("Syncing hive: %s %s", hiveName, org.GetOID()))
 
@@ -83,62 +87,75 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 
 		// now check if we need to update or add new data for this particular hive
 		for hiveKey, ncd := range newConfigData {
-			// if key does not exist in current config data
-			// new data needs to be added
-			if _, ok := currentConfigData[hiveKey]; !ok {
-				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hives,
-					ElementName: hiveName + "/" + hiveKey,
-					IsAdded:     true,
-					IsRemoved:   false,
-				}
-				if opts.IsDryRun {
-					orgOps = append(orgOps, op)
-					continue
-				}
-				err = org.addHiveConfigData(HiveArgs{
-					Key:          hiveKey,
-					HiveName:     hiveName,
-					PartitionKey: orgInfo.OID,
-				}, newConfigData[hiveKey])
-				if err != nil {
-					return orgOps, err
-				}
-				orgOps = append(orgOps, op)
-			} else {
-				// if new config data exists in current config
-				// check to see if data is equal if not update
-				curData := currentConfigData[hiveKey]
-				equals, err := ncd.Equals(curData)
-				if err != nil {
-					return orgOps, err
-				}
-				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hives,
-					ElementName: hiveName + "/" + hiveKey,
-					IsAdded:     false,
-					IsRemoved:   false,
-				}
-				if equals {
-					orgOps = append(orgOps, op)
-				} else { // not equal run hive update
-					if opts.IsDryRun {
-						op.IsAdded = true
-						orgOps = append(orgOps, op)
-						continue
+			eg.Go(func() error {
+				// if key does not exist in current config data
+				// new data needs to be added
+				if _, ok := currentConfigData[hiveKey]; !ok {
+					op := OrgSyncOperation{
+						ElementType: OrgSyncOperationElementType.Hives,
+						ElementName: hiveName + "/" + hiveKey,
+						IsAdded:     true,
+						IsRemoved:   false,
 					}
-					err = org.updateHiveConfigData(HiveArgs{
+					if opts.IsDryRun {
+						mOps.Lock()
+						orgOps = append(orgOps, op)
+						mOps.Unlock()
+						return nil
+					}
+					err = org.addHiveConfigData(HiveArgs{
 						Key:          hiveKey,
 						HiveName:     hiveName,
-						PartitionKey: orgInfo.OID},
-						ncd)
+						PartitionKey: orgInfo.OID,
+					}, newConfigData[hiveKey])
 					if err != nil {
-						return orgOps, err
+						return err
 					}
-					op.IsAdded = true
+					mOps.Lock()
 					orgOps = append(orgOps, op)
+					mOps.Unlock()
+				} else {
+					// if new config data exists in current config
+					// check to see if data is equal if not update
+					curData := currentConfigData[hiveKey]
+					equals, err := ncd.Equals(curData)
+					if err != nil {
+						return err
+					}
+					op := OrgSyncOperation{
+						ElementType: OrgSyncOperationElementType.Hives,
+						ElementName: hiveName + "/" + hiveKey,
+						IsAdded:     false,
+						IsRemoved:   false,
+					}
+					if equals {
+						mOps.Lock()
+						orgOps = append(orgOps, op)
+						mOps.Unlock()
+					} else { // not equal run hive update
+						if opts.IsDryRun {
+							op.IsAdded = true
+							mOps.Lock()
+							orgOps = append(orgOps, op)
+							mOps.Unlock()
+							return nil
+						}
+						err = org.updateHiveConfigData(HiveArgs{
+							Key:          hiveKey,
+							HiveName:     hiveName,
+							PartitionKey: orgInfo.OID},
+							ncd)
+						if err != nil {
+							return err
+						}
+						op.IsAdded = true
+						mOps.Lock()
+						orgOps = append(orgOps, op)
+						mOps.Unlock()
+					}
 				}
-			}
+				return nil
+			})
 		}
 
 		// only remove values from org if IsForce is set
@@ -148,39 +165,51 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 
 		// now that keys have been added or updated for this hive
 		// identify what keys should be removed
-		for k, _ := range currentConfigData {
-			if _, ok := newConfigData[k]; !ok {
-				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hives,
-					ElementName: hiveName + "/" + k,
-					IsAdded:     false,
-					IsRemoved:   true,
-				}
-				// If tags are passed ensure all tags match before removing
-				if opts.Tags != nil && len(opts.Tags) != 0 {
-					if !slicesContainSameItems(currentConfigData[k].UsrMtd.Tags, opts.Tags) {
-						continue // tags do not match do not remove
+		for k := range currentConfigData {
+			eg.Go(func() error {
+				if _, ok := newConfigData[k]; !ok {
+					op := OrgSyncOperation{
+						ElementType: OrgSyncOperationElementType.Hives,
+						ElementName: hiveName + "/" + k,
+						IsAdded:     false,
+						IsRemoved:   true,
 					}
-				}
+					// If tags are passed ensure all tags match before removing
+					if opts.Tags != nil && len(opts.Tags) != 0 {
+						if !slicesContainSameItems(currentConfigData[k].UsrMtd.Tags, opts.Tags) {
+							return nil // tags do not match do not remove
+						}
+					}
 
-				if opts.IsDryRun {
+					if opts.IsDryRun {
+						mOps.Lock()
+						orgOps = append(orgOps, op)
+						mOps.Unlock()
+						return nil
+					}
+
+					err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: orgInfo.OID, HiveName: hiveName})
+					if err != nil {
+						return err
+					}
+					mOps.Lock()
 					orgOps = append(orgOps, op)
-					continue
+					mOps.Unlock()
 				}
-
-				err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: orgInfo.OID, HiveName: hiveName})
-				if err != nil {
-					return orgOps, err
-				}
-				orgOps = append(orgOps, op)
-			}
+				return nil
+			})
 		}
 	}
+
+	if err := eg.Wait(); err != nil {
+		return orgOps, err
+	}
+
 	return orgOps, nil
 }
 
-func (org Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, error) {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, error) {
+	hiveClient := NewHiveClient(org)
 
 	dataSet, err := hiveClient.List(args)
 	if err != nil {
@@ -202,8 +231,8 @@ func (org Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, 
 	return currentHiveDataConfig, nil
 }
 
-func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
+	hiveClient := NewHiveClient(org)
 
 	err := encodeDecodeHiveData(&hd.Data)
 	if err != nil {
@@ -232,8 +261,8 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error
 	return nil
 }
 
-func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
+	hiveClient := NewHiveClient(org)
 
 	err := encodeDecodeHiveData(&hd.Data)
 	if err != nil {
@@ -262,8 +291,8 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 	return nil
 }
 
-func (org Organization) removeHiveConfigData(args HiveArgs) error {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) removeHiveConfigData(args HiveArgs) error {
+	hiveClient := NewHiveClient(org)
 
 	_, err := hiveClient.Remove(args)
 	if err != nil {
