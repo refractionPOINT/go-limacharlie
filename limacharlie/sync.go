@@ -1089,6 +1089,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		return nil, nil
 	}
 
+	org.logger.Info(fmt.Sprintf("Fetching supported org values: %s", org.GetOID()))
 	ops := []OrgSyncOperation{}
 	existingVals, err := org.getSupportedOrgValues()
 	if err != nil {
@@ -1097,6 +1098,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 	if values == nil {
 		values = orgSyncOrgValues{}
 	}
+	org.logger.Info(fmt.Sprintf("Org values fetched: %s", org.GetOID()))
 
 	for name, val := range values {
 		if v, ok := existingVals[name]; ok && v == val {
@@ -1125,6 +1127,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 			IsAdded:     true,
 		})
 	}
+	org.logger.Info(fmt.Sprintf("Org values synced: %s", org.GetOID()))
 
 	if !options.IsForce {
 		return ops, nil
@@ -1135,6 +1138,8 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 	if err != nil {
 		return ops, err
 	}
+
+	org.logger.Info(fmt.Sprintf("Removing org values: %s", org.GetOID()))
 
 	for name, v := range existingVals {
 		_, found := values[name]
@@ -1160,6 +1165,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 			IsRemoved:   true,
 		})
 	}
+	org.logger.Info(fmt.Sprintf("Org values removed: %s", org.GetOID()))
 	return ops, nil
 }
 
