@@ -679,6 +679,7 @@ func (org *Organization) getSupportedOrgValues() (map[OrgValueName]OrgValue, err
 	for _, ovn := range supportedOrgValues {
 		wg.Add(1)
 		go func(ovn string) {
+			defer wg.Done()
 			ovi, err := org.OrgValueGet(ovn)
 			if err != nil {
 				// Likely the value was never set.
