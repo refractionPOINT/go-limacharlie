@@ -268,13 +268,14 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 
 func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
-	request := makeDefaultRequest(&resp).withQueryData(Dict{
+	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"dest_bucket": bucketName,
 		"svc_creds":   writeCreds,
 	})
 	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return nil, err
 	}
+
 	if resp.Payload != "" {
 		b64Dec, err := base64.StdEncoding.DecodeString(resp.Payload)
 		if err != nil {
@@ -298,7 +299,7 @@ func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID
 	var r io.ReadCloser
 	for !time.Now().After(deadline) {
 		r, err = bucket.Object(objPath).NewReader(ctx)
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -313,7 +314,7 @@ func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID
 
 func (org Organization) ExportArtifactToGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (string, error) {
 	resp := artifactExportResp{}
-	request := makeDefaultRequest(&resp).withQueryData(Dict{
+	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"dest_bucket": bucketName,
 		"svc_creds":   writeCreds,
 	})
@@ -335,7 +336,7 @@ func (org Organization) ExportArtifactToGCS(ctx context.Context, artifactID stri
 	var r io.ReadCloser
 	for !time.Now().After(deadline) {
 		r, err = bucket.Object(objPath).NewReader(ctx)
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			time.Sleep(5 * time.Second)
 			continue
 		}
