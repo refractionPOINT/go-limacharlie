@@ -51,6 +51,19 @@ type SyncOptions struct {
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
 
+var KnownHives = []string{
+	"dr-general",
+	"dr-managed",
+	"dr-service",
+	"fp",
+	"cloud_sensor",
+	"extension_config",
+	"yara",
+	"secret",
+	"lookup",
+	"query",
+}
+
 func SyncAll() SyncOptions {
 	return SyncOptions{
 		SyncDRRules:          true,
