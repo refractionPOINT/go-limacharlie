@@ -253,7 +253,7 @@ type orgSyncYara = struct {
 
 type OrgConfig struct {
 	Version          int                     `json:"version" yaml:"version"`
-	Includes         []string                `json:"-" yaml:"-"`
+	Includes         []string                `json:"includes" yaml:"includes"`
 	Resources        orgSyncResources        `json:"resources,omitempty" yaml:"resources,omitempty"`
 	Extensions       orgSyncExtensions       `json:"extensions,omitempty" yaml:"extensions,omitempty"`
 	DRRules          orgSyncDRRules          `json:"rules,omitempty" yaml:"rules,omitempty"`
@@ -885,7 +885,7 @@ func (org *Organization) SyncPushFromFiles(rootConfigFile string, options SyncOp
 	// If no custom loader was included, default to the built-in
 	// local file system loader.
 	if options.IncludeLoader == nil {
-		options.IncludeLoader = localFileIncludeLoader
+		return nil, fmt.Errorf("no include loader provided")
 	}
 	conf, err := loadEffectiveConfig("", rootConfigFile, options)
 	if err != nil {
@@ -932,7 +932,7 @@ func loadConfWithOptions(parent string, configFile string, options SyncOptions) 
 	return thisConfig, nil
 }
 
-func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
+func LocalFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
 	// If this is the first include (empty parent), target file is not absolute, assume CWD.
 	root := ""
 	var err error
