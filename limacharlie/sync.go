@@ -51,6 +51,19 @@ type SyncOptions struct {
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
 
+var KnownHives = []string{
+	"dr-general",
+	"dr-managed",
+	"dr-service",
+	"fp",
+	"cloud_sensor",
+	"extension_config",
+	"yara",
+	"secret",
+	"lookup",
+	"query",
+}
+
 func SyncAll() SyncOptions {
 	return SyncOptions{
 		SyncDRRules:          true,
@@ -584,7 +597,7 @@ func (o OrgSyncOperation) String() string {
 	return fmt.Sprintf("%s %s %s", op, o.ElementType, o.ElementName)
 }
 
-func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err error) {
+func (org *Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err error) {
 	if options.SyncResources {
 		orgConfig.Resources, err = org.syncFetchResources()
 		if err != nil {
@@ -666,11 +679,11 @@ func (org Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err
 	return orgConfig, nil
 }
 
-func (org Organization) syncFetchOrgValues() (orgSyncOrgValues, error) {
+func (org *Organization) syncFetchOrgValues() (orgSyncOrgValues, error) {
 	return org.getSupportedOrgValues()
 }
 
-func (org Organization) getSupportedOrgValues() (map[OrgValueName]OrgValue, error) {
+func (org *Organization) getSupportedOrgValues() (map[OrgValueName]OrgValue, error) {
 	ov := map[OrgValueName]OrgValue{}
 	for _, ovn := range supportedOrgValues {
 		ovi, err := org.OrgValueGet(ovn)
@@ -683,7 +696,7 @@ func (org Organization) getSupportedOrgValues() (map[OrgValueName]OrgValue, erro
 	return ov, nil
 }
 
-func (org Organization) syncFetchExfil() (*orgSyncExfilRules, error) {
+func (org *Organization) syncFetchExfil() (*orgSyncExfilRules, error) {
 	exfils := &orgSyncExfilRules{}
 	orgExfil, err := org.ExfilRules()
 	if err != nil {
@@ -718,7 +731,7 @@ func (org Organization) syncFetchExfil() (*orgSyncExfilRules, error) {
 	return exfils, nil
 }
 
-func (org Organization) syncFetchArtifacts() (orgSyncArtifacts, error) {
+func (org *Organization) syncFetchArtifacts() (orgSyncArtifacts, error) {
 	orgArtifacts, err := org.ArtifactsRules()
 	if err != nil {
 		return nil, err
@@ -737,7 +750,7 @@ func (org Organization) syncFetchArtifacts() (orgSyncArtifacts, error) {
 	return rules, nil
 }
 
-func (org Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
+func (org *Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
 	orgRules, err := org.IntegrityRules()
 	if err != nil {
 		return nil, err
@@ -753,7 +766,7 @@ func (org Organization) syncFetchIntegrity() (orgSyncIntegrityRules, error) {
 	return rules, nil
 }
 
-func (org Organization) syncFetchOutputs() (orgSyncOutputs, error) {
+func (org *Organization) syncFetchOutputs() (orgSyncOutputs, error) {
 	orgOutputs, err := org.Outputs()
 	if err != nil {
 		return nil, err
@@ -769,7 +782,7 @@ func (org Organization) syncFetchOutputs() (orgSyncOutputs, error) {
 	return orgOutputs, nil
 }
 
-func (org Organization) syncFetchFPRules() (orgSyncFPRules, error) {
+func (org *Organization) syncFetchFPRules() (orgSyncFPRules, error) {
 	orgRules, err := org.FPRules()
 	if err != nil {
 		return nil, err
@@ -784,7 +797,7 @@ func (org Organization) syncFetchFPRules() (orgSyncFPRules, error) {
 	return rules, nil
 }
 
-func (org Organization) syncFetchResources() (orgSyncResources, error) {
+func (org *Organization) syncFetchResources() (orgSyncResources, error) {
 	orgResources, err := org.Resources()
 	if err != nil {
 		return nil, err
@@ -801,7 +814,7 @@ func (org Organization) syncFetchResources() (orgSyncResources, error) {
 	return resources, nil
 }
 
-func (org Organization) syncFetchExtensions() (orgSyncExtensions, error) {
+func (org *Organization) syncFetchExtensions() (orgSyncExtensions, error) {
 	orgExtensions, err := org.Extensions()
 	if err != nil {
 		return nil, err
@@ -809,7 +822,7 @@ func (org Organization) syncFetchExtensions() (orgSyncExtensions, error) {
 	return orgExtensions, nil
 }
 
-func (org Organization) syncFetchDRRules(who WhoAmIJsonResponse) (orgSyncDRRules, error) {
+func (org *Organization) syncFetchDRRules(who WhoAmIJsonResponse) (orgSyncDRRules, error) {
 	rules := orgSyncDRRules{}
 	availableNamespaces := org.resolveAvailableNamespaces(who)
 	orgRules, err := org.drRulesFromNamespaces(availableNamespaces)
@@ -827,7 +840,7 @@ func (org Organization) syncFetchDRRules(who WhoAmIJsonResponse) (orgSyncDRRules
 	return rules, nil
 }
 
-func (org Organization) syncFetchInstallationKeys() (orgSyncInstallationKeys, error) {
+func (org *Organization) syncFetchInstallationKeys() (orgSyncInstallationKeys, error) {
 	ikeys, err := org.InstallationKeys()
 	if err != nil {
 		return nil, err
@@ -843,7 +856,7 @@ func (org Organization) syncFetchInstallationKeys() (orgSyncInstallationKeys, er
 	return keys, nil
 }
 
-func (org Organization) syncFetchYara() (*orgSyncYara, error) {
+func (org *Organization) syncFetchYara() (*orgSyncYara, error) {
 	rules, err := org.YaraListRules()
 	if err != nil {
 		return nil, err
@@ -868,11 +881,11 @@ func (org Organization) syncFetchYara() (*orgSyncYara, error) {
 	}, nil
 }
 
-func (org Organization) SyncPushFromFiles(rootConfigFile string, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) SyncPushFromFiles(rootConfigFile string, options SyncOptions) ([]OrgSyncOperation, error) {
 	// If no custom loader was included, default to the built-in
 	// local file system loader.
 	if options.IncludeLoader == nil {
-		options.IncludeLoader = localFileIncludeLoader
+		return nil, fmt.Errorf("no include loader provided")
 	}
 	conf, err := loadEffectiveConfig("", rootConfigFile, options)
 	if err != nil {
@@ -888,7 +901,6 @@ func loadEffectiveConfig(parent string, configFile string, options SyncOptions) 
 	}
 
 	includePath := filepath.Join(filepath.Dir(parent), configFile)
-
 	for _, toInclude := range thisConfig.Includes {
 		incConf, err := loadEffectiveConfig(includePath, toInclude, options)
 		if err != nil {
@@ -919,7 +931,7 @@ func loadConfWithOptions(parent string, configFile string, options SyncOptions) 
 	return thisConfig, nil
 }
 
-func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
+func LocalFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
 	// If this is the first include (empty parent), target file is not absolute, assume CWD.
 	root := ""
 	var err error
@@ -949,7 +961,7 @@ func localFileIncludeLoader(parent string, toInclude string) ([]byte, error) {
 	return data, nil
 }
 
-func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyncOperation, error) {
 	ops := []OrgSyncOperation{}
 
 	who, err := org.client.WhoAmI()
@@ -1047,7 +1059,7 @@ func (org Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSync
 	return ops, nil
 }
 
-func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(values) == 0 {
 		return nil, nil
 	}
@@ -1126,7 +1138,7 @@ func (org Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptio
 	return ops, nil
 }
 
-func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(artifacts) == 0 {
 		return nil, nil
 	}
@@ -1204,7 +1216,7 @@ func (org Organization) syncArtifacts(artifacts orgSyncArtifacts, options SyncOp
 	return ops, nil
 }
 
-func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && (exfil == nil || (len(exfil.Events) == 0 && len(exfil.Performance) == 0 && len(exfil.Watches) == 0)) {
 		return nil, nil
 	}
@@ -1341,7 +1353,7 @@ func (org Organization) syncExfil(exfil *orgSyncExfilRules, options SyncOptions)
 	return ops, nil
 }
 
-func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncIntegrity(integrity orgSyncIntegrityRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(integrity) == 0 {
 		return nil, nil
 	}
@@ -1424,7 +1436,7 @@ func (org Organization) syncIntegrity(integrity orgSyncIntegrityRules, options S
 	return ops, nil
 }
 
-func (org Organization) syncOutputs(outputs orgSyncOutputs, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncOutputs(outputs orgSyncOutputs, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(outputs) == 0 {
 		return nil, nil
 	}
@@ -1503,7 +1515,7 @@ func (org Organization) syncOutputs(outputs orgSyncOutputs, options SyncOptions)
 	return ops, nil
 }
 
-func (org Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(rules) == 0 {
 		return nil, nil
 	}
@@ -1582,7 +1594,7 @@ func (org Organization) syncFPRules(rules orgSyncFPRules, options SyncOptions) (
 	return ops, nil
 }
 
-func (org Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(ikeys) == 0 {
 		return nil, nil
 	}
@@ -1669,7 +1681,7 @@ func (org Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, opti
 	return ops, nil
 }
 
-func (org Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && (yara == nil || (len(yara.Rules) == 0 && len(yara.Sources) == 0)) {
 		return nil, nil
 	}
@@ -1818,7 +1830,7 @@ func (org Organization) syncYara(yara *orgSyncYara, options SyncOptions) ([]OrgS
 	return ops, nil
 }
 
-func (org Organization) resolveAvailableNamespaces(who WhoAmIJsonResponse) map[string]struct{} {
+func (org *Organization) resolveAvailableNamespaces(who WhoAmIJsonResponse) map[string]struct{} {
 	// Check which namespaces we have available.
 	availableNamespaces := map[string]struct{}{}
 	if who.HasPermissionForOrg(org.client.options.OID, "dr.list") {
@@ -1833,7 +1845,7 @@ func (org Organization) resolveAvailableNamespaces(who WhoAmIJsonResponse) map[s
 	return availableNamespaces
 }
 
-func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (existingRules orgSyncDRRules, err error) {
+func (org *Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (existingRules orgSyncDRRules, err error) {
 	existingRules = orgSyncDRRules{}
 	// Get rules from all the namespaces we have access to.
 	for ns := range namespaces {
@@ -1852,7 +1864,7 @@ func (org Organization) drRulesFromNamespaces(namespaces map[string]struct{}) (e
 	return existingRules, nil
 }
 
-func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(rules) == 0 {
 		return nil, nil
 	}
@@ -1940,7 +1952,7 @@ func (org Organization) syncDRRules(who WhoAmIJsonResponse, rules orgSyncDRRules
 	return ops, nil
 }
 
-func (org Organization) syncResources(resources orgSyncResources, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncResources(resources orgSyncResources, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(resources) == 0 {
 		return nil, nil
 	}
@@ -2070,7 +2082,7 @@ func (org Organization) syncResources(resources orgSyncResources, options SyncOp
 	return ops, nil
 }
 
-func (org Organization) syncExtensions(extensions orgSyncExtensions, options SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncExtensions(extensions orgSyncExtensions, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(extensions) == 0 {
 		return nil, nil
 	}
