@@ -901,7 +901,7 @@ func loadEffectiveConfig(parent string, configFile string, options SyncOptions) 
 	}
 
 	includePath := filepath.Join(filepath.Dir(parent), configFile)
-
+	panic(fmt.Sprintf("conf: %#v", thisConfig))
 	for _, toInclude := range thisConfig.Includes {
 		incConf, err := loadEffectiveConfig(includePath, toInclude, options)
 		if err != nil {
