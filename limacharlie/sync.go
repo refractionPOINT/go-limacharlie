@@ -253,7 +253,7 @@ type orgSyncYara = struct {
 
 type OrgConfig struct {
 	Version          int                     `json:"version" yaml:"version"`
-	Includes         []string                `json:"includes" yaml:"includes"`
+	Includes         []string                `json:"-" yaml:"-"`
 	Resources        orgSyncResources        `json:"resources,omitempty" yaml:"resources,omitempty"`
 	Extensions       orgSyncExtensions       `json:"extensions,omitempty" yaml:"extensions,omitempty"`
 	DRRules          orgSyncDRRules          `json:"rules,omitempty" yaml:"rules,omitempty"`
@@ -901,7 +901,6 @@ func loadEffectiveConfig(parent string, configFile string, options SyncOptions) 
 	}
 
 	includePath := filepath.Join(filepath.Dir(parent), configFile)
-	panic(fmt.Sprintf("conf: %#v", thisConfig))
 	for _, toInclude := range thisConfig.Includes {
 		incConf, err := loadEffectiveConfig(includePath, toInclude, options)
 		if err != nil {
