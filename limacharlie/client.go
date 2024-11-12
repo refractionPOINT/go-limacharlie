@@ -24,7 +24,7 @@ const (
 	getJWTURL         = "https://jwt.limacharlie.io"
 
 	restRetries          = 3
-	restTimeout          = 5 * time.Second
+	restTimeout          = 30 * time.Second
 	restCreateOrgTimeout = 35 * time.Second
 )
 
