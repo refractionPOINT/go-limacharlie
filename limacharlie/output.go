@@ -99,6 +99,7 @@ type OutputConfig struct {
 	DeleteOnFailure   bool   `json:"is_delete_on_failure,omitempty,string" yaml:"is_delete_on_failure,omitempty"`
 	NoRouting         bool   `json:"is_no_routing,omitempty,string" yaml:"is_no_routing,omitempty"`
 	NoSharding        bool   `json:"is_no_sharding,omitempty,string" yaml:"is_no_sharding,omitempty"`
+	IsJsonList        bool   `json:"is_json_list,omitempty,string" yaml:"is_json_list,omitempty"`
 	PayloadAsString   bool   `json:"is_payload_as_string,omitempty,string" yaml:"is_payload_as_string,omitempty"`
 	InvestigationID   string `json:"inv_id,omitempty" yaml:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty" yaml:"tag,omitempty"`
