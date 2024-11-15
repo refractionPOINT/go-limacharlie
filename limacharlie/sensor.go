@@ -240,6 +240,10 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 				"continuation_token": lastToken,
 				"is_compressed":      "true",
 			})
+		} else {
+			q = q.withQueryData(Dict{
+				"is_compressed": "true",
+			})
 		}
 		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 			return nil, err
@@ -285,7 +289,8 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 			})
 		} else {
 			q = q.withQueryData(Dict{
-				"selector": selector,
+				"selector":      selector,
+				"is_compressed": "true",
 			})
 		}
 		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
