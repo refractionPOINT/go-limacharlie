@@ -322,6 +322,49 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 	return m, nil
 }
 
+func (org *Organization) ListSensorsFromSelectorIteratively(selector string, continuationToken string) (map[string]*Sensor, string, error) {
+	m := map[string]*Sensor{}
+	lastToken := continuationToken
+
+	page := rawSensorListPage{}
+	q := makeDefaultRequest(&page)
+	if lastToken != "" {
+		q = q.withQueryData(Dict{
+			"continuation_token": lastToken,
+			"selector":           selector,
+			"is_compressed":      "true",
+		})
+	} else {
+		q = q.withQueryData(Dict{
+			"selector":      selector,
+			"is_compressed": "true",
+		})
+	}
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
+		return nil, "", err
+	}
+
+	sensors := []*Sensor{}
+	if err := decompressPayload(page.Sensors, &sensors); err != nil {
+		return nil, "", err
+	}
+
+	for _, s := range sensors {
+		s.Organization = org
+		s.InvestigationID = org.invID
+		if s.DID != "" {
+			s.Device = &Device{
+				DID:          s.DID,
+				Organization: org,
+			}
+		}
+		m[s.SID] = s
+	}
+	lastToken = page.ContinuationToken
+
+	return m, lastToken, nil
+}
+
 func (org *Organization) GetAllTags() ([]string, error) {
 	tags := struct {
 		Tags []string `json:"tags"`
