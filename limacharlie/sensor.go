@@ -1,6 +1,9 @@
 package limacharlie
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -42,9 +45,9 @@ type sensorInfo struct {
 	IsOnline bool    `json:"is_online"`
 }
 
-type sensorListPage struct {
-	ContinuationToken string    `json:"continuation_token"`
-	Sensors           []*Sensor `json:"sensors"`
+type rawSensorListPage struct {
+	ContinuationToken string `json:"continuation_token"`
+	Sensors           string `json:"sensors"`
 }
 
 type sensorTagsList struct {
@@ -230,17 +233,24 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 	lastToken := ""
 
 	for {
-		page := sensorListPage{}
+		page := rawSensorListPage{}
 		q := makeDefaultRequest(&page)
 		if lastToken != "" {
 			q = q.withQueryData(Dict{
 				"continuation_token": lastToken,
+				"is_compressed":      "true",
 			})
 		}
 		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 			return nil, err
 		}
-		for _, s := range page.Sensors {
+
+		sensors := []*Sensor{}
+		if err := decompressPayload(page.Sensors, &sensors); err != nil {
+			return nil, err
+		}
+
+		for _, s := range sensors {
 			s.Organization = org
 			s.InvestigationID = org.invID
 			if s.DID != "" {
@@ -265,12 +275,13 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 	lastToken := ""
 
 	for {
-		page := sensorListPage{}
+		page := rawSensorListPage{}
 		q := makeDefaultRequest(&page)
 		if lastToken != "" {
 			q = q.withQueryData(Dict{
 				"continuation_token": lastToken,
 				"selector":           selector,
+				"is_compressed":      "true",
 			})
 		} else {
 			q = q.withQueryData(Dict{
@@ -280,7 +291,13 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 			return nil, err
 		}
-		for _, s := range page.Sensors {
+
+		sensors := []*Sensor{}
+		if err := decompressPayload(page.Sensors, &sensors); err != nil {
+			return nil, err
+		}
+
+		for _, s := range sensors {
 			s.Organization = org
 			s.InvestigationID = org.invID
 			if s.DID != "" {
@@ -327,4 +344,20 @@ func (org *Organization) GetSensorsWithTag(tag string) (map[string][]string, err
 		return nil, err
 	}
 	return data, nil
+}
+
+func decompressPayload(data string, out interface{}) error {
+	// We decode the base64 string.
+	b64 := base64.NewDecoder(base64.StdEncoding, bytes.NewReader([]byte(data)))
+	// We decompress the data.
+	z, err := gzip.NewReader(b64)
+	if err != nil {
+		return err
+	}
+	defer z.Close()
+	// We decode the JSON.
+	if err := json.NewDecoder(z).Decode(out); err != nil {
+		return err
+	}
+	return nil
 }
