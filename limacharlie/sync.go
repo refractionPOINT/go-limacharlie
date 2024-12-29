@@ -62,6 +62,8 @@ var KnownHives = []string{
 	"secret",
 	"lookup",
 	"query",
+	"model",
+	"playbook",
 }
 
 func SyncAll() SyncOptions {
@@ -88,6 +90,8 @@ func SyncAll() SyncOptions {
 			"secret":           true,
 			"lookup":           true,
 			"query":            true,
+			"model":            true,
+			"playbook":         true,
 		},
 	}
 }
