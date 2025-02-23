@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -121,7 +122,7 @@ type HistoricalDetectionsRequest struct {
 	Limit int `json:"limit"`
 }
 
-func (org Organization) HistoricalDetections(detectionReq HistoricalDetectionsRequest) (HistoricalDetectionsResponse, error) {
+func (org *Organization) HistoricalDetections(detectionReq HistoricalDetectionsRequest) (HistoricalDetectionsResponse, error) {
 
 	var results HistoricalDetectionsResponse
 
@@ -137,4 +138,115 @@ func (org Organization) HistoricalDetections(detectionReq HistoricalDetectionsRe
 	}
 
 	return results, nil
+}
+
+type HistoricEventsRequest struct {
+	// Start is the start unix (seconds) timestamp to fetch events from
+	Start int64 `json:"start"`
+	// End is the end unix (seconds) timestamp to fetch events to
+	End int64 `json:"end"`
+	// Limit is the maximum number of events to return (optional)
+	Limit *int `json:"limit,omitempty"`
+	// EventType returns events only of this type (optional)
+	EventType string `json:"event_type,omitempty"`
+	// IsForward returns events in ascending order
+	IsForward bool `json:"is_forward"`
+	// OutputName sends data to a named output instead (optional)
+	OutputName string `json:"output_name,omitempty"`
+	// IsCompressed indicates if the response should be compressed
+	IsCompressed bool `json:"is_compressed"`
+	// Cursor is used for pagination
+	Cursor string `json:"cursor,omitempty"`
+}
+
+type HistoricEventsResponse struct {
+	Events     []Event `json:"events"`
+	NextCursor string  `json:"next_cursor"`
+}
+
+// GetHistoricEvents gets the events for a sensor between two times, requires Insight (retention) enabled.
+// If outputName is specified, it will return a single response. Otherwise, it will handle pagination internally.
+// The returned close function can be called to abort the operation.
+func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRequest) (chan Event, func(), error) {
+	if req.Cursor == "" {
+		req.Cursor = "-"
+	}
+	req.IsCompressed = true
+
+	// Create a channel to stream events and a done channel for cancellation
+	eventChan := make(chan Event)
+	done := make(chan struct{})
+
+	// Convert request to Dict using JSON marshaling
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	var reqDict Dict
+	if err := json.Unmarshal(reqBytes, &reqDict); err != nil {
+		return nil, nil, err
+	}
+
+	// Create close function
+	closeFunc := func() {
+		close(done)
+	}
+
+	// If outputName is specified, make a single request and close the channel
+	if req.OutputName != "" {
+		go func() {
+			defer close(eventChan)
+			response := HistoricEventsResponse{}
+			err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+			if err != nil {
+				return
+			}
+			for _, event := range response.Events {
+				select {
+				case <-done:
+					return
+				case eventChan <- event:
+				}
+			}
+		}()
+		return eventChan, closeFunc, nil
+	}
+
+	// Handle pagination
+	go func() {
+		defer close(eventChan)
+		nReturned := 0
+
+		for req.Cursor != "" {
+			select {
+			case <-done:
+				return
+			default:
+			}
+
+			response := HistoricEventsResponse{}
+			// Update cursor in Dict
+			reqDict["cursor"] = req.Cursor
+			err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+			if err != nil {
+				return
+			}
+
+			for _, event := range response.Events {
+				select {
+				case <-done:
+					return
+				case eventChan <- event:
+					nReturned++
+					if req.Limit != nil && nReturned >= *req.Limit {
+						return
+					}
+				}
+			}
+
+			req.Cursor = response.NextCursor
+		}
+	}()
+
+	return eventChan, closeFunc, nil
 }
