@@ -15,11 +15,7 @@ type DetStats struct {
 type EventContainer struct {
 	Event Event `json:"event"`
 }
-type Event struct {
-	Event     interface{} `json:"event"`
-	Routing   Routing     `json:"routing"`
-	TimeStamp string      `json:"ts"`
-}
+type Event = Dict
 type Routing struct {
 	Arch      int      `json:"arch"`
 	DID       string   `json:"did"`
