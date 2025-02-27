@@ -16,6 +16,10 @@ type EventContainer struct {
 	Event Event `json:"event"`
 }
 type Event = Dict
+type IteratedEvent struct {
+	Error string `json:"error"`
+	Data  Dict   `json:"data"`
+}
 type Routing struct {
 	Arch      int      `json:"arch"`
 	DID       string   `json:"did"`
@@ -163,14 +167,14 @@ type HistoricEventsResponse struct {
 // GetHistoricEvents gets the events for a sensor between two times, requires Insight (retention) enabled.
 // If outputName is specified, it will return a single response. Otherwise, it will handle pagination internally.
 // The returned close function can be called to abort the operation.
-func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRequest) (chan Event, func(), error) {
+func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRequest) (chan IteratedEvent, func(), error) {
 	if req.Cursor == "" {
 		req.Cursor = "-"
 	}
 	req.IsCompressed = true
 
 	// Create a channel to stream events and a done channel for cancellation
-	eventChan := make(chan Event)
+	eventChan := make(chan IteratedEvent)
 	done := make(chan struct{})
 
 	// Convert request to Dict using JSON marshaling
@@ -201,7 +205,7 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 				select {
 				case <-done:
 					return
-				case eventChan <- event:
+				case eventChan <- IteratedEvent{Data: event}:
 				}
 			}
 		}()
@@ -212,7 +216,6 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 	go func() {
 		defer close(eventChan)
 		nReturned := 0
-
 		for req.Cursor != "" {
 			select {
 			case <-done:
@@ -225,6 +228,7 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 			reqDict["cursor"] = req.Cursor
 			err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
 			if err != nil {
+				eventChan <- IteratedEvent{Error: err.Error()}
 				return
 			}
 
@@ -232,7 +236,7 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 				select {
 				case <-done:
 					return
-				case eventChan <- event:
+				case eventChan <- IteratedEvent{Data: event}:
 					nReturned++
 					if req.Limit != nil && nReturned >= *req.Limit {
 						return
