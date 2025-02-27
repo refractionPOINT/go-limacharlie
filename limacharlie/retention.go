@@ -1,9 +1,12 @@
 package limacharlie
 
 import (
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 type Stats struct {
@@ -159,9 +162,14 @@ type HistoricEventsRequest struct {
 	Cursor string `json:"cursor,omitempty"`
 }
 
-type HistoricEventsResponse struct {
+type historicEventsResponse struct {
 	Events     []Event `json:"events"`
 	NextCursor string  `json:"next_cursor"`
+}
+
+type historicEventsResponseCompressed struct {
+	Events     string `json:"events"`
+	NextCursor string `json:"next_cursor"`
 }
 
 // GetHistoricEvents gets the events for a sensor between two times, requires Insight (retention) enabled.
@@ -194,22 +202,12 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 
 	// If outputName is specified, make a single request and close the channel
 	if req.OutputName != "" {
-		go func() {
-			defer close(eventChan)
-			response := HistoricEventsResponse{}
-			err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
-			if err != nil {
-				return
-			}
-			for _, event := range response.Events {
-				select {
-				case <-done:
-					return
-				case eventChan <- IteratedEvent{Data: event}:
-				}
-			}
-		}()
-		return eventChan, closeFunc, nil
+		response := Dict{}
+		err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, nil
 	}
 
 	// Handle pagination
@@ -223,16 +221,48 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 			default:
 			}
 
-			response := HistoricEventsResponse{}
-			// Update cursor in Dict
-			reqDict["cursor"] = req.Cursor
-			err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+			events := []Event{}
+			respCursor := ""
+
+			if req.IsCompressed {
+				response := historicEventsResponseCompressed{}
+				// Update cursor in Dict
+				reqDict["cursor"] = req.Cursor
+				err = org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+				if err == nil {
+					respCursor = response.NextCursor
+					// We need to decompress the events
+					r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(response.Events))
+					if err != nil {
+						eventChan <- IteratedEvent{Error: err.Error()}
+						return
+					}
+					z, err := gzip.NewReader(r)
+					if err != nil {
+						eventChan <- IteratedEvent{Error: err.Error()}
+						return
+					}
+					if err := json.NewDecoder(z).Decode(&events); err != nil {
+						eventChan <- IteratedEvent{Error: err.Error()}
+						return
+					}
+				}
+			} else {
+				response := historicEventsResponse{}
+				// Update cursor in Dict
+				reqDict["cursor"] = req.Cursor
+				err = org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+				if err == nil {
+					events = response.Events
+					respCursor = response.NextCursor
+				}
+			}
 			if err != nil {
 				eventChan <- IteratedEvent{Error: err.Error()}
 				return
 			}
 
-			for _, event := range response.Events {
+			for _, event := range events {
 				select {
 				case <-done:
 					return
@@ -244,7 +274,7 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 				}
 			}
 
-			req.Cursor = response.NextCursor
+			req.Cursor = respCursor
 		}
 	}()
 
