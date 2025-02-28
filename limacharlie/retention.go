@@ -240,12 +240,15 @@ func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRe
 					z, err := gzip.NewReader(r)
 					if err != nil {
 						eventChan <- IteratedEvent{Error: err.Error()}
+						z.Close()
 						return
 					}
 					if err := json.NewDecoder(z).Decode(&events); err != nil {
 						eventChan <- IteratedEvent{Error: err.Error()}
+						z.Close()
 						return
 					}
+					z.Close()
 				}
 			} else {
 				response := historicEventsResponse{}
