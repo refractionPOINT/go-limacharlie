@@ -108,7 +108,7 @@ var supportedOrgValues []string = []string{
 	"socprime",
 	"alphamountain",
 	"pangea",
-	"hybrid-analysis",
+	"hybrid_analysis",
 	"echotrail",
 	"greynoise",
 }

@@ -1,8 +1,12 @@
 package limacharlie
 
 import (
+	"compress/gzip"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 type Stats struct {
@@ -14,10 +18,10 @@ type DetStats struct {
 type EventContainer struct {
 	Event Event `json:"event"`
 }
-type Event struct {
-	Event     interface{} `json:"event"`
-	Routing   Routing     `json:"routing"`
-	TimeStamp string      `json:"ts"`
+type Event = Dict
+type IteratedEvent struct {
+	Error string `json:"error"`
+	Data  Dict   `json:"data"`
 }
 type Routing struct {
 	Arch      int      `json:"arch"`
@@ -121,7 +125,7 @@ type HistoricalDetectionsRequest struct {
 	Limit int `json:"limit"`
 }
 
-func (org Organization) HistoricalDetections(detectionReq HistoricalDetectionsRequest) (HistoricalDetectionsResponse, error) {
+func (org *Organization) HistoricalDetections(detectionReq HistoricalDetectionsRequest) (HistoricalDetectionsResponse, error) {
 
 	var results HistoricalDetectionsResponse
 
@@ -137,4 +141,145 @@ func (org Organization) HistoricalDetections(detectionReq HistoricalDetectionsRe
 	}
 
 	return results, nil
+}
+
+type HistoricEventsRequest struct {
+	// Start is the start unix (seconds) timestamp to fetch events from
+	Start int64 `json:"start"`
+	// End is the end unix (seconds) timestamp to fetch events to
+	End int64 `json:"end"`
+	// Limit is the maximum number of events to return (optional)
+	Limit *int `json:"limit,omitempty"`
+	// EventType returns events only of this type (optional)
+	EventType string `json:"event_type,omitempty"`
+	// IsForward returns events in ascending order
+	IsForward bool `json:"is_forward"`
+	// OutputName sends data to a named output instead (optional)
+	OutputName string `json:"output_name,omitempty"`
+	// IsCompressed indicates if the response should be compressed
+	IsCompressed bool `json:"is_compressed"`
+	// Cursor is used for pagination
+	Cursor string `json:"cursor,omitempty"`
+}
+
+type historicEventsResponse struct {
+	Events     []Event `json:"events"`
+	NextCursor string  `json:"next_cursor"`
+}
+
+type historicEventsResponseCompressed struct {
+	Events     string `json:"events"`
+	NextCursor string `json:"next_cursor"`
+}
+
+// GetHistoricEvents gets the events for a sensor between two times, requires Insight (retention) enabled.
+// If outputName is specified, it will return a single response. Otherwise, it will handle pagination internally.
+// The returned close function can be called to abort the operation.
+func (org *Organization) GetHistoricEvents(sensorID string, req HistoricEventsRequest) (chan IteratedEvent, func(), error) {
+	if req.Cursor == "" {
+		req.Cursor = "-"
+	}
+	req.IsCompressed = true
+
+	// Create a channel to stream events and a done channel for cancellation
+	eventChan := make(chan IteratedEvent)
+	done := make(chan struct{})
+
+	// Convert request to Dict using JSON marshaling
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	var reqDict Dict
+	if err := json.Unmarshal(reqBytes, &reqDict); err != nil {
+		return nil, nil, err
+	}
+
+	// Create close function
+	closeFunc := func() {
+		close(done)
+	}
+
+	// If outputName is specified, make a single request and close the channel
+	if req.OutputName != "" {
+		response := Dict{}
+		err := org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, nil
+	}
+
+	// Handle pagination
+	go func() {
+		defer close(eventChan)
+		nReturned := 0
+		for req.Cursor != "" {
+			select {
+			case <-done:
+				return
+			default:
+			}
+
+			events := []Event{}
+			respCursor := ""
+
+			if req.IsCompressed {
+				response := historicEventsResponseCompressed{}
+				// Update cursor in Dict
+				reqDict["cursor"] = req.Cursor
+				err = org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+				if err == nil {
+					respCursor = response.NextCursor
+					// We need to decompress the events
+					r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(response.Events))
+					if err != nil {
+						eventChan <- IteratedEvent{Error: err.Error()}
+						return
+					}
+					z, err := gzip.NewReader(r)
+					if err != nil {
+						eventChan <- IteratedEvent{Error: err.Error()}
+						z.Close()
+						return
+					}
+					if err := json.NewDecoder(z).Decode(&events); err != nil {
+						eventChan <- IteratedEvent{Error: err.Error()}
+						z.Close()
+						return
+					}
+					z.Close()
+				}
+			} else {
+				response := historicEventsResponse{}
+				// Update cursor in Dict
+				reqDict["cursor"] = req.Cursor
+				err = org.GenericGETRequest(fmt.Sprintf("insight/%s/%s", org.client.options.OID, sensorID), reqDict, &response)
+				if err == nil {
+					events = response.Events
+					respCursor = response.NextCursor
+				}
+			}
+			if err != nil {
+				eventChan <- IteratedEvent{Error: err.Error()}
+				return
+			}
+
+			for _, event := range events {
+				select {
+				case <-done:
+					return
+				case eventChan <- IteratedEvent{Data: event}:
+					nReturned++
+					if req.Limit != nil && nReturned >= *req.Limit {
+						return
+					}
+				}
+			}
+
+			req.Cursor = respCursor
+		}
+	}()
+
+	return eventChan, closeFunc, nil
 }
