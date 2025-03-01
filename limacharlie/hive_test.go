@@ -446,35 +446,8 @@ func hiveBatchTest(t *testing.T) {
 
 	// Now fetch both records in a batch and also delete them in the same batch.
 	// Finally fetch the deleted records to ensure they are gone.
+	// Batches are processed in parallel, so we can't do a serial check with deletes etc.
 	batch = testHiveClient.NewBatchOperations()
-	batch.GetRecord(RecordID{
-		Hive: HiveID{
-			Name:      "cloud_sensor",
-			Partition: PartitionID(os.Getenv("_OID")),
-		},
-		Name: "test2",
-	})
-	batch.GetRecord(RecordID{
-		Hive: HiveID{
-			Name:      "cloud_sensor",
-			Partition: PartitionID(os.Getenv("_OID")),
-		},
-		Name: "test3",
-	})
-	batch.DelRecord(RecordID{
-		Hive: HiveID{
-			Name:      "cloud_sensor",
-			Partition: PartitionID(os.Getenv("_OID")),
-		},
-		Name: "test2",
-	})
-	batch.DelRecord(RecordID{
-		Hive: HiveID{
-			Name:      "cloud_sensor",
-			Partition: PartitionID(os.Getenv("_OID")),
-		},
-		Name: "test3",
-	})
 	batch.GetRecord(RecordID{
 		Hive: HiveID{
 			Name:      "cloud_sensor",
@@ -497,7 +470,7 @@ func hiveBatchTest(t *testing.T) {
 	}
 
 	// Check the responses.
-	if len(responses) != 6 {
+	if len(responses) != 2 {
 		t.Errorf("Batch failed: expected 6 responses, got %d", len(responses))
 		return
 	}
@@ -509,36 +482,12 @@ func hiveBatchTest(t *testing.T) {
 		t.Errorf("Batch 2 failed: %s", responses[1].Error)
 		return
 	}
-	if responses[2].Error != "" {
-		t.Errorf("Batch 3 failed: %s", responses[2].Error)
-		return
-	}
-	if responses[3].Error != "" {
-		t.Errorf("Batch 4 failed: %s", responses[3].Error)
-		return
-	}
-	if !strings.Contains(responses[4].Error, "RECORD_NOT_FOUND") {
-		t.Errorf("Batch 5 failed: %s", responses[4].Error)
-		return
-	}
-	if !strings.Contains(responses[5].Error, "RECORD_NOT_FOUND") {
-		t.Errorf("Batch 6 failed: %s", responses[5].Error)
-		return
-	}
 	if responses[0].Data == nil {
 		t.Errorf("Batch 1 failed: missing data")
 		return
 	}
 	if responses[1].Data == nil {
 		t.Errorf("Batch 2 failed: missing data")
-		return
-	}
-	if len(responses[4].Data) != 0 {
-		t.Errorf("Batch 5 failed: data should not be nil")
-		return
-	}
-	if len(responses[5].Data) != 0 {
-		t.Errorf("Batch 6 failed: data should not be nil")
 		return
 	}
 }
