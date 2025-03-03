@@ -47,6 +47,7 @@ type SyncOptions struct {
 	SyncHives            map[string]bool `json:"sync_hives"`
 	SyncInstallationKeys bool            `json:"sync_installation_keys"`
 	SyncYara             bool            `json:"sync_yara"`
+	SyncPlaybook         bool            `json:"sync_playbook"`
 
 	IncludeLoader IncludeLoaderCB `json:"-"`
 }
