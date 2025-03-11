@@ -113,6 +113,8 @@ func (org *Organization) EventByAtom(sensorID, atom string) (EventContainer, err
 }
 
 type HistoricalDetectionsRequest struct {
+	// SID is the sensor ID to fetch detections for
+	SID string `json:"sid"`
 	// Cat is the category of the detections to fetch
 	Cat string `json:"cat"`
 	// Cursor is optional for paginated access, set to '-' for first query
