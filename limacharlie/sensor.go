@@ -145,7 +145,7 @@ func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withFormData(Dict{
 		"tags": tag,
-		"ttl":  fmt.Sprintf("%d", ttl/time.Second),
+		"ttl":  ttl / time.Second,
 	})
 	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
@@ -228,10 +228,18 @@ func (org *Organization) GetSensors(SIDs []string) map[string]*Sensor {
 	return m
 }
 
-func (org *Organization) ListSensors() (map[string]*Sensor, error) {
+type ListSensorsOptions struct {
+	Selector string
+	Limit    int
+}
+
+func (org *Organization) ListSensors(options ...ListSensorsOptions) (map[string]*Sensor, error) {
 	m := map[string]*Sensor{}
 	lastToken := ""
-
+	effectiveOptions := ListSensorsOptions{}
+	if len(options) != 0 {
+		effectiveOptions = options[0]
+	}
 	for {
 		page := rawSensorListPage{}
 		q := makeDefaultRequest(&page)
@@ -239,10 +247,14 @@ func (org *Organization) ListSensors() (map[string]*Sensor, error) {
 			q = q.withQueryData(Dict{
 				"continuation_token": lastToken,
 				"is_compressed":      "true",
+				"selector":           effectiveOptions.Selector,
+				"limit":              effectiveOptions.Limit,
 			})
 		} else {
 			q = q.withQueryData(Dict{
 				"is_compressed": "true",
+				"selector":      effectiveOptions.Selector,
+				"limit":         effectiveOptions.Limit,
 			})
 		}
 		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
