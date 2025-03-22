@@ -145,7 +145,7 @@ func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withFormData(Dict{
 		"tags": tag,
-		"ttl":  ttl / time.Second,
+		"ttl":  fmt.Sprintf("%d", ttl/time.Second),
 	})
 	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
