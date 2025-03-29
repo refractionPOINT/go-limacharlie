@@ -25,7 +25,7 @@ func TestSchemas(t *testing.T) {
 	}
 
 	// Test GetSchema with a known event type
-	eventType := schemas.EventTypes[0] // Use the first event type from the list
+	eventType := "evt:CODE_IDENTITY"
 	schema, err := org.GetSchema(eventType)
 	if err != nil {
 		t.Errorf("GetSchema(%s): %v", eventType, err)
