@@ -47,7 +47,6 @@ type SyncOptions struct {
 	SyncHives            map[string]bool `json:"sync_hives"`
 	SyncInstallationKeys bool            `json:"sync_installation_keys"`
 	SyncYara             bool            `json:"sync_yara"`
-	SyncPlaybook         bool            `json:"sync_playbook"`
 	IncludeLoader        IncludeLoaderCB `json:"-"`
 }
 
@@ -64,6 +63,7 @@ var KnownHives = []string{
 	"query",
 	"model",
 	"playbook",
+	"ai_agent",
 }
 
 func SyncAll() SyncOptions {
@@ -92,6 +92,7 @@ func SyncAll() SyncOptions {
 			"query":            true,
 			"model":            true,
 			"playbook":         true,
+			"ai_agent":         true,
 		},
 	}
 }

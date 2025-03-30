@@ -13,7 +13,7 @@ type SyncHiveData struct {
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
 
-func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
+func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (org Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHive
 	}
 }
 
-func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) ([]OrgSyncOperation, error) {
+func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) ([]OrgSyncOperation, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 					IsRemoved:   true,
 				}
 				// If tags are passed ensure all tags match before removing
-				if opts.Tags != nil && len(opts.Tags) != 0 {
+				if len(opts.Tags) != 0 {
 					if !slicesContainSameItems(currentConfigData[k].UsrMtd.Tags, opts.Tags) {
 						continue // tags do not match do not remove
 					}
@@ -177,8 +177,8 @@ func (org Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) 
 	return orgOps, nil
 }
 
-func (org Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, error) {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, error) {
+	hiveClient := NewHiveClient(org)
 
 	dataSet, err := hiveClient.List(args)
 	if err != nil {
@@ -200,8 +200,8 @@ func (org Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, 
 	return currentHiveDataConfig, nil
 }
 
-func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
+	hiveClient := NewHiveClient(org)
 
 	err := encodeDecodeHiveData(&hd.Data)
 	if err != nil {
@@ -230,8 +230,8 @@ func (org Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) error
 	return nil
 }
 
-func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
+	hiveClient := NewHiveClient(org)
 
 	err := encodeDecodeHiveData(&hd.Data)
 	if err != nil {
@@ -260,8 +260,8 @@ func (org Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 	return nil
 }
 
-func (org Organization) removeHiveConfigData(args HiveArgs) error {
-	hiveClient := NewHiveClient(&org)
+func (org *Organization) removeHiveConfigData(args HiveArgs) error {
+	hiveClient := NewHiveClient(org)
 
 	_, err := hiveClient.Remove(args)
 	if err != nil {
