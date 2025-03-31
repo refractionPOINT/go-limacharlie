@@ -2,13 +2,14 @@ package limacharlie
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 	"path/filepath"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func resetResource(org *Organization) {
@@ -256,7 +257,79 @@ rules:
 	if string(yOut) != expected {
 		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
 	}
+
+	// Add new test case for hive merging
+	t.Run("hive merge", func(t *testing.T) {
+		o1 := OrgConfig{
+			Version: 3,
+			Hives: orgSyncHives{
+				"lookup": {
+					"record1": SyncHiveData{
+						"key1": "val1",
+						"key2": "val2",
+					},
+					"record2": SyncHiveData{
+						"key3": "val3",
+					},
+				},
+				"secret": {
+					"secret1": SyncHiveData{
+						"user": "admin",
+					},
+				},
+			},
+		}
+
+		o2 := OrgConfig{
+			Hives: orgSyncHives{
+				"lookup": {
+					"record1": SyncHiveData{
+						"key2": "newval2",
+						"key4": "val4",
+					},
+					"record3": SyncHiveData{
+						"key5": "val5",
+					},
+				},
+				"secret": {
+					"secret2": SyncHiveData{
+						"pass": "1234",
+					},
+				},
+			},
+		}
+
+		expected := `version: 3
+hives:
+    lookup:
+        record1:
+            key1: val1
+            key2: newval2
+            key4: val4
+        record2:
+            key3: val3
+        record3:
+            key5: val5
+    secret:
+        secret1:
+            user: admin
+        secret2:
+            pass: "1234"
+`
+
+		out := o1.Merge(o2)
+
+		yOut, err := yaml.Marshal(out)
+		if err != nil {
+			t.Errorf("yaml: %v", err)
+		}
+
+		if string(yOut) != expected {
+			t.Errorf("unexpected hive merge config:\n%s\n!=\n\n%s", string(yOut), expected)
+		}
+	})
 }
+
 func TestPushMultiFiles(t *testing.T) {
 	files := map[string][]byte{
 		"f1": []byte(`version: 3
