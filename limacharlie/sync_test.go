@@ -269,10 +269,22 @@ rules:
 							"key1": "val1",
 							"key2": "val2",
 						},
+						UsrMtd: UsrMtd{
+							Enabled: true,
+							Expiry:  1000,
+							Tags:    []string{"tag1", "tag2"},
+							Comment: "comment1",
+						},
 					},
 					"record2": SyncHiveData{
 						Data: map[string]interface{}{
 							"key3": "val3",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
 						},
 					},
 				},
@@ -280,6 +292,12 @@ rules:
 					"secret1": SyncHiveData{
 						Data: map[string]interface{}{
 							"user": "admin",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: true,
+							Expiry:  1000,
+							Tags:    []string{"tag3", "tag4"},
+							Comment: "comment2",
 						},
 					},
 				},
@@ -294,10 +312,22 @@ rules:
 							"key2": "newval2",
 							"key4": "val4",
 						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
 					},
 					"record3": SyncHiveData{
 						Data: map[string]interface{}{
 							"key5": "val5",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
 						},
 					},
 				},
@@ -305,6 +335,12 @@ rules:
 					"secret2": SyncHiveData{
 						Data: map[string]interface{}{
 							"pass": "1234",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
 						},
 					},
 				},
@@ -315,18 +351,49 @@ rules:
 hives:
     lookup:
         record1:
-            key1: val1
-            key2: newval2
-            key4: val4
+			data:
+				key1: val1
+				key2: newval2
+			usr_mtd:
+				enabled: true
+				expiry: 1000
+				tags:
+					- tag1
+					- tag2
+				comment: comment1
         record2:
-            key3: val3
+            data:
+				key3: val3
+			usr_mtd:
+				enabled: false
+				expiry: 0
+				tags: []
+				comment: ""
         record3:
-            key5: val5
+            data:
+				key5: val5
+			usr_mtd:
+				enabled: false
+				expiry: 0
+				tags: []
+				comment: ""
     secret:
         secret1:
-            user: admin
+            data:
+				user: admin
+			usr_mtd:
+				enabled: true
+				expiry: 1000
+				tags:
+					- tag3
         secret2:
-            pass: "1234"
+            data:
+				pass: "1234"
+			usr_mtd:
+				enabled: false
+				expiry: 0
+				tags: []
+				comment: ""
 `
 
 		out := o1.Merge(o2)
