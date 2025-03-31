@@ -265,16 +265,22 @@ rules:
 			Hives: orgSyncHives{
 				"lookup": {
 					"record1": SyncHiveData{
-						"key1": "val1",
-						"key2": "val2",
+						Data: map[string]interface{}{
+							"key1": "val1",
+							"key2": "val2",
+						},
 					},
 					"record2": SyncHiveData{
-						"key3": "val3",
+						Data: map[string]interface{}{
+							"key3": "val3",
+						},
 					},
 				},
 				"secret": {
 					"secret1": SyncHiveData{
-						"user": "admin",
+						Data: map[string]interface{}{
+							"user": "admin",
+						},
 					},
 				},
 			},
@@ -284,16 +290,22 @@ rules:
 			Hives: orgSyncHives{
 				"lookup": {
 					"record1": SyncHiveData{
-						"key2": "newval2",
-						"key4": "val4",
+						Data: map[string]interface{}{
+							"key2": "newval2",
+							"key4": "val4",
+						},
 					},
 					"record3": SyncHiveData{
-						"key5": "val5",
+						Data: map[string]interface{}{
+							"key5": "val5",
+						},
 					},
 				},
 				"secret": {
 					"secret2": SyncHiveData{
-						"pass": "1234",
+						Data: map[string]interface{}{
+							"pass": "1234",
+						},
 					},
 				},
 			},
