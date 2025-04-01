@@ -352,14 +352,12 @@ hives:
     lookup:
         record1:
 			data:
-				key1: val1
 				key2: newval2
+				key4: val4
 			usr_mtd:
-				enabled: true
+				enabled: false
 				expiry: 1000
-				tags:
-					- tag1
-					- tag2
+				tags: []
 				comment: comment1
         record2:
             data:
