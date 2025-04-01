@@ -358,7 +358,7 @@ hives:
 				enabled: false
 				expiry: 1000
 				tags: []
-				comment: comment1
+				comment: ""
         record2:
             data:
 				key3: val3
