@@ -384,6 +384,8 @@ hives:
                     expiry: 1000
                     tags:
                         - tag3
+                        - tag4
+                    comment: comment2
             secret2:
                 data:
                     pass: "1234"
