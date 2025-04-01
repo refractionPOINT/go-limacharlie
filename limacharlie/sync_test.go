@@ -356,7 +356,7 @@ hives:
                 key4: val4
             usr_mtd:
                 enabled: false
-                expiry: 1000
+                expiry: 0
                 tags: []
                 comment: ""
         record2:
