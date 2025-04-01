@@ -432,10 +432,20 @@ func (a OrgConfig) mergeHives(hiveConfig orgSyncHives) orgSyncHives {
 
 	n := orgSyncHives{}
 	for k, v := range a.Hives {
-		n[k] = v
+		for k2, v2 := range v {
+			if _, ok := n[k]; !ok {
+				n[k] = map[HiveKey]SyncHiveData{}
+			}
+			n[k][k2] = v2
+		}
 	}
 	for k, v := range hiveConfig {
-		n[k] = v
+		for k2, v2 := range v {
+			if _, ok := n[k]; !ok {
+				n[k] = map[HiveKey]SyncHiveData{}
+			}
+			n[k][k2] = v2
+		}
 	}
 	return n
 }

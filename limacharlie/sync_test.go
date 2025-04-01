@@ -2,13 +2,14 @@ package limacharlie
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 	"path/filepath"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func resetResource(org *Organization) {
@@ -256,7 +257,158 @@ rules:
 	if string(yOut) != expected {
 		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
 	}
+
+	// Add new test case for hive merging
+	t.Run("hive merge", func(t *testing.T) {
+		o1 := OrgConfig{
+			Version: 3,
+			Hives: orgSyncHives{
+				"lookup": {
+					"record1": SyncHiveData{
+						Data: map[string]interface{}{
+							"key1": "val1",
+							"key2": "val2",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: true,
+							Expiry:  1000,
+							Tags:    []string{"tag1", "tag2"},
+							Comment: "comment1",
+						},
+					},
+					"record2": SyncHiveData{
+						Data: map[string]interface{}{
+							"key3": "val3",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+				},
+				"secret": {
+					"secret1": SyncHiveData{
+						Data: map[string]interface{}{
+							"user": "admin",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: true,
+							Expiry:  1000,
+							Tags:    []string{"tag3", "tag4"},
+							Comment: "comment2",
+						},
+					},
+				},
+			},
+		}
+
+		o2 := OrgConfig{
+			Hives: orgSyncHives{
+				"lookup": {
+					"record1": SyncHiveData{
+						Data: map[string]interface{}{
+							"key2": "newval2",
+							"key4": "val4",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+					"record3": SyncHiveData{
+						Data: map[string]interface{}{
+							"key5": "val5",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+				},
+				"secret": {
+					"secret2": SyncHiveData{
+						Data: map[string]interface{}{
+							"pass": "1234",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+				},
+			},
+		}
+
+		expected := `version: 3
+hives:
+    lookup:
+        record1:
+            data:
+                key2: newval2
+                key4: val4
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+        record2:
+            data:
+                key3: val3
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+        record3:
+            data:
+                key5: val5
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+    secret:
+        secret1:
+            data:
+                user: admin
+            usr_mtd:
+                enabled: true
+                expiry: 1000
+                tags:
+                    - tag3
+                    - tag4
+                comment: comment2
+        secret2:
+            data:
+                pass: "1234"
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+`
+
+		out := o1.Merge(o2)
+
+		yOut, err := yaml.Marshal(out)
+		if err != nil {
+			t.Errorf("yaml: %v", err)
+		}
+
+		if string(yOut) != expected {
+			t.Errorf("unexpected hive merge config:\n%s\n!=\n\n%s", string(yOut), expected)
+		}
+	})
 }
+
 func TestPushMultiFiles(t *testing.T) {
 	files := map[string][]byte{
 		"f1": []byte(`version: 3
