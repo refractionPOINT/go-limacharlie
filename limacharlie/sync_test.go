@@ -375,25 +375,25 @@ hives:
                 expiry: 0
                 tags: []
                 comment: ""
-        secret:
-            secret1:
-                data:
-                    user: admin
-                usr_mtd:
-                    enabled: true
-                    expiry: 1000
-                    tags:
-                        - tag3
-                        - tag4
-                    comment: comment2
-            secret2:
-                data:
-                    pass: "1234"
-                usr_mtd:
-                    enabled: false
-                    expiry: 0
-                    tags: []
-                    comment: ""
+	secret:
+		secret1:
+			data:
+				user: admin
+			usr_mtd:
+				enabled: true
+				expiry: 1000
+				tags:
+					- tag3
+					- tag4
+				comment: comment2
+		secret2:
+			data:
+				pass: "1234"
+			usr_mtd:
+				enabled: false
+				expiry: 0
+				tags: []
+				comment: ""
 `
 
 		out := o1.Merge(o2)
