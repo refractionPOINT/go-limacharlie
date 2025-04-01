@@ -108,7 +108,7 @@ func (k InstallationKey) EqualsContent(k2 InstallationKey) bool {
 	return true
 }
 
-func (org Organization) InstallationKeys() ([]InstallationKey, error) {
+func (org *Organization) InstallationKeys() ([]InstallationKey, error) {
 	resp := map[string]map[string]InstallationKey{}
 
 	request := makeDefaultRequest(&resp)
@@ -116,14 +116,14 @@ func (org Organization) InstallationKeys() ([]InstallationKey, error) {
 		return nil, err
 	}
 	keys := []InstallationKey{}
-	orgKeys, _ := resp[org.client.options.OID]
+	orgKeys := resp[org.client.options.OID]
 	for _, k := range orgKeys {
 		keys = append(keys, k)
 	}
 	return keys, nil
 }
 
-func (org Organization) InstallationKey(iid string) (*InstallationKey, error) {
+func (org *Organization) InstallationKey(iid string) (*InstallationKey, error) {
 	resp := InstallationKey{}
 
 	request := makeDefaultRequest(&resp)
@@ -133,7 +133,7 @@ func (org Organization) InstallationKey(iid string) (*InstallationKey, error) {
 	return &resp, nil
 }
 
-func (org Organization) AddInstallationKey(k InstallationKey) (string, error) {
+func (org *Organization) AddInstallationKey(k InstallationKey) (string, error) {
 	resp := Dict{}
 	req := Dict{
 		"tags":               k.Tags,
@@ -151,7 +151,7 @@ func (org Organization) AddInstallationKey(k InstallationKey) (string, error) {
 	return iid, nil
 }
 
-func (org Organization) DelInstallationKey(iid string) error {
+func (org *Organization) DelInstallationKey(iid string) error {
 	resp := Dict{}
 
 	request := makeDefaultRequest(&resp).withFormData(Dict{

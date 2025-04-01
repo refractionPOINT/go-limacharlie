@@ -820,3 +820,146 @@ func TestSyncOrgExtensions(t *testing.T) {
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
 }
+
+func TestLoadInstallationKeysFromYaml(t *testing.T) {
+	a := assert.New(t)
+
+	yamlConfig := `version: 3
+installation_keys:
+  key1:
+    desc: test key 1
+    tags:
+      - tag1
+      - tag2
+    use_public_root_ca: true
+  key2:
+    desc: test key 2
+    tags:
+      - tag3
+    use_public_root_ca: false
+  key3:
+    desc: test key 3
+    use_public_root_ca: true
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlConfig), &orgConfig))
+
+	// Verify the installation keys were loaded correctly
+	a.Equal(3, len(orgConfig.InstallationKeys))
+
+	// Check key1
+	key1, exists := orgConfig.InstallationKeys["key1"]
+	a.True(exists)
+	a.Equal("test key 1", key1.Description)
+	a.Equal(2, len(key1.Tags))
+	a.Contains(key1.Tags, "tag1")
+	a.Contains(key1.Tags, "tag2")
+	a.True(key1.UsePublicCA)
+
+	// Check key2
+	key2, exists := orgConfig.InstallationKeys["key2"]
+	a.True(exists)
+	a.Equal("test key 2", key2.Description)
+	a.Equal(1, len(key2.Tags))
+	a.Contains(key2.Tags, "tag3")
+	a.False(key2.UsePublicCA)
+
+	// Check key3
+	key3, exists := orgConfig.InstallationKeys["key3"]
+	a.True(exists)
+	a.Equal("test key 3", key3.Description)
+	a.Empty(key3.Tags)
+	a.True(key3.UsePublicCA)
+
+	// Test that the keys can be properly compared using EqualsContent
+	key1Copy := InstallationKey{
+		Description: "test key 1",
+		Tags:        []string{"tag1", "tag2"},
+		UsePublicCA: true,
+	}
+	a.True(key1.EqualsContent(key1Copy))
+
+	// Test that different keys are not equal
+	a.False(key1.EqualsContent(key2))
+}
+
+func TestMergeInstallationKeysFromYaml(t *testing.T) {
+	a := assert.New(t)
+
+	// First config with 2 keys
+	yamlConfig1 := `version: 3
+installation_keys:
+  key1:
+    desc: test key 1
+    tags:
+      - tag1
+      - tag2
+    use_public_root_ca: true
+  key2:
+    desc: test key 2
+    tags:
+      - tag3
+    use_public_root_ca: false
+`
+	// Second config with 1 existing key modified and 1 new key
+	yamlConfig2 := `version: 3
+installation_keys:
+  key1:
+    desc: test key 1 modified
+    tags:
+      - tag1
+      - tag2
+      - tag4
+    use_public_root_ca: false
+  key3:
+    desc: test key 3
+    tags:
+      - tag5
+    use_public_root_ca: true
+`
+	orgConfig1 := OrgConfig{}
+	orgConfig2 := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlConfig1), &orgConfig1))
+	a.NoError(yaml.Unmarshal([]byte(yamlConfig2), &orgConfig2))
+
+	// Merge configs
+	mergedConfig := orgConfig1.Merge(orgConfig2)
+
+	// Verify merged installation keys
+	a.Equal(3, len(mergedConfig.InstallationKeys))
+
+	// Check key1 (should have updated values from config2)
+	key1, exists := mergedConfig.InstallationKeys["key1"]
+	a.True(exists)
+	a.Equal("test key 1 modified", key1.Description)
+	a.Equal(3, len(key1.Tags))
+	a.Contains(key1.Tags, "tag1")
+	a.Contains(key1.Tags, "tag2")
+	a.Contains(key1.Tags, "tag4")
+	a.False(key1.UsePublicCA)
+
+	// Check key2 (should remain unchanged from config1)
+	key2, exists := mergedConfig.InstallationKeys["key2"]
+	a.True(exists)
+	a.Equal("test key 2", key2.Description)
+	a.Equal(1, len(key2.Tags))
+	a.Contains(key2.Tags, "tag3")
+	a.False(key2.UsePublicCA)
+
+	// Check key3 (should be added from config2)
+	key3, exists := mergedConfig.InstallationKeys["key3"]
+	a.True(exists)
+	a.Equal("test key 3", key3.Description)
+	a.Equal(1, len(key3.Tags))
+	a.Contains(key3.Tags, "tag5")
+	a.True(key3.UsePublicCA)
+
+	// Test merging with empty installation keys
+	emptyConfig := OrgConfig{Version: 3}
+	mergedWithEmpty := orgConfig1.Merge(emptyConfig)
+	a.Equal(2, len(mergedWithEmpty.InstallationKeys))
+
+	// Test merging empty with non-empty
+	mergedEmptyWithNonEmpty := emptyConfig.Merge(orgConfig1)
+	a.Equal(2, len(mergedEmptyWithNonEmpty.InstallationKeys))
+}

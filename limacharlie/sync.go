@@ -458,7 +458,7 @@ func (a OrgConfig) mergeInstallationKeys(ikeys orgSyncInstallationKeys) orgSyncI
 	for k, v := range ikeys {
 		nk[k] = v
 	}
-	return ikeys
+	return nk
 }
 
 func (a OrgConfig) mergeYara(yara *orgSyncYara) *orgSyncYara {
