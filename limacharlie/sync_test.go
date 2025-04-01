@@ -359,16 +359,16 @@ hives:
                 expiry: 1000
                 tags: []
                 comment: ""
-            record2:
-                        data:
+        record2:
+            data:
                 key3: val3
             usr_mtd:
                 enabled: false
                 expiry: 0
                 tags: []
                 comment: ""
-            record3:
-                        data:
+        record3:
+            data:
                 key5: val5
             usr_mtd:
                 enabled: false
@@ -384,14 +384,14 @@ hives:
                     expiry: 1000
                     tags:
                         - tag3
-                secret2:
-                    data:
-                        pass: "1234"
-            usr_mtd:
-                enabled: false
-                expiry: 0
-                tags: []
-                comment: ""
+            secret2:
+                data:
+                    pass: "1234"
+                usr_mtd:
+                    enabled: false
+                    expiry: 0
+                    tags: []
+                    comment: ""
 `
 
 		out := o1.Merge(o2)
