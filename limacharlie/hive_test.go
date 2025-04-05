@@ -20,19 +20,20 @@ func TestHiveClient(t *testing.T) {
 	testHiveClient = NewHiveClient(org)
 
 	tests := map[string]func(t *testing.T){
-		"add":     hiveAddTest,
-		"get":     hiveGetTest,
-		"getMtd":  hiveGetMtdTest,
-		"list":    hiveListTest,
-		"listMtd": hiveListMtdTest,
-		"update":  hiveUpdate,
-		"tx":      hiveUpdateTx,
-		"remove":  hiveRemove,
-		"batch":   hiveBatchTest,
+		"add":           hiveAddTest,
+		"get":           hiveGetTest,
+		"getMtd":        hiveGetMtdTest,
+		"list":          hiveListTest,
+		"listMtd":       hiveListMtdTest,
+		"update":        hiveUpdate,
+		"tx":            hiveUpdateTx,
+		"getPublicGUID": hiveGetPublicByGUIDTest,
+		"remove":        hiveRemove,
+		"batch":         hiveBatchTest,
 	}
 
 	// ensure test execute in proper order
-	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "remove", "batch"}
+	testArray := []string{"add", "get", "getMtd", "list", "listMtd", "update", "tx", "getPublicGUID", "remove", "batch"}
 	for _, name := range testArray {
 		t.Run(name, tests[name])
 	}
@@ -489,5 +490,114 @@ func hiveBatchTest(t *testing.T) {
 	if responses[1].Data == nil {
 		t.Errorf("Batch 2 failed: missing data")
 		return
+	}
+}
+
+func hiveGetPublicByGUIDTest(t *testing.T) {
+	// First create a record in the external_adapter hive
+	externalAdapterKey := "external-test-" + randSeq(8)
+	// Build a dummy record.
+	jsonString := `{
+		"s3": {
+		  "access_key": "access key",
+		  "bucket_name": "bucket_name",
+		  "client_options": {
+			"hostname": "syslog-test",
+			"identity": {
+			  "installation_key": "test install key",
+			  "oid": "oid-input"
+			},
+			"platform": "text",
+			"sensor_seed_key": "syslog-test"
+		  },
+		  "prefix": "prefix",
+		  "secret_key": "secret key"
+		},
+		"sensor_type": "s3"
+	  }`
+	jsonString = strings.ReplaceAll(jsonString, "oid-input", os.Getenv("_OID"))
+
+	testData := Dict{}
+	if err := json.Unmarshal([]byte(jsonString), &testData); err != nil {
+		panic(err)
+	}
+
+	// Add the test record to external_adapter hive
+	_, err := testHiveClient.Add(HiveArgs{
+		HiveName:     "external_adapter",
+		PartitionKey: os.Getenv("_OID"),
+		Key:          externalAdapterKey,
+		Data:         testData,
+	})
+
+	if err != nil {
+		t.Errorf("failed to create test record in external_adapter: %v", err)
+		return
+	}
+
+	// Get the record to extract its GUID
+	hiveData, err := testHiveClient.Get(HiveArgs{
+		HiveName:     "external_adapter",
+		PartitionKey: os.Getenv("_OID"),
+		Key:          externalAdapterKey})
+
+	if err != nil {
+		t.Errorf("failed to get record for GUID test setup: %v", err)
+		return
+	}
+
+	guid := hiveData.SysMtd.GUID
+	if guid == "" {
+		t.Error("record has no GUID")
+		return
+	}
+
+	// Now test the GetPublicByGUID method
+	etag := hiveData.SysMtd.Etag
+	publicData, err := testHiveClient.GetPublicByGUID(HiveArgs{
+		HiveName:     "external_adapter",
+		PartitionKey: os.Getenv("_OID"),
+		ETag:         &etag,
+	}, guid)
+
+	if err != nil {
+		t.Errorf("GetPublicByGUID failed: %v", err)
+		return
+	}
+
+	// The record should not have changed and the returned data should be
+	// empty but successful to indicate no update.
+	if len(publicData.Data) != 0 {
+		t.Errorf("GetPublicByGUID failed: expected empty data, got %v", publicData.Data)
+		return
+	}
+
+	// Test with invalid GUID
+	_, err = testHiveClient.GetPublicByGUID(HiveArgs{
+		HiveName:     "external_adapter",
+		PartitionKey: os.Getenv("_OID"),
+	}, "invalid-guid")
+
+	if err == nil {
+		t.Error("expected error with invalid GUID, got nil")
+		return
+	}
+
+	// Test with missing required parameters
+	_, err = testHiveClient.GetPublicByGUID(HiveArgs{}, guid)
+	if err == nil {
+		t.Error("expected error with missing parameters, got nil")
+		return
+	}
+
+	// Clean up the test record
+	_, err = testHiveClient.Remove(HiveArgs{
+		HiveName:     "external_adapter",
+		PartitionKey: os.Getenv("_OID"),
+		Key:          externalAdapterKey,
+	})
+
+	if err != nil {
+		t.Errorf("failed to clean up test record: %v", err)
 	}
 }
