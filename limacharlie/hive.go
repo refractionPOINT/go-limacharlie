@@ -184,19 +184,19 @@ func (h *HiveClient) GetPublicByGUID(args HiveArgs, guid string) (*HiveData, err
 		return nil, errors.New("GUID is required")
 	}
 
-	params := url.Values{}
+	reqData := Dict{
+		"guid": guid,
+	}
+
 	if args.ETag != nil {
-		params.Add("etag", *args.ETag)
+		reqData["etag"] = args.ETag
 	}
 
 	var hiveData HiveData
-	req := makeDefaultRequest(&hiveData)
-	if len(params) > 0 {
-		req = req.withURLValues(params)
-	}
+	req := makeDefaultRequest(&hiveData).withFormData(reqData)
 
-	if err := h.Organization.client.reliableRequest(http.MethodGet,
-		fmt.Sprintf("hive-public/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(guid)), req); err != nil {
+	if err := h.Organization.client.reliableRequest(http.MethodPost,
+		fmt.Sprintf("hive-public/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
 		return nil, err
 	}
 
