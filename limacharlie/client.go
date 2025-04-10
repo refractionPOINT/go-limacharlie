@@ -51,13 +51,14 @@ type jwtResponse struct {
 }
 
 type restRequest struct {
-	nRetries  int
-	timeout   time.Duration
-	queryData interface{}
-	formData  interface{}
-	urlValues url.Values
-	response  interface{}
-	urlRoot   string
+	nRetries      int
+	timeout       time.Duration
+	queryData     interface{}
+	formData      interface{}
+	urlValues     url.Values
+	response      interface{}
+	urlRoot       string
+	idempotentKey string
 }
 
 func makeDefaultRequest(response interface{}) restRequest {
@@ -91,6 +92,11 @@ func (r restRequest) withURLValues(urlValues url.Values) restRequest {
 
 func (r restRequest) withURLRoot(root string) restRequest {
 	r.urlRoot = root
+	return r
+}
+
+func (r restRequest) withIdempotentKey(idempotentKey string) restRequest {
+	r.idempotentKey = idempotentKey
 	return r
 }
 
@@ -382,6 +388,9 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 
 	r.Header.Set("User-Agent", "limacharlie-sdk")
 	r.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.options.JWT))
+	if request.idempotentKey != "" {
+		r.Header.Set("x-idempotent-key", request.idempotentKey)
+	}
 	for k, v := range headers {
 		r.Header.Set(k, v)
 	}

@@ -63,6 +63,7 @@ type TagInfo struct {
 type TaskingOptions struct {
 	InvestigationID      string
 	InvestigationContext string
+	IdempotentKey        string
 }
 
 func (t *TagInfo) UnmarshalJSON(b []byte) error {
@@ -171,6 +172,7 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 		"tasks": task,
 	}
 	effectiveInvestigationID := s.InvestigationID
+	idempotentKey := ""
 	if len(options) != 0 {
 		opt := options[0]
 		if opt.InvestigationID != "" {
@@ -179,12 +181,18 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 		if effectiveInvestigationID != "" && opt.InvestigationContext != "" {
 			effectiveInvestigationID = fmt.Sprintf("%s/%s", effectiveInvestigationID, opt.InvestigationContext)
 		}
+		if opt.IdempotentKey != "" {
+			idempotentKey = opt.IdempotentKey
+		}
 	}
 	if effectiveInvestigationID != "" {
 		data["investigation_id"] = effectiveInvestigationID
 	}
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withFormData(data)
+	if idempotentKey != "" {
+		req = req.withIdempotentKey(idempotentKey)
+	}
 	if err := s.Organization.client.reliableRequest(http.MethodPost, s.SID, req); err != nil {
 		s.LastError = err
 		return err
