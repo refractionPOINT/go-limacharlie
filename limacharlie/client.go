@@ -389,7 +389,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 	r.Header.Set("User-Agent", "limacharlie-sdk")
 	r.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.options.JWT))
 	if request.idempotentKey != "" {
-		r.Header.Set("x-request-id", request.idempotentKey)
+		r.Header.Set("x-idempotent-key", request.idempotentKey)
 	}
 	for k, v := range headers {
 		r.Header.Set(k, v)
