@@ -24,14 +24,6 @@ type LiveStreamRequest struct {
 	UserID          string `json:"uid,omitempty"`
 }
 
-// Manager represents the limacharlie.io manager.
-type Manager struct {
-	oid          string
-	secretAPIKey string
-	jwt          string
-	Log          func(format string, args ...interface{})
-}
-
 const (
 	// Default timeout for WebSocket operations
 	defaultWebSocketTimeout = 5 * time.Second
@@ -41,7 +33,7 @@ const (
 
 // Spout is a listener object to receive data (Events, Detects or Audit) from a limacharlie.io Organization.
 type Spout struct {
-	man       *Manager
+	org       *Organization
 	dataType  string
 	isParse   bool
 	maxBuffer int
@@ -60,13 +52,13 @@ type Spout struct {
 }
 
 // NewSpout creates a new Spout instance to receive data from limacharlie.io.
-func NewSpout(man *Manager, dataType string, opts ...SpoutOption) (*Spout, error) {
+func NewSpout(org *Organization, dataType string, opts ...SpoutOption) (*Spout, error) {
 	if dataType != "event" && dataType != "detect" && dataType != "audit" && dataType != "deployment" && dataType != "billing" {
 		return nil, fmt.Errorf("invalid data type: %s", dataType)
 	}
 
 	sp := &Spout{
-		man:       man,
+		org:       org,
 		dataType:  dataType,
 		isParse:   true,
 		maxBuffer: 1024,
@@ -139,9 +131,9 @@ func WithUserID(uid string) SpoutOption {
 func (s *Spout) Start() error {
 	// Create WebSocket connection
 	header := LiveStreamRequest{
-		OrgID:           s.man.oid,
-		APIKey:          s.man.secretAPIKey,
-		JWT:             s.man.jwt,
+		OrgID:           s.org.GetOID(),
+		APIKey:          s.org.client.options.APIKey,
+		JWT:             s.org.GetCurrentJWT(),
 		StreamType:      s.dataType,
 		Tag:             s.tag,
 		Category:        s.cat,
@@ -196,7 +188,7 @@ func (s *Spout) readMessages() {
 		default:
 			// Set read deadline
 			if err := s.conn.SetReadDeadline(time.Now().Add(defaultWebSocketTimeout)); err != nil {
-				s.man.Log("error setting read deadline: %v", err)
+				s.org.logger.Info(fmt.Sprintf("error setting read deadline: %v", err))
 				return
 			}
 
@@ -204,14 +196,14 @@ func (s *Spout) readMessages() {
 			_, message, err := s.conn.ReadMessage()
 			if err != nil {
 				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-					s.man.Log("error reading message: %v", err)
+					s.org.logger.Info(fmt.Sprintf("error reading message: %v", err))
 				}
 				return
 			}
 
 			// Process message
 			if err := s.processMessage(message); err != nil {
-				s.man.Log("error processing message: %v", err)
+				s.org.logger.Info(fmt.Sprintf("error processing message: %v", err))
 				continue
 			}
 		}

@@ -13,6 +13,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func createTestOrganization() *Organization {
+	return &Organization{
+		client: &Client{
+			options: ClientOptions{
+				OID:    "test-oid",
+				APIKey: "test-key",
+			},
+			logger: &testLogger{},
+		},
+		logger: &testLogger{},
+	}
+}
+
+type testLogger struct{}
+
+func (l *testLogger) Info(format string)  {}
+func (l *testLogger) Debug(format string) {}
+func (l *testLogger) Error(format string) {}
+func (l *testLogger) Fatal(format string) {}
+func (l *testLogger) Trace(format string) {}
+func (l *testLogger) Warn(format string)  {}
+
 func TestNewSpout(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -77,13 +99,9 @@ func TestNewSpout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			man := &Manager{
-				oid:          "test-oid",
-				secretAPIKey: "test-key",
-				Log:          func(format string, args ...interface{}) {},
-			}
+			org := createTestOrganization()
 
-			got, err := NewSpout(man, tt.dataType, tt.opts...)
+			got, err := NewSpout(org, tt.dataType, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, got)
@@ -92,7 +110,7 @@ func TestNewSpout(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.NotNil(t, got)
-			assert.Equal(t, man, got.man)
+			assert.Equal(t, org, got.org)
 			assert.Equal(t, tt.dataType, got.dataType)
 
 			if tt.checkFunc != nil {
@@ -125,13 +143,9 @@ func TestSpout_StartAndShutdown(t *testing.T) {
 	defer server.Close()
 
 	// Create a Spout with the test server URL
-	man := &Manager{
-		oid:          "test-oid",
-		secretAPIKey: "test-key",
-		Log:          func(format string, args ...interface{}) {},
-	}
+	org := createTestOrganization()
 
-	spout, err := NewSpout(man, "event")
+	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
 
 	// Create a test connection
@@ -164,13 +178,9 @@ func TestSpout_StartAndShutdown(t *testing.T) {
 }
 
 func TestSpout_DroppedMessages(t *testing.T) {
-	man := &Manager{
-		oid:          "test-oid",
-		secretAPIKey: "test-key",
-		Log:          func(format string, args ...interface{}) {},
-	}
+	org := createTestOrganization()
 
-	spout, err := NewSpout(man, "event", WithMaxBuffer(1))
+	spout, err := NewSpout(org, "event", WithMaxBuffer(1))
 	require.NoError(t, err)
 
 	// Create a test message
@@ -193,13 +203,9 @@ func TestSpout_DroppedMessages(t *testing.T) {
 }
 
 func TestSpout_TraceMessages(t *testing.T) {
-	man := &Manager{
-		oid:          "test-oid",
-		secretAPIKey: "test-key",
-		Log:          func(format string, args ...interface{}) {},
-	}
+	org := createTestOrganization()
 
-	spout, err := NewSpout(man, "event")
+	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
 
 	// Test dropped trace message
@@ -225,13 +231,9 @@ func TestSpout_TraceMessages(t *testing.T) {
 }
 
 func TestSpout_UnparseableMessages(t *testing.T) {
-	man := &Manager{
-		oid:          "test-oid",
-		secretAPIKey: "test-key",
-		Log:          func(format string, args ...interface{}) {},
-	}
+	org := createTestOrganization()
 
-	spout, err := NewSpout(man, "event")
+	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
 
 	// Test invalid JSON
@@ -246,13 +248,9 @@ func TestSpout_UnparseableMessages(t *testing.T) {
 }
 
 func TestSpout_ContextCancellation(t *testing.T) {
-	man := &Manager{
-		oid:          "test-oid",
-		secretAPIKey: "test-key",
-		Log:          func(format string, args ...interface{}) {},
-	}
+	org := createTestOrganization()
 
-	spout, err := NewSpout(man, "event")
+	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
 
 	// Create a context with timeout

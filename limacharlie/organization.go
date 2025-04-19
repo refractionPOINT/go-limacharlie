@@ -17,6 +17,7 @@ type Organization struct {
 
 	mCachedUrls sync.RWMutex
 	cachedURLs  *SiteConnectivityInfo
+	spout       *Spout
 }
 
 // OrganizationInformation has the information about the organization
@@ -68,7 +69,7 @@ func NewOrganizationFromClientOptions(opt ClientOptions, logger LCLogger) (*Orga
 }
 
 // Get the OID of the organization.
-func (o Organization) GetOID() string {
+func (o *Organization) GetOID() string {
 	return o.client.options.OID
 }
 
@@ -327,5 +328,31 @@ func (o *Organization) AddToGroup(gid string) (bool, error) {
 }
 
 func (org *Organization) Close() {
+	if org.spout != nil {
+		org.spout.Shutdown()
+	}
 	org.client.httpClient.CloseIdleConnections()
+}
+
+// MakeInteractive enables interactive mode on this instance if it was not created with is_interactive.
+// This creates a Spout to track tasks sent to sensors in real-time.
+func (o *Organization) MakeInteractive() error {
+	if o.invID == "" {
+		return fmt.Errorf("investigation ID must be set for interactive mode to be enabled")
+	}
+
+	// Create a new Spout for event tracking
+	spout, err := NewSpout(o, "event", WithInvestigationID(o.invID))
+	if err != nil {
+		return fmt.Errorf("failed to create spout: %v", err)
+	}
+
+	// Start the Spout
+	if err := spout.Start(); err != nil {
+		return fmt.Errorf("failed to start spout: %v", err)
+	}
+
+	// Store the spout reference
+	o.spout = spout
+	return nil
 }
