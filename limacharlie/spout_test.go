@@ -277,6 +277,8 @@ func TestSpout_SpecificSensor(t *testing.T) {
 	}
 	require.NotEmpty(t, targetSID, "no online Linux sensor found")
 
+	t.Logf("targetSID: %v", targetSID)
+
 	// Create a Spout specifically for this sensor
 	spout, err := NewSpout(org, "event", WithSensorID(targetSID))
 	require.NoError(t, err)
