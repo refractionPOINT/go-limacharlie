@@ -22,7 +22,7 @@ func getTestClientOpts(a *assert.Assertions) ClientOptions {
 }
 
 func getTestClientFromEnv(a *assert.Assertions) *Client {
-	c, err := NewClient(getTestClientOpts(a), nil)
+	c, err := NewClient(getTestClientOpts(a), &LCLoggerGCP{})
 	a.NoError(err)
 	return c
 }

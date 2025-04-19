@@ -181,6 +181,7 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 // readMessages continuously reads messages from the WebSocket connection.
 func (s *Spout) readMessages() {
 	defer s.conn.Close()
+	s.org.logger.Info("Starting to read messages")
 
 	for {
 		select {
@@ -195,6 +196,7 @@ func (s *Spout) readMessages() {
 
 			// Read message
 			_, message, err := s.conn.ReadMessage()
+			s.org.logger.Info(fmt.Sprintf("message: %s %v", string(message), err))
 			if err != nil {
 				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 					s.org.logger.Info(fmt.Sprintf("error reading message: %v", err))
@@ -271,6 +273,7 @@ func (s *Spout) ResetDroppedCounter() {
 
 // Shutdown stops the Spout and closes the connection.
 func (s *Spout) Shutdown() {
+	s.org.logger.Info("Shutting down Spout")
 	s.mu.Lock()
 	if s.isStop {
 		s.mu.Unlock()
