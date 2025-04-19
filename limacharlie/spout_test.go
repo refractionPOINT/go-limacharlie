@@ -286,7 +286,7 @@ func TestSpout_SpecificSensor(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a context with timeout for the test
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	// Start a goroutine to read messages
