@@ -169,7 +169,7 @@ func TestSpout_DroppedMessages(t *testing.T) {
 	// Try to add another message (should be dropped)
 	err = spout.processMessage([]byte(`{"test":"message2"}`))
 	assert.Error(t, err)
-	assert.Equal(t, "queue full", err.Error())
+	assert.Equal(t, "queue full after timeout", err.Error())
 
 	// Verify dropped count
 	assert.Equal(t, int64(1), spout.GetDropped())
@@ -300,6 +300,7 @@ func TestSpout_SpecificSensor(t *testing.T) {
 				return
 			default:
 				msg, err := spout.Get()
+				t.Logf("received message: %v %v", msg, err)
 				if err != nil {
 					if err.Error() == "spout stopped" {
 						return
