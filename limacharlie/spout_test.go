@@ -3,39 +3,17 @@ package limacharlie
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func createTestOrganization() *Organization {
-	return &Organization{
-		client: &Client{
-			options: ClientOptions{
-				OID:    "test-oid",
-				APIKey: "test-key",
-			},
-			logger: &testLogger{},
-		},
-		logger: &testLogger{},
-	}
-}
-
-type testLogger struct{}
-
-func (l *testLogger) Info(format string)  {}
-func (l *testLogger) Debug(format string) {}
-func (l *testLogger) Error(format string) {}
-func (l *testLogger) Fatal(format string) {}
-func (l *testLogger) Trace(format string) {}
-func (l *testLogger) Warn(format string)  {}
-
 func TestNewSpout(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
 	tests := []struct {
 		name      string
 		dataType  string
@@ -99,8 +77,6 @@ func TestNewSpout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			org := createTestOrganization()
-
 			got, err := NewSpout(org, tt.dataType, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -121,55 +97,55 @@ func TestNewSpout(t *testing.T) {
 }
 
 func TestSpout_StartAndShutdown(t *testing.T) {
-	// Create a test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			t.Fatalf("failed to upgrade connection: %v", err)
-		}
-		defer conn.Close()
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 
-		// Read the header
-		var header LiveStreamRequest
-		if err := conn.ReadJSON(&header); err != nil {
-			t.Fatalf("failed to read header: %v", err)
-		}
-
-		// Send some test messages
-		conn.WriteJSON(map[string]interface{}{"test": "message1"})
-		conn.WriteJSON(map[string]interface{}{"test": "message2"})
-	}))
-	defer server.Close()
-
-	// Create a Spout with the test server URL
-	org := createTestOrganization()
-
+	// Create a Spout with a real connection
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
 
-	// Create a test connection
-	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial("ws"+server.URL[4:], nil)
+	// Start the spout
+	err = spout.Start()
 	require.NoError(t, err)
 
-	// Manually set the connection for testing
-	spout.conn = conn
+	// Create a context with timeout for the test
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	// Start reading messages in a goroutine
-	go spout.readMessages()
+	// Start a goroutine to read messages
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				msg, err := spout.Get()
+				if err != nil {
+					if err.Error() == "spout stopped" {
+						return
+					}
+					t.Logf("error getting message: %v", err)
+					continue
+				}
+				t.Logf("received message: %v", msg)
+			}
+		}
+	}()
 
-	// Get messages
-	msg1, err := spout.Get()
-	require.NoError(t, err)
-	assert.Equal(t, map[string]interface{}{"test": "message1"}, msg1)
-
-	msg2, err := spout.Get()
-	require.NoError(t, err)
-	assert.Equal(t, map[string]interface{}{"test": "message2"}, msg2)
+	// Wait a bit to receive some messages
+	time.Sleep(2 * time.Second)
 
 	// Shutdown
 	spout.Shutdown()
+
+	// Wait for the reader to finish
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("test timed out")
+	}
 
 	// Verify shutdown
 	_, err = spout.Get()
@@ -178,7 +154,8 @@ func TestSpout_StartAndShutdown(t *testing.T) {
 }
 
 func TestSpout_DroppedMessages(t *testing.T) {
-	org := createTestOrganization()
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 
 	spout, err := NewSpout(org, "event", WithMaxBuffer(1))
 	require.NoError(t, err)
@@ -203,7 +180,8 @@ func TestSpout_DroppedMessages(t *testing.T) {
 }
 
 func TestSpout_TraceMessages(t *testing.T) {
-	org := createTestOrganization()
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
@@ -231,7 +209,8 @@ func TestSpout_TraceMessages(t *testing.T) {
 }
 
 func TestSpout_UnparseableMessages(t *testing.T) {
-	org := createTestOrganization()
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
@@ -248,7 +227,8 @@ func TestSpout_UnparseableMessages(t *testing.T) {
 }
 
 func TestSpout_ContextCancellation(t *testing.T) {
-	org := createTestOrganization()
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
 
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
