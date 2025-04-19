@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -216,11 +217,9 @@ func (s *Spout) processMessage(message []byte) error {
 		select {
 		case s.queue <- message:
 			return nil
-		default:
-			s.mu.Lock()
-			s.dropped++
-			s.mu.Unlock()
-			return errors.New("queue full")
+		case <-time.After(10 * time.Second):
+			atomic.AddInt64(&s.dropped, 1)
+			return errors.New("queue full after timeout")
 		}
 	}
 
@@ -234,9 +233,7 @@ func (s *Spout) processMessage(message []byte) error {
 		if trace, ok := m["__trace"].(string); ok {
 			if trace == "dropped" {
 				if n, ok := m["n"].(float64); ok {
-					s.mu.Lock()
-					s.dropped += int64(n)
-					s.mu.Unlock()
+					atomic.AddInt64(&s.dropped, int64(n))
 				}
 			}
 			return nil
@@ -246,11 +243,9 @@ func (s *Spout) processMessage(message []byte) error {
 	select {
 	case s.queue <- data:
 		return nil
-	default:
-		s.mu.Lock()
-		s.dropped++
-		s.mu.Unlock()
-		return errors.New("queue full")
+	case <-time.After(10 * time.Second):
+		atomic.AddInt64(&s.dropped, 1)
+		return errors.New("queue full after timeout")
 	}
 }
 
@@ -266,16 +261,12 @@ func (s *Spout) Get() (interface{}, error) {
 
 // GetDropped returns the number of dropped messages.
 func (s *Spout) GetDropped() int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.dropped
+	return atomic.LoadInt64(&s.dropped)
 }
 
 // ResetDroppedCounter resets the dropped message counter.
 func (s *Spout) ResetDroppedCounter() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.dropped = 0
+	atomic.StoreInt64(&s.dropped, 0)
 }
 
 // Shutdown stops the Spout and closes the connection.
