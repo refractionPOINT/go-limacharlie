@@ -254,3 +254,76 @@ func TestSpout_ContextCancellation(t *testing.T) {
 	<-ctx.Done()
 	<-done
 }
+
+func TestSpout_SpecificSensor(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// List all sensors
+	sensors, err := org.ListSensors()
+	require.NoError(t, err)
+	require.NotEmpty(t, sensors, "no sensors found")
+
+	// Find an online Linux sensor
+	var targetSID string
+	for sid, sensor := range sensors {
+		if sensor.Platform == Platforms.Linux {
+			isOnline, err := sensor.IsOnline()
+			if err == nil && isOnline {
+				targetSID = sid
+				break
+			}
+		}
+	}
+	require.NotEmpty(t, targetSID, "no online Linux sensor found")
+
+	// Create a Spout specifically for this sensor
+	spout, err := NewSpout(org, "event", WithSensorID(targetSID))
+	require.NoError(t, err)
+
+	// Start the spout
+	err = spout.Start()
+	require.NoError(t, err)
+
+	// Create a context with timeout for the test
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Start a goroutine to read messages
+	done := make(chan struct{})
+	eventsReceived := 0
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				msg, err := spout.Get()
+				if err != nil {
+					if err.Error() == "spout stopped" {
+						return
+					}
+					t.Logf("error getting message: %v", err)
+					continue
+				}
+				t.Logf("received message: %v", msg)
+				eventsReceived++
+				if eventsReceived >= 2 {
+					return
+				}
+			}
+		}
+	}()
+
+	// Wait for either 2 events or timeout
+	select {
+	case <-done:
+		assert.GreaterOrEqual(t, eventsReceived, 2, "did not receive at least 2 events")
+	case <-ctx.Done():
+		t.Fatal("test timed out waiting for events")
+	}
+
+	// Shutdown
+	spout.Shutdown()
+}

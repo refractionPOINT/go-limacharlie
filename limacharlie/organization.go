@@ -18,6 +18,7 @@ type Organization struct {
 	mCachedUrls sync.RWMutex
 	cachedURLs  *SiteConnectivityInfo
 	spout       *Spout
+	spoutMutex  sync.Mutex
 }
 
 // OrganizationInformation has the information about the organization
@@ -328,6 +329,8 @@ func (o *Organization) AddToGroup(gid string) (bool, error) {
 }
 
 func (org *Organization) Close() {
+	org.spoutMutex.Lock()
+	defer org.spoutMutex.Unlock()
 	if org.spout != nil {
 		org.spout.Shutdown()
 	}
@@ -339,6 +342,15 @@ func (org *Organization) Close() {
 func (o *Organization) MakeInteractive() error {
 	if o.invID == "" {
 		return fmt.Errorf("investigation ID must be set for interactive mode to be enabled")
+	}
+
+	// Try to acquire the mutex
+	o.spoutMutex.Lock()
+	defer o.spoutMutex.Unlock()
+
+	// Check if spout is already initialized
+	if o.spout != nil {
+		return nil
 	}
 
 	// Create a new Spout for event tracking
