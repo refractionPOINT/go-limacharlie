@@ -29,7 +29,8 @@ const (
 	// Default timeout for WebSocket operations
 	defaultWebSocketTimeout = 5 * time.Second
 	// Default keep-alive interval
-	defaultKeepAliveInterval = 25 * time.Second
+	cloudKeepAliveInterval = 60 * time.Second
+	cloudTimeout           = (cloudKeepAliveInterval * 2) + 1*time.Second
 )
 
 // Spout is a listener object to receive data (Events, Detects or Audit) from a limacharlie.io Organization.
@@ -180,7 +181,7 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 
 // readMessages continuously reads messages from the WebSocket connection.
 func (s *Spout) readMessages() {
-	defer s.conn.Close()
+	defer s.Shutdown()
 	s.org.logger.Info("Starting to read messages")
 
 	for {
@@ -189,16 +190,15 @@ func (s *Spout) readMessages() {
 			return
 		default:
 			// Set read deadline
-			if err := s.conn.SetReadDeadline(time.Now().Add(defaultWebSocketTimeout)); err != nil {
+			if err := s.conn.SetReadDeadline(time.Now().Add(cloudTimeout)); err != nil {
 				s.org.logger.Info(fmt.Sprintf("error setting read deadline: %v", err))
 				return
 			}
 
 			// Read message
 			_, message, err := s.conn.ReadMessage()
-			s.org.logger.Info(fmt.Sprintf("message: %s %v", string(message), err))
 			if err != nil {
-				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) && !s.isStop {
 					s.org.logger.Info(fmt.Sprintf("error reading message: %v", err))
 				}
 				return
@@ -273,7 +273,6 @@ func (s *Spout) ResetDroppedCounter() {
 
 // Shutdown stops the Spout and closes the connection.
 func (s *Spout) Shutdown() {
-	s.org.logger.Info("Shutting down Spout")
 	s.mu.Lock()
 	if s.isStop {
 		s.mu.Unlock()
@@ -281,9 +280,11 @@ func (s *Spout) Shutdown() {
 	}
 	s.isStop = true
 	s.mu.Unlock()
+	s.org.logger.Info("Shutting down Spout")
 
 	s.cancel()
 	if s.conn != nil {
 		s.conn.Close()
 	}
+	close(s.queue)
 }

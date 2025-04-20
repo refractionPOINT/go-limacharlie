@@ -302,7 +302,6 @@ func TestSpout_SpecificSensor(t *testing.T) {
 				return
 			default:
 				msg, err := spout.Get()
-				t.Logf("received message: %v %v", msg, err)
 				if err != nil {
 					if err.Error() == "spout stopped" {
 						return
@@ -310,7 +309,13 @@ func TestSpout_SpecificSensor(t *testing.T) {
 					t.Logf("error getting message: %v", err)
 					continue
 				}
-				t.Logf("received message: %v", msg)
+				if d, ok := msg.(map[string]interface{}); ok {
+					if len(d) == 0 {
+						t.Errorf("received empty message: %v", msg)
+					}
+				} else {
+					t.Errorf("received non-map message: %v", msg)
+				}
 				eventsReceived++
 				if eventsReceived >= 2 {
 					return
