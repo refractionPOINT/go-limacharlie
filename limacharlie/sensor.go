@@ -498,8 +498,12 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 
 			// Process the message
 			if m, ok := msg.(map[string]interface{}); ok {
+				routing, ok := m["routing"].(map[string]interface{})
+				if !ok {
+					continue
+				}
 				// Check if this message belongs to our tracking ID
-				if invID, ok := m["investigation_id"].(string); !ok || invID != trackingID {
+				if invID, ok := routing["investigation_id"].(string); !ok || invID != trackingID {
 					continue
 				}
 
@@ -529,7 +533,6 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 			responseChan <- responses
 		}
 	}()
-
 	// Send the tasks
 	if err := s.Task(taskList[0], TaskingOptions{InvestigationID: trackingID}); err != nil {
 		return nil, fmt.Errorf("failed to send task: %v", err)

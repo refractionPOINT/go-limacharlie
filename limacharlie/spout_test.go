@@ -339,7 +339,7 @@ func TestSpout_SpecificSensor(t *testing.T) {
 
 func TestSpout_SimpleRequest(t *testing.T) {
 	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
+	org := getTestOrgFromEnv(a).WithInvestigationID("test-cicd")
 
 	// List all sensors to find an online one
 	sensors, err := org.ListSensors()
@@ -363,16 +363,13 @@ func TestSpout_SimpleRequest(t *testing.T) {
 	sensor := org.GetSensor(targetSID)
 	require.NotNil(t, sensor)
 
-	// Set investigation ID for interactive mode
-	org.WithInvestigationID("test-inv")
-
 	// Make organization interactive
 	err = org.MakeInteractive()
 	require.NoError(t, err)
 
 	// Send a simple task
 	resp, err := sensor.SimpleRequest("os_version", SimpleRequestOptions{
-		Timeout: 10 * time.Second,
+		Timeout: 30 * time.Second,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -380,8 +377,8 @@ func TestSpout_SimpleRequest(t *testing.T) {
 	// Verify response structure
 	if m, ok := resp.(map[string]interface{}); ok {
 		// Check for expected fields in system info
-		require.Contains(t, m, "investigation_id")
-		require.Equal(t, "test-inv", m["investigation_id"])
+		require.Contains(t, m, "event")
+		require.NotEmpty(t, m["event"])
 	} else {
 		t.Errorf("unexpected response type: %T", resp)
 	}

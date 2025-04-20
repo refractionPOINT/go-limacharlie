@@ -151,10 +151,56 @@ func (s *Spout) Start() error {
 	}
 	s.conn = conn
 
-	// Start reading messages
-	go s.readMessages()
+	// Create a channel to signal connection success
+	connected := make(chan bool, 1)
+	timeout := time.After(10 * time.Second)
 
-	return nil
+	// Start reading messages in a separate goroutine
+	go func() {
+		defer close(connected)
+		for {
+			// Set read deadline
+			if err := s.conn.SetReadDeadline(time.Now().Add(cloudTimeout)); err != nil {
+				s.org.logger.Info(fmt.Sprintf("error setting read deadline: %v", err))
+				return
+			}
+
+			// Read message
+			_, message, err := s.conn.ReadMessage()
+			if err != nil {
+				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) && !s.isStop {
+					s.org.logger.Info(fmt.Sprintf("error reading message: %v", err))
+				}
+				return
+			}
+
+			// Check for connected event
+			var data map[string]interface{}
+			if err := json.Unmarshal(message, &data); err == nil {
+				if trace, ok := data["__trace"].(string); ok && trace == "connected" {
+					connected <- true
+					return
+				}
+			}
+
+			// Process the message normally
+			if err := s.processMessage(message); err != nil {
+				s.org.logger.Info(fmt.Sprintf("error processing message: %v", err))
+				continue
+			}
+		}
+	}()
+
+	// Wait for connection confirmation or timeout
+	select {
+	case <-connected:
+		// Start the main message reading goroutine
+		go s.readMessages()
+		return nil
+	case <-timeout:
+		s.Shutdown()
+		return fmt.Errorf("timeout waiting for connection confirmation")
+	}
 }
 
 // connectWebSocket establishes a WebSocket connection to the server.
