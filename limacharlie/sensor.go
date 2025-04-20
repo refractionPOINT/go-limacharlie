@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Sensor struct {
@@ -64,6 +66,11 @@ type TaskingOptions struct {
 	InvestigationID      string
 	InvestigationContext string
 	IdempotentKey        string
+}
+
+type SimpleRequestOptions struct {
+	Timeout         time.Duration
+	UntilCompletion bool
 }
 
 func (t *TagInfo) UnmarshalJSON(b []byte) error {
@@ -428,4 +435,113 @@ func decompressPayload(data string, out interface{}) error {
 		return err
 	}
 	return nil
+}
+
+// SimpleRequest makes a request to the sensor assuming a single response.
+// It uses the Organization's Spout to track responses and provides a simpler interface for making requests.
+func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOptions) (interface{}, error) {
+	// Convert tasks to string slice if needed
+	var taskList []string
+	switch t := tasks.(type) {
+	case string:
+		taskList = []string{t}
+	case []string:
+		taskList = t
+	default:
+		return nil, fmt.Errorf("tasks must be string or []string")
+	}
+
+	// Set default options
+	opts := SimpleRequestOptions{
+		Timeout:         30 * time.Second,
+		UntilCompletion: false,
+	}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// Create a unique tracking ID
+	trackingID := fmt.Sprintf("%s/%s", s.InvestigationID, uuid.New().String())
+
+	// Create a channel to receive responses
+	responseChan := make(chan interface{}, len(taskList))
+	errorChan := make(chan error, 1)
+
+	// Check if organization has an active spout
+	err := s.Organization.MakeInteractive()
+	if err != nil {
+		return nil, fmt.Errorf("failed to make organization interactive: %v", err)
+	}
+
+	// Start a goroutine to read responses
+	go func() {
+		deadline := time.Now().Add(opts.Timeout)
+		responses := []interface{}{}
+		completionCount := 0
+
+		for {
+			// Check if we've hit the deadline
+			if time.Now().After(deadline) {
+				errorChan <- fmt.Errorf("timeout waiting for responses")
+				return
+			}
+
+			// Get next message with timeout
+			msg, err := s.Organization.spout.Get()
+			if err != nil {
+				if err.Error() == "spout stopped" {
+					break
+				}
+				errorChan <- err
+				return
+			}
+
+			// Process the message
+			if m, ok := msg.(map[string]interface{}); ok {
+				// Check if this message belongs to our tracking ID
+				if invID, ok := m["investigation_id"].(string); !ok || invID != trackingID {
+					continue
+				}
+
+				// Check for completion receipt
+				if errMsg, ok := m["ERROR_MESSAGE"].(string); ok && errMsg == "done" {
+					completionCount++
+					if completionCount >= len(taskList) {
+						break
+					}
+					continue
+				}
+
+				// Add to responses
+				responses = append(responses, msg)
+
+				// If not waiting for completion and we have all responses, we're done
+				if !opts.UntilCompletion && len(responses) >= len(taskList) {
+					break
+				}
+			}
+		}
+
+		// Return the appropriate response
+		if len(taskList) == 1 && len(responses) > 0 {
+			responseChan <- responses[0]
+		} else {
+			responseChan <- responses
+		}
+	}()
+
+	// Send the tasks
+	if err := s.Task(taskList[0], TaskingOptions{InvestigationID: trackingID}); err != nil {
+		return nil, fmt.Errorf("failed to send task: %v", err)
+	}
+
+	// Wait for response
+	select {
+	case resp := <-responseChan:
+		return resp, nil
+	case err := <-errorChan:
+		return nil, err
+	case <-time.After(opts.Timeout):
+		return nil, fmt.Errorf("timeout waiting for responses")
+	}
 }
