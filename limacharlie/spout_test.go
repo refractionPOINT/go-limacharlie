@@ -336,3 +336,53 @@ func TestSpout_SpecificSensor(t *testing.T) {
 	// Shutdown
 	spout.Shutdown()
 }
+
+func TestSpout_SimpleRequest(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// List all sensors to find an online one
+	sensors, err := org.ListSensors()
+	require.NoError(t, err)
+	require.NotEmpty(t, sensors, "no sensors found")
+
+	// Find an online Linux sensor
+	var targetSID string
+	for sid, sensor := range sensors {
+		if sensor.Platform == Platforms.Linux {
+			isOnline, err := sensor.IsOnline()
+			if err == nil && isOnline {
+				targetSID = sid
+				break
+			}
+		}
+	}
+	require.NotEmpty(t, targetSID, "no online Linux sensor found")
+
+	// Create a sensor instance
+	sensor := org.GetSensor(targetSID)
+	require.NotNil(t, sensor)
+
+	// Set investigation ID for interactive mode
+	org.WithInvestigationID("test-inv")
+
+	// Make organization interactive
+	err = org.MakeInteractive()
+	require.NoError(t, err)
+
+	// Send a simple task
+	resp, err := sensor.SimpleRequest("os_version", SimpleRequestOptions{
+		Timeout: 10 * time.Second,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// Verify response structure
+	if m, ok := resp.(map[string]interface{}); ok {
+		// Check for expected fields in system info
+		require.Contains(t, m, "investigation_id")
+		require.Equal(t, "test-inv", m["investigation_id"])
+	} else {
+		t.Errorf("unexpected response type: %T", resp)
+	}
+}
