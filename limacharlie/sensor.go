@@ -507,8 +507,13 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 					continue
 				}
 
+				// Ignore CLOUD_NOTIFICATION messages as they're simply receipts.
+				if et, ok := routing["event_type"].(string); ok && et == "CLOUD_NOTIFICATION" {
+					continue
+				}
+
 				// Check for completion receipt
-				if errMsg, ok := m["ERROR_MESSAGE"].(string); ok && errMsg == "done" {
+				if errMsg, ok := m["ERROR_MESSAGE"].(string); opts.UntilCompletion && ok && errMsg == "done" {
 					completionCount++
 					if completionCount >= len(taskList) {
 						break
