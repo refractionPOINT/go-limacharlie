@@ -993,6 +993,20 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 			return ops, fmt.Errorf("resources: %v", err)
 		}
 	}
+	// We will sync manually a few hives specifically here to avoid cases
+	// where a new resource uses a record and it's not there yet.
+	for _, hive := range []string{"secret", "yara", "lookup", "model"} {
+		if isEnabled, ok := options.SyncHives[hive]; ok && isEnabled && len(conf.Hives[hive]) > 0 {
+			justOne := orgSyncHives{
+				hive: conf.Hives[hive],
+			}
+			newOps, err := org.syncHive(justOne, options)
+			ops = append(ops, newOps...)
+			if err != nil {
+				return ops, fmt.Errorf("sync_hives %q: %+v ", hive, err)
+			}
+		}
+	}
 	if options.SyncExtensions {
 		newOps, err := org.syncExtensions(conf.Extensions, options)
 		ops = append(ops, newOps...)
