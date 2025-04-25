@@ -35,13 +35,13 @@ func deleteAllOutputs(org *Organization) {
 	for outputName := range outputs {
 		org.OutputDel(outputName)
 	}
-	time.Sleep(5 * time.Second)
 }
 
 func TestSyncPushOutputs(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 	defer deleteAllOutputs(org)
+	deleteAllOutputs(org)
 
 	outputs, err := org.Outputs()
 	a.NoError(err)
