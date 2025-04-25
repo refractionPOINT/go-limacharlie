@@ -78,12 +78,12 @@ func TestNewSpout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewSpout(org, tt.dataType, tt.opts...)
-			defer got.Shutdown()
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, got)
 				return
 			}
+			defer got.Shutdown()
 
 			assert.NoError(t, err)
 			assert.NotNil(t, got)
