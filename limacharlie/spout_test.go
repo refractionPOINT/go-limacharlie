@@ -345,6 +345,7 @@ func TestSpout_SpecificSensor(t *testing.T) {
 func TestSpout_SimpleRequest(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a).WithInvestigationID("test-cicd")
+	defer org.Close()
 
 	// List all sensors to find an online one
 	sensors, err := org.ListSensors()
