@@ -99,6 +99,7 @@ func TestNewSpout(t *testing.T) {
 func TestSpout_StartAndShutdown(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	defer org.Close()
 
 	// Create a Spout with a real connection
 	spout, err := NewSpout(org, "event")
@@ -157,6 +158,7 @@ func TestSpout_StartAndShutdown(t *testing.T) {
 func TestSpout_DroppedMessages(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	defer org.Close()
 
 	spout, err := NewSpout(org, "event", WithMaxBuffer(1))
 	require.NoError(t, err)
@@ -183,6 +185,7 @@ func TestSpout_DroppedMessages(t *testing.T) {
 func TestSpout_TraceMessages(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	defer org.Close()
 
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
@@ -212,6 +215,7 @@ func TestSpout_TraceMessages(t *testing.T) {
 func TestSpout_UnparseableMessages(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	defer org.Close()
 
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
@@ -230,6 +234,7 @@ func TestSpout_UnparseableMessages(t *testing.T) {
 func TestSpout_ContextCancellation(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	defer org.Close()
 
 	spout, err := NewSpout(org, "event")
 	require.NoError(t, err)
@@ -259,7 +264,7 @@ func TestSpout_ContextCancellation(t *testing.T) {
 func TestSpout_SpecificSensor(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
-
+	defer org.Close()
 	// List all sensors
 	sensors, err := org.ListSensors()
 	require.NoError(t, err)
