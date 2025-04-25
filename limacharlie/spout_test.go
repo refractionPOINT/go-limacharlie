@@ -78,6 +78,7 @@ func TestNewSpout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewSpout(org, tt.dataType, tt.opts...)
+			defer got.Shutdown()
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, got)
@@ -103,6 +104,7 @@ func TestSpout_StartAndShutdown(t *testing.T) {
 
 	// Create a Spout with a real connection
 	spout, err := NewSpout(org, "event")
+	defer spout.Shutdown()
 	require.NoError(t, err)
 
 	// Start the spout
@@ -161,6 +163,7 @@ func TestSpout_DroppedMessages(t *testing.T) {
 	defer org.Close()
 
 	spout, err := NewSpout(org, "event", WithMaxBuffer(1))
+	defer spout.Shutdown()
 	require.NoError(t, err)
 
 	// Create a test message
@@ -218,6 +221,7 @@ func TestSpout_UnparseableMessages(t *testing.T) {
 	defer org.Close()
 
 	spout, err := NewSpout(org, "event")
+	defer spout.Shutdown()
 	require.NoError(t, err)
 
 	// Test invalid JSON
@@ -237,6 +241,7 @@ func TestSpout_ContextCancellation(t *testing.T) {
 	defer org.Close()
 
 	spout, err := NewSpout(org, "event")
+	defer spout.Shutdown()
 	require.NoError(t, err)
 
 	// Create a context with timeout
