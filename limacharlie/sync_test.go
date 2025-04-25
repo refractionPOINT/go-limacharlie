@@ -35,6 +35,7 @@ func deleteAllOutputs(org *Organization) {
 	for outputName := range outputs {
 		org.OutputDel(outputName)
 	}
+	time.Sleep(5 * time.Second)
 }
 
 func TestSyncPushOutputs(t *testing.T) {
