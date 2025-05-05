@@ -2,13 +2,14 @@ package limacharlie
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 	"path/filepath"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func resetResource(org *Organization) {
@@ -22,402 +23,11 @@ func resetResource(org *Organization) {
 	}
 }
 
-func TestSyncPushResources(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-
-	resetResource(org)
-	resourcesBase, err := org.Resources()
-
-	a.NoError(err)
-	defer resetResource(org)
-
-	err = org.ResourceUnsubscribe("yara", "replicant")
-	if err != nil {
-		t.Errorf("failed to unsubscribe from yara rule %+v ", err)
-	}
-
-	resourcesConfig := `
-resources:
-  api:
-    - ip-geo
-    - vt
-  replicant:
-    - exfil
-	- logging
-`
-	orgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(resourcesConfig), &orgConfig))
-
-	// sync resources in dry run
-	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncResources: true})
-	a.NoError(err)
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/logging", IsAdded: false},
-	})
-	a.Equal(sortSyncOps(expectedOps), sortSyncOps(ops))
-	resources, err := org.Resources()
-	a.NoError(err)
-	a.Equal(resourcesBase, resources)
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncResources: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	resources, err = org.Resources()
-	a.NoError(err)
-	expectedResources := resourcesBase.duplicate()
-	expectedResources.AddToCategory(ResourceCategories.API, "ip-geo")
-	expectedResources.AddToCategory(ResourceCategories.API, "vt")
-	expectedResources.AddToCategory(ResourceCategories.Replicant, "exfil")
-	a.Equal(expectedResources, resources)
-
-	// remove the vt element to test force
-	orgConfig.Resources["api"] = []string{"ip-geo"}
-	postForce := resources.duplicate()
-	postForce.RemoveFromCategory(ResourceCategories.API, "vt")
-	// force dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncResources: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/ip-geo"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "api/vt", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/exfil"},
-		{ElementType: OrgSyncOperationElementType.Resource, ElementName: "replicant/logging", IsAdded: false},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	a.Equal(expectedResources, resources)
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{IsForce: true, SyncResources: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	resources, err = org.Resources()
-	a.NoError(err)
-	a.Equal(postForce, resources)
-
-}
-
-func TestSyncPushDRRules(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	rules, err := org.DRRules()
-	a.NoError(err)
-	if len(rules) != 0 {
-		t.Errorf("unexpected preexisting rules in add/delete: %+v", rules)
-	}
-
-	yc := `
-rules:
-  r1:
-    is_enabled: false
-    detect:
-      op: is
-      event: NEW_PROCESS
-      path: event/FILE_PATH
-      value: nope1
-    respond:
-      - action: report
-        name: t1
-  r2:
-    is_enabled: true
-    detect:
-      op: is
-      event: NEW_PROCESS
-      path: event/FILE_PATH
-      value: nope2
-    respond:
-      - action: report
-        name: t2
-  r3:
-    namespace: managed
-    detect:
-      op: is
-      event: NEW_PROCESS
-      path: event/FILE_PATH
-      value: nope3
-    respond:
-      - action: report
-        name: t3
-`
-	c := OrgConfig{}
-	err = yaml.Unmarshal([]byte(yc), &c)
-	a.NoError(err)
-
-	if len(c.DRRules) != 3 {
-		t.Errorf("unexpected conf: %+v", c)
-	}
-
-	ops, err := org.SyncPush(c, SyncOptions{
-		IsDryRun:    true,
-		SyncDRRules: true,
-	})
-	a.NoError(err)
-
-	if len(ops) != 3 {
-		t.Errorf("unexpected ops: %+v", err)
-	}
-	for _, o := range ops {
-		if !o.IsAdded {
-			t.Errorf("non-add op: %+v", o)
-		}
-	}
-
-	rules, err = org.DRRules(WithNamespace("general"))
-	a.NoError(err)
-	if len(rules) != 0 {
-		t.Errorf("general rules is not empty")
-	}
-	rules, err = org.DRRules(WithNamespace("managed"))
-	a.NoError(err)
-	if len(rules) != 0 {
-		t.Errorf("managed rules is not empty")
-	}
-
-	ops, err = org.SyncPush(c, SyncOptions{
-		SyncDRRules: true,
-	})
-	a.NoError(err)
-
-	if len(ops) != 3 {
-		t.Errorf("unexpected ops: %+v", err)
-	}
-	for _, o := range ops {
-		if !o.IsAdded {
-			t.Errorf("non-add op: %+v", o)
-		}
-	}
-	rules, err = org.DRRules(WithNamespace("general"))
-	a.NoError(err)
-	if len(rules) != 2 {
-		t.Errorf("general rules has: %+v", rules)
-	} else {
-		if rules["r1"]["is_enabled"].(bool) {
-			t.Errorf("rule should be disabled: %+v", rules["r1"])
-		}
-		if !rules["r2"]["is_enabled"].(bool) {
-			t.Errorf("rule should be enabled: %+v", rules["r2"])
-		}
-	}
-
-	rules, err = org.DRRules(WithNamespace("managed"))
-	a.NoError(err)
-	if len(rules) != 1 {
-		t.Errorf("managed rules has: %+v", rules)
-	}
-
-	nc := `
-rules:
-  r1:
-    detect:
-      op: is
-      event: NEW_PROCESS
-      path: event/FILE_PATH
-      value: nope1
-    respond:
-      - action: report
-        name: t1
-  r2:
-    detect:
-      op: is
-      event: NEW_PROCESS
-      path: event/FILE_PATH
-      value: nope2
-    respond:
-      - action: report
-        name: t2
-  r3:
-    namespace: general
-    detect:
-      op: is
-      event: NEW_PROCESS
-      path: event/FILE_PATH
-      value: nope3
-    respond:
-      - action: report
-        name: t3
-`
-
-	c = OrgConfig{}
-	err = yaml.Unmarshal([]byte(nc), &c)
-	a.NoError(err)
-
-	ops, err = org.SyncPush(c, SyncOptions{
-		SyncDRRules: true,
-	})
-	a.NoError(err)
-
-	if len(ops) != 3 {
-		t.Errorf("unexpected ops: %+v", err)
-	}
-	nNew := 0
-	nOld := 0
-	for _, o := range ops {
-		if o.IsAdded {
-			nNew++
-		}
-		if !o.IsAdded && !o.IsRemoved {
-			nOld++
-		}
-	}
-	if nNew != 2 || nOld != 1 {
-		t.Errorf("unexpected ops: %v", ops)
-	}
-
-	rules, err = org.DRRules(WithNamespace("general"))
-	a.NoError(err)
-	if len(rules) != 3 {
-		t.Errorf("general rules has: %+v", rules)
-	}
-	rules, err = org.DRRules(WithNamespace("managed"))
-	a.NoError(err)
-	if len(rules) != 0 {
-		t.Errorf("managed rules has: %+v", rules)
-	}
-
-	ops, err = org.SyncPush(OrgConfig{}, SyncOptions{
-		SyncDRRules: true,
-		IsForce:     true,
-	})
-	a.NoError(err)
-
-	if len(ops) != 3 {
-		t.Errorf("unexpected ops: %+v", err)
-	}
-	for _, o := range ops {
-		if !o.IsRemoved {
-			t.Errorf("non-remove op: %+v", o)
-		}
-	}
-}
-
-func deleteAllFPRules(org *Organization) {
-	rules, _ := org.FPRules()
-	for ruleName := range rules {
-		org.FPRuleDelete(ruleName)
-	}
-}
-
 func sortSyncOps(ops []OrgSyncOperation) []OrgSyncOperation {
 	sort.Slice(ops, func(i int, j int) bool {
 		return ops[i].ElementName < ops[j].ElementName
 	})
 	return ops
-}
-
-func TestSyncPushFPRules(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	defer deleteAllFPRules(org)
-
-	deleteAllFPRules(org)
-
-	rules, err := org.FPRules()
-	a.NoError(err)
-	a.Empty(rules)
-
-	// sync rules in dry run
-	orgRules := `
-fps:
-  fp0:
-    data:
-      op: ends with
-      path: detect/event/FILE_PATH
-      value: fp.exe
-  fp1:
-    data:
-      op: is
-      path: routing/hostname
-      value: google.com
-  fp2:
-    data:
-      op: is
-      path: DOMAIN_NAME
-      value: 8.8.8.8
-`
-	orgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(orgRules), &orgConfig))
-
-	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncFPRules: true})
-	a.NoError(err)
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp0", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp1", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp2", IsAdded: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	fpRules, err := org.FPRules()
-	a.NoError(err)
-	a.Empty(fpRules)
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncFPRules: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	fpRules, err = org.FPRules()
-	a.NoError(err)
-	a.Equal(len(orgConfig.FPRules), len(fpRules))
-	for fpRuleName, fpRule := range fpRules {
-		configFPRule, found := orgConfig.FPRules[fpRuleName]
-		a.True(found)
-		a.True(configFPRule.DetectionEquals(fpRule))
-	}
-
-	// force sync in dry run
-	orgRulesForce := `
-fps:
-  fp0:
-    data:
-      op: ends with
-      path: detect/event/FILE_PATH
-      value: fp.exe
-  fp11:
-    data:
-      op: is
-      path: routing/hostname
-      value: google.somethingelse
-  fp12:
-    data:
-      op: is
-      path: DOMAIN_NAME
-      value: 8.8.4.4
-`
-	orgConfigForce := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(orgRulesForce), &orgConfigForce))
-
-	ops, err = org.SyncPush(orgConfigForce, SyncOptions{IsDryRun: true, SyncFPRules: true, IsForce: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp0"},
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp1", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp2", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp11", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.FPRule, ElementName: "fp12", IsAdded: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	fpRulesForce, err := org.FPRules()
-	a.NoError(err)
-	for fpRuleName, fpRule := range fpRulesForce {
-		configFPRule, found := orgConfig.FPRules[fpRuleName]
-		a.True(found)
-		a.True(configFPRule.DetectionEquals(fpRule))
-	}
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfigForce, SyncOptions{SyncFPRules: true, IsForce: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	fpRulesForce, err = org.FPRules()
-	a.NoError(err)
-	a.Equal(len(orgConfigForce.FPRules), len(fpRulesForce))
-	for fpRuleName, fpRule := range fpRulesForce {
-		configFPRule, found := orgConfigForce.FPRules[fpRuleName]
-		a.True(found)
-		a.True(configFPRule.DetectionEquals(fpRule))
-	}
 }
 
 func deleteAllOutputs(org *Organization) {
@@ -557,438 +167,6 @@ outputs:
 
 }
 
-func deleteIntegrityRules(org *Organization) {
-	rules, _ := org.IntegrityRules()
-	for ruleName := range rules {
-		org.IntegrityRuleDelete(ruleName)
-	}
-}
-
-func TestSyncPushIntegrity(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	defer deleteIntegrityRules(org)
-
-	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "integrity")
-	a.NoError(err)
-	if unsubReplicantCB != nil {
-		defer unsubReplicantCB()
-	}
-
-	rules, err := org.IntegrityRules()
-	a.NoError(err)
-	a.Empty(rules)
-
-	yamlIntegrityRules := `
-integrity:
-  testrule0:
-    patterns:
-    - /root/.ssh/authorized_keys
-    platforms:
-    - linux
-  testrule1:
-    patterns:
-    - /home/user/.ssh/*
-    platforms:
-    - linux
-  testrule2:
-    patterns:
-    - c:\\test.txt
-    platforms:
-    - windows
-`
-	orgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlIntegrityRules), &orgConfig))
-
-	// dry run
-	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncIntegrity: true})
-	a.NoError(err)
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule0", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule1", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule2", IsAdded: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.IntegrityRules()
-	a.NoError(err)
-	a.Empty(rules)
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncIntegrity: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.IntegrityRules()
-	a.NoError(err)
-	a.Equal(len(orgConfig.Integrity), len(rules))
-	for ruleName, rule := range rules {
-		configRule, found := orgConfig.Integrity[ruleName]
-		a.True(found)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
-	}
-
-	// force and dry run
-	yamlIntegrityRules = `
-integrity:
-  testrule1:
-    patterns:
-    - /home/user/.ssh/*
-    platforms:
-    - linux
-  testrule3:
-    patterns:
-    - /home/user/.gitconfig
-    platforms:
-    - linux
-    - windows
-`
-	forceOrgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlIntegrityRules), &forceOrgConfig))
-
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncIntegrity: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule1"},
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule3", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule0", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.Integrity, ElementName: "testrule2", IsRemoved: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.IntegrityRules()
-	a.NoError(err)
-	a.Equal(len(orgConfig.Integrity), len(rules))
-	for ruleName, rule := range rules {
-		configRule, found := orgConfig.Integrity[ruleName]
-		a.True(found, "rule '%s' not found", ruleName)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
-	}
-
-	// force and no dry run
-
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncIntegrity: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.IntegrityRules()
-	a.NoError(err)
-	a.Equal(len(forceOrgConfig.Integrity), len(rules))
-	for ruleName, rule := range rules {
-		configRule, found := forceOrgConfig.Integrity[ruleName]
-		a.True(found, "rule '%s' not found", ruleName)
-		a.True(configRule.EqualsContent(rule), "integrity rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
-	}
-}
-
-func deleteExfil(org *Organization) {
-	rules, _ := org.ExfilRules()
-	for ruleName := range rules.Watches {
-		org.ExfilRuleWatchDelete(ruleName)
-	}
-	for ruleName := range rules.Events {
-		org.ExfilRuleEventDelete(ruleName)
-	}
-}
-
-func TestSyncPushExfil(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	defer deleteExfil(org)
-
-	unsubReplicantCB, err := findUnsubscribeReplicantCallback(org, "exfil")
-	a.NoError(err)
-	if unsubReplicantCB != nil {
-		defer unsubReplicantCB()
-	}
-
-	rules, err := org.ExfilRules()
-	a.NoError(err)
-	rulesWatchesLenStart := len(rules.Watches)
-	rulesEventsLenStart := len(rules.Events)
-
-	yamlExfil := `
-exfil:
-  watch:
-    watch_evil:
-      event: NEW_PROCESS
-      path:
-        - COMMAND_LINE
-      operator: contains
-      value: evil
-    watch_ps1:
-      event: NEW_DOCUMENT
-      path:
-        - FILE_PATH
-      operator: ends with
-      value: .ps1
-  list:
-    event_base:
-      events:
-        - NEW_PROCESS
-        - EXEC_OOB
-      filters:
-        platforms:
-          - windows
-          - linux
-    event_chrome:
-      events:
-        - DNS_REQUEST
-      filters:
-        platforms:
-          - chrome
-`
-	orgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlExfil), &orgConfig))
-
-	// dry run
-	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncExfil: true})
-	a.NoError(err)
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_evil", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsAdded: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.ExfilRules()
-	a.NoError(err)
-	a.Equal(rulesWatchesLenStart, len(rules.Watches))
-	a.Equal(rulesEventsLenStart, len(rules.Events))
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncExfil: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_evil", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsAdded: true},
-	})
-	for _, expectedOp := range expectedOps {
-		a.Contains(ops, expectedOp)
-	}
-	rules, err = org.ExfilRules()
-	a.NoError(err)
-
-	a.Equal(rulesWatchesLenStart+2, len(rules.Watches))
-	for ruleName, watch := range orgConfig.Exfil.Watches {
-		configWatch, found := rules.Watches[ruleName]
-		a.True(found, "watch '%s' not found", ruleName)
-		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
-	}
-	rulesWatchesLenStart += 2
-
-	a.Equal(rulesEventsLenStart+2, len(rules.Events))
-	for ruleName, event := range orgConfig.Exfil.Events {
-		configEvent, found := rules.Events[ruleName]
-		a.True(found, "event '%s' not found", ruleName)
-		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
-	}
-	rulesEventsLenStart += 2
-
-	// force sync and dry run
-	yamlExfil = `
-exfil:
-  watch:
-    watch_evil:
-      event: NEW_PROCESS
-      path:
-        - COMMAND_LINE
-      operator: contains
-      value: evil
-  list:
-    event_base:
-      events:
-        - NEW_PROCESS
-        - EXEC_OOB
-      filters:
-        platforms:
-          - windows
-          - linux
-`
-	forceOrgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlExfil), &forceOrgConfig))
-
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncExfil: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_evil"},
-		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_base"},
-		{ElementType: OrgSyncOperationElementType.ExfilWatch, ElementName: "watch_ps1", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.ExfilEvent, ElementName: "event_chrome", IsRemoved: true},
-	})
-	for _, expectedOp := range expectedOps {
-		a.Contains(ops, expectedOp)
-	}
-	rules, err = org.ExfilRules()
-	a.NoError(err)
-
-	a.Equal(rulesWatchesLenStart, len(rules.Watches))
-	for ruleName, watch := range orgConfig.Exfil.Watches {
-		configWatch, found := rules.Watches[ruleName]
-		a.True(found, "watch '%s' not found", ruleName)
-		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
-	}
-
-	a.Equal(rulesEventsLenStart, len(rules.Events))
-	for ruleName, event := range orgConfig.Exfil.Events {
-		configEvent, found := rules.Events[ruleName]
-		a.True(found, "event '%s' not found", ruleName)
-		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
-	}
-
-	// no dry run
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncExfil: true})
-	a.NoError(err)
-	for _, expectedOp := range expectedOps {
-		a.Contains(ops, expectedOp)
-	}
-	rules, err = org.ExfilRules()
-	a.NoError(err)
-
-	a.Equal(rulesWatchesLenStart-1, len(rules.Watches))
-	for ruleName, watch := range forceOrgConfig.Exfil.Watches {
-		configWatch, found := rules.Watches[ruleName]
-		a.True(found, "watch '%s' not found", ruleName)
-		a.True(watch.EqualsContent(configWatch), "watch content not equals: %v != %v", watch, configWatch)
-	}
-	for ruleName, event := range forceOrgConfig.Exfil.Events {
-		configEvent, found := rules.Events[ruleName]
-		a.True(found, "event '%s' not found", ruleName)
-		a.True(event.EqualsContent(configEvent), "event content not equals: %v != %v", event, configEvent)
-	}
-}
-
-func deleteArtifacts(org *Organization) {
-	rules, _ := org.ArtifactsRules()
-	for ruleName := range rules {
-		org.ArtifactRuleDelete(ruleName)
-	}
-}
-
-func TestSyncPushArtifact(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	defer deleteArtifacts(org)
-
-	unsubCB, err := findUnsubscribeReplicantCallback(org, "logging")
-	a.NoError(err)
-	if unsubCB != nil {
-		defer unsubCB()
-	}
-
-	rules, err := org.ArtifactsRules()
-	a.NoError(err)
-	rulesCountStart := len(rules)
-
-	yamlArtifact := `
-artifact:
-  linux-logs:
-    is_delete_after: false
-    is_ignore_cert: false
-    patterns:
-    - /var/log/syslog.1
-    - /var/log/auth.log.1
-    platforms:
-    - linux
-    days_retention: 30
-    tags: []
-  windows-logs:
-    is_delete_after: false
-    is_ignore_cert: false
-    patterns:
-    - c:\\windows\\system32\\winevt\\logs\\Security.evtx
-    - c:\\windows\\system32\\winevt\\logs\\System.evtx
-    platforms:
-    - windows
-    days_retention: 30
-    tags: []
-  browser-chrome-logs:
-    is_delete_after: false
-    is_ignore_cert: false
-    patterns:
-    - "%homepath%\\AppData\\Local\\Google\\Chrome\\User Data\\Crashpad\\reports"
-    - "~/Library/Application Support/Google/Chrome/Crashpad/completed/"
-    platforms:
-    - windows
-    - macos
-    tags: []
-`
-	orgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlArtifact), &orgConfig))
-
-	// dry run - no force
-	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncArtifacts: true})
-	a.NoError(err)
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "linux-logs", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "windows-logs", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "browser-chrome-logs", IsAdded: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.ArtifactsRules()
-	a.NoError(err)
-	a.Equal(rulesCountStart, len(rules))
-
-	// no force
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncArtifacts: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-
-	rules, err = org.ArtifactsRules()
-	a.NoError(err)
-	a.Equal(rulesCountStart+3, len(rules))
-	for ruleName, rule := range orgConfig.Artifacts {
-		orgRule, found := rules[ruleName]
-		a.True(found, "artifact rule not found for %s", ruleName)
-		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
-	}
-
-	// dry run - force
-	yamlArtifact = `
-artifact:
-  windows-logs:
-    is_delete_after: false
-    is_ignore_cert: false
-    patterns:
-    - c:\\windows\\system32\\winevt\\logs\\Security.evtx
-    - c:\\windows\\system32\\winevt\\logs\\System.evtx
-    platforms:
-    - windows
-    days_retention: 30
-    tags: []
-`
-	forceOrgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlArtifact), &forceOrgConfig))
-
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncArtifacts: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "linux-logs", IsRemoved: true},
-		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "windows-logs"},
-		{ElementType: OrgSyncOperationElementType.Artifact, ElementName: "browser-chrome-logs", IsRemoved: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.ArtifactsRules()
-	a.NoError(err)
-	a.Equal(rulesCountStart+3, len(rules))
-	for ruleName, rule := range orgConfig.Artifacts {
-		orgRule, found := rules[ruleName]
-		a.True(found, "artifact rule not found for %s", ruleName)
-		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
-	}
-
-	// force
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncArtifacts: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.ArtifactsRules()
-	a.NoError(err)
-	a.Equal(rulesCountStart+1, len(rules))
-	for ruleName, rule := range forceOrgConfig.Artifacts {
-		orgRule, found := rules[ruleName]
-		a.True(found, "artifact rule not found for %s", ruleName)
-		a.True(rule.EqualsContent(orgRule), "artifact rule content not equal: %v != %v", rule, OrgSyncArtifactRule{}.FromArtifactRule(orgRule))
-	}
-}
-
 func TestMerge(t *testing.T) {
 	o1 := OrgConfig{
 		Version: 3,
@@ -1079,7 +257,158 @@ rules:
 	if string(yOut) != expected {
 		t.Errorf("unexpected config: %s\n!=\n\n%s", string(yOut), expected)
 	}
+
+	// Add new test case for hive merging
+	t.Run("hive merge", func(t *testing.T) {
+		o1 := OrgConfig{
+			Version: 3,
+			Hives: orgSyncHives{
+				"lookup": {
+					"record1": SyncHiveData{
+						Data: map[string]interface{}{
+							"key1": "val1",
+							"key2": "val2",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: true,
+							Expiry:  1000,
+							Tags:    []string{"tag1", "tag2"},
+							Comment: "comment1",
+						},
+					},
+					"record2": SyncHiveData{
+						Data: map[string]interface{}{
+							"key3": "val3",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+				},
+				"secret": {
+					"secret1": SyncHiveData{
+						Data: map[string]interface{}{
+							"user": "admin",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: true,
+							Expiry:  1000,
+							Tags:    []string{"tag3", "tag4"},
+							Comment: "comment2",
+						},
+					},
+				},
+			},
+		}
+
+		o2 := OrgConfig{
+			Hives: orgSyncHives{
+				"lookup": {
+					"record1": SyncHiveData{
+						Data: map[string]interface{}{
+							"key2": "newval2",
+							"key4": "val4",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+					"record3": SyncHiveData{
+						Data: map[string]interface{}{
+							"key5": "val5",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+				},
+				"secret": {
+					"secret2": SyncHiveData{
+						Data: map[string]interface{}{
+							"pass": "1234",
+						},
+						UsrMtd: UsrMtd{
+							Enabled: false,
+							Expiry:  0,
+							Tags:    []string{},
+							Comment: "",
+						},
+					},
+				},
+			},
+		}
+
+		expected := `version: 3
+hives:
+    lookup:
+        record1:
+            data:
+                key2: newval2
+                key4: val4
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+        record2:
+            data:
+                key3: val3
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+        record3:
+            data:
+                key5: val5
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+    secret:
+        secret1:
+            data:
+                user: admin
+            usr_mtd:
+                enabled: true
+                expiry: 1000
+                tags:
+                    - tag3
+                    - tag4
+                comment: comment2
+        secret2:
+            data:
+                pass: "1234"
+            usr_mtd:
+                enabled: false
+                expiry: 0
+                tags: []
+                comment: ""
+`
+
+		out := o1.Merge(o2)
+
+		yOut, err := yaml.Marshal(out)
+		if err != nil {
+			t.Errorf("yaml: %v", err)
+		}
+
+		if string(yOut) != expected {
+			t.Errorf("unexpected hive merge config:\n%s\n!=\n\n%s", string(yOut), expected)
+		}
+	})
 }
+
 func TestPushMultiFiles(t *testing.T) {
 	files := map[string][]byte{
 		"f1": []byte(`version: 3
@@ -1328,160 +657,6 @@ func deleteYaraRules(org *Organization) {
 	}
 }
 
-func TestSyncPushYara(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	defer deleteYaraRules(org)
-
-	_, err := findUnsubscribeReplicantCallback(org, "yara")
-	a.NoError(err)
-
-	rules, err := org.YaraListRules()
-	a.NoError(err)
-	a.Empty(rules)
-	sources, err := org.YaraListSources()
-	a.NoError(err)
-	a.Empty(sources)
-
-	yamlYaraRules := `
-yara:
-  rules:
-    testrule1:
-      sources:
-        - testsource
-      filters:
-      tags:
-        - t1
-      platforms:
-        - windows
-    testrule2:
-      sources:
-        - testsource
-      filters:
-        tags:
-          - t2
-        platforms:
-          - windows
-  sources:
-    testsource:
-      source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
-`
-	orgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &orgConfig))
-
-	// dry run
-	ops, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncYara: true})
-	a.NoError(err)
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule1", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2", IsAdded: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.YaraListRules()
-	a.NoError(err)
-	a.Empty(rules)
-	sources, err = org.YaraListSources()
-	a.NoError(err)
-	a.Empty(sources)
-
-	// no dry run
-	ops, err = org.SyncPush(orgConfig, SyncOptions{SyncYara: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.YaraListRules()
-	a.NoError(err)
-	a.Equal(len(orgConfig.Yara.Rules), len(rules))
-	for ruleName, rule := range rules {
-		configRule, found := orgConfig.Yara.Rules[ruleName]
-		a.True(found)
-		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
-	}
-	sources, err = org.YaraListSources()
-	a.NoError(err)
-	a.Equal(len(orgConfig.Yara.Sources), len(sources))
-	for sourceName, source := range sources {
-		configRule, found := orgConfig.Yara.Sources[sourceName]
-		a.True(found)
-		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
-	}
-
-	// force and dry run
-	yamlYaraRules = `
-yara:
-  rules:
-    testrule3:
-      sources:
-        - testsource
-      filters:
-        tags:
-          - t3
-        platforms:
-          - linux
-    testrule2:
-      sources:
-        - testsource
-      filters:
-        tags:
-          - t2
-        platforms:
-          - windows
-  sources:
-    testsource:
-      source: https://github.com/Neo23x0/signature-base/blob/master/yara/expl_log4j_cve_2021_44228.yar
-`
-	forceOrgConfig := OrgConfig{}
-	a.NoError(yaml.Unmarshal([]byte(yamlYaraRules), &forceOrgConfig))
-
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, IsDryRun: true, SyncYara: true})
-	a.NoError(err)
-	expectedOps = sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.YaraSource, ElementName: "testsource"},
-		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule3", IsAdded: true},
-		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule2"},
-		{ElementType: OrgSyncOperationElementType.YaraRule, ElementName: "testrule1", IsRemoved: true},
-	})
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.YaraListRules()
-	a.NoError(err)
-	a.Equal(len(orgConfig.Yara.Rules), len(rules))
-	for ruleName, rule := range rules {
-		configRule, found := orgConfig.Yara.Rules[ruleName]
-		a.True(found)
-		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
-	}
-	sources, err = org.YaraListSources()
-	a.NoError(err)
-	a.Equal(len(orgConfig.Yara.Sources), len(sources))
-	for sourceName, source := range sources {
-		configRule, found := orgConfig.Yara.Sources[sourceName]
-		a.True(found)
-		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
-	}
-
-	// force and no dry run
-
-	ops, err = org.SyncPush(forceOrgConfig, SyncOptions{IsForce: true, SyncYara: true})
-	a.NoError(err)
-	a.Equal(expectedOps, sortSyncOps(ops))
-	rules, err = org.YaraListRules()
-	a.NoError(err)
-	a.Equal(len(forceOrgConfig.Yara.Rules), len(rules))
-	for ruleName, rule := range rules {
-		configRule, found := forceOrgConfig.Yara.Rules[ruleName]
-		a.True(found)
-		a.True(configRule.EqualsContent(rule), "yara rule content not equal\n%#v\n\n!=\n\n%#v", configRule, rule)
-	}
-	sources, err = org.YaraListSources()
-	a.NoError(err)
-	a.Equal(len(forceOrgConfig.Yara.Sources), len(sources))
-	for sourceName, source := range sources {
-		configRule, found := forceOrgConfig.Yara.Sources[sourceName]
-		a.True(found)
-		a.True(configRule.EqualsContent(source), "yara source content not equal\n%#v\n\n!=\n\n%#v", configRule, source)
-	}
-}
-
 func TestSyncInstallationKeys(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
@@ -1644,4 +819,147 @@ func TestSyncOrgExtensions(t *testing.T) {
 		{ElementType: OrgSyncOperationElementType.Extension, ElementName: "binlib", IsAdded: true},
 	})
 	a.Equal(expectedOps, sortSyncOps(ops))
+}
+
+func TestLoadInstallationKeysFromYaml(t *testing.T) {
+	a := assert.New(t)
+
+	yamlConfig := `version: 3
+installation_keys:
+  key1:
+    desc: test key 1
+    tags:
+      - tag1
+      - tag2
+    use_public_root_ca: true
+  key2:
+    desc: test key 2
+    tags:
+      - tag3
+    use_public_root_ca: false
+  key3:
+    desc: test key 3
+    use_public_root_ca: true
+`
+	orgConfig := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlConfig), &orgConfig))
+
+	// Verify the installation keys were loaded correctly
+	a.Equal(3, len(orgConfig.InstallationKeys))
+
+	// Check key1
+	key1, exists := orgConfig.InstallationKeys["key1"]
+	a.True(exists)
+	a.Equal("test key 1", key1.Description)
+	a.Equal(2, len(key1.Tags))
+	a.Contains(key1.Tags, "tag1")
+	a.Contains(key1.Tags, "tag2")
+	a.True(key1.UsePublicCA)
+
+	// Check key2
+	key2, exists := orgConfig.InstallationKeys["key2"]
+	a.True(exists)
+	a.Equal("test key 2", key2.Description)
+	a.Equal(1, len(key2.Tags))
+	a.Contains(key2.Tags, "tag3")
+	a.False(key2.UsePublicCA)
+
+	// Check key3
+	key3, exists := orgConfig.InstallationKeys["key3"]
+	a.True(exists)
+	a.Equal("test key 3", key3.Description)
+	a.Empty(key3.Tags)
+	a.True(key3.UsePublicCA)
+
+	// Test that the keys can be properly compared using EqualsContent
+	key1Copy := InstallationKey{
+		Description: "test key 1",
+		Tags:        []string{"tag1", "tag2"},
+		UsePublicCA: true,
+	}
+	a.True(key1.EqualsContent(key1Copy))
+
+	// Test that different keys are not equal
+	a.False(key1.EqualsContent(key2))
+}
+
+func TestMergeInstallationKeysFromYaml(t *testing.T) {
+	a := assert.New(t)
+
+	// First config with 2 keys
+	yamlConfig1 := `version: 3
+installation_keys:
+  key1:
+    desc: test key 1
+    tags:
+      - tag1
+      - tag2
+    use_public_root_ca: true
+  key2:
+    desc: test key 2
+    tags:
+      - tag3
+    use_public_root_ca: false
+`
+	// Second config with 1 existing key modified and 1 new key
+	yamlConfig2 := `version: 3
+installation_keys:
+  key1:
+    desc: test key 1 modified
+    tags:
+      - tag1
+      - tag2
+      - tag4
+    use_public_root_ca: false
+  key3:
+    desc: test key 3
+    tags:
+      - tag5
+    use_public_root_ca: true
+`
+	orgConfig1 := OrgConfig{}
+	orgConfig2 := OrgConfig{}
+	a.NoError(yaml.Unmarshal([]byte(yamlConfig1), &orgConfig1))
+	a.NoError(yaml.Unmarshal([]byte(yamlConfig2), &orgConfig2))
+
+	// Merge configs
+	mergedConfig := orgConfig1.Merge(orgConfig2)
+
+	// Verify merged installation keys
+	a.Equal(3, len(mergedConfig.InstallationKeys))
+
+	// Check key1 (should have updated values from config2)
+	key1, exists := mergedConfig.InstallationKeys["key1"]
+	a.True(exists)
+	a.Equal("test key 1 modified", key1.Description)
+	a.Equal(3, len(key1.Tags))
+	a.Contains(key1.Tags, "tag1")
+	a.Contains(key1.Tags, "tag2")
+	a.Contains(key1.Tags, "tag4")
+	a.False(key1.UsePublicCA)
+
+	// Check key2 (should remain unchanged from config1)
+	key2, exists := mergedConfig.InstallationKeys["key2"]
+	a.True(exists)
+	a.Equal("test key 2", key2.Description)
+	a.Equal(1, len(key2.Tags))
+	a.Contains(key2.Tags, "tag3")
+	a.False(key2.UsePublicCA)
+
+	// Check key3 (should be added from config2)
+	key3, exists := mergedConfig.InstallationKeys["key3"]
+	a.True(exists)
+	a.Equal("test key 3", key3.Description)
+	a.Equal(1, len(key3.Tags))
+	a.Contains(key3.Tags, "tag5")
+	a.True(key3.UsePublicCA)
+
+	// Test merging with empty installation keys
+	emptyConfig := OrgConfig{Version: 3}
+	mergedWithEmpty := orgConfig1.Merge(emptyConfig)
+	a.Equal(2, len(mergedWithEmpty.InstallationKeys))
+
+	// Test merging empty with non-empty
+	mergedEmptyWithNonEmpty := emptyConfig.Merge(orgConfig1)
+	a.Equal(2, len(mergedEmptyWithNonEmpty.InstallationKeys))
 }

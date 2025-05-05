@@ -172,6 +172,37 @@ func (h *HiveClient) Get(args HiveArgs) (*HiveData, error) {
 	return &hiveSet, nil
 }
 
+// GetPublicByGUID retrieves a public hive record using its GUID
+func (h *HiveClient) GetPublicByGUID(args HiveArgs, guid string) (*HiveData, error) {
+	if args.HiveName == "" {
+		return nil, errors.New("hive name is required")
+	}
+	if args.PartitionKey == "" {
+		return nil, errors.New("partition key is required")
+	}
+	if guid == "" {
+		return nil, errors.New("GUID is required")
+	}
+
+	reqData := Dict{
+		"guid": guid,
+	}
+
+	if args.ETag != nil {
+		reqData["etag"] = args.ETag
+	}
+
+	var hiveData HiveData
+	req := makeDefaultRequest(&hiveData).withFormData(reqData)
+
+	if err := h.Organization.client.reliableRequest(http.MethodPost,
+		fmt.Sprintf("hive-public/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
+		return nil, err
+	}
+
+	return &hiveData, nil
+}
+
 func (h *HiveClient) GetMTD(args HiveArgs) (*HiveData, error) {
 	if args.Key == "" {
 		return nil, errors.New("key is required")

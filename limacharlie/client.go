@@ -51,13 +51,14 @@ type jwtResponse struct {
 }
 
 type restRequest struct {
-	nRetries  int
-	timeout   time.Duration
-	queryData interface{}
-	formData  interface{}
-	urlValues url.Values
-	response  interface{}
-	urlRoot   string
+	nRetries      int
+	timeout       time.Duration
+	queryData     interface{}
+	formData      interface{}
+	urlValues     url.Values
+	response      interface{}
+	urlRoot       string
+	idempotentKey string
 }
 
 func makeDefaultRequest(response interface{}) restRequest {
@@ -91,6 +92,11 @@ func (r restRequest) withURLValues(urlValues url.Values) restRequest {
 
 func (r restRequest) withURLRoot(root string) restRequest {
 	r.urlRoot = root
+	return r
+}
+
+func (r restRequest) withIdempotentKey(idempotentKey string) restRequest {
+	r.idempotentKey = idempotentKey
 	return r
 }
 
@@ -382,6 +388,9 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 
 	r.Header.Set("User-Agent", "limacharlie-sdk")
 	r.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.options.JWT))
+	if request.idempotentKey != "" {
+		r.Header.Set("x-idempotent-key", request.idempotentKey)
+	}
 	for k, v := range headers {
 		r.Header.Set(k, v)
 	}
@@ -403,6 +412,15 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 			errorStr = string(errorDetails)
 		}
 		return resp.StatusCode, NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
+	}
+
+	// Prior to enforcement of rate limits, we return the headers
+	// in the response. If the request is over quota and the headers
+	// are present, display a warning in stderr.
+	rateLimitQuota := resp.Header.Get("X-RateLimit-Quota")
+	rateLimitPeriod := resp.Header.Get("X-RateLimit-Period")
+	if rateLimitQuota != "" && rateLimitPeriod != "" {
+		os.Stderr.WriteString(fmt.Sprintf("Warning: Rate limit hit, quota limit: %s, quota period: %s seconds, see https://docs.limacharlie.io/v2/docs/en/api-keys?highlight=bulk\n", rateLimitQuota, rateLimitPeriod))
 	}
 
 	respData := bytes.Buffer{}

@@ -47,8 +47,7 @@ type SyncOptions struct {
 	SyncHives            map[string]bool `json:"sync_hives"`
 	SyncInstallationKeys bool            `json:"sync_installation_keys"`
 	SyncYara             bool            `json:"sync_yara"`
-
-	IncludeLoader IncludeLoaderCB `json:"-"`
+	IncludeLoader        IncludeLoaderCB `json:"-"`
 }
 
 var KnownHives = []string{
@@ -64,6 +63,7 @@ var KnownHives = []string{
 	"query",
 	"model",
 	"playbook",
+	"ai_agent",
 }
 
 func SyncAll() SyncOptions {
@@ -92,6 +92,7 @@ func SyncAll() SyncOptions {
 			"query":            true,
 			"model":            true,
 			"playbook":         true,
+			"ai_agent":         true,
 		},
 	}
 }
@@ -108,7 +109,7 @@ var supportedOrgValues []string = []string{
 	"socprime",
 	"alphamountain",
 	"pangea",
-	"hybrid-analysis",
+	"hybrid_analysis",
 	"echotrail",
 	"greynoise",
 }
@@ -431,10 +432,20 @@ func (a OrgConfig) mergeHives(hiveConfig orgSyncHives) orgSyncHives {
 
 	n := orgSyncHives{}
 	for k, v := range a.Hives {
-		n[k] = v
+		for k2, v2 := range v {
+			if _, ok := n[k]; !ok {
+				n[k] = map[HiveKey]SyncHiveData{}
+			}
+			n[k][k2] = v2
+		}
 	}
 	for k, v := range hiveConfig {
-		n[k] = v
+		for k2, v2 := range v {
+			if _, ok := n[k]; !ok {
+				n[k] = map[HiveKey]SyncHiveData{}
+			}
+			n[k][k2] = v2
+		}
 	}
 	return n
 }
@@ -447,7 +458,7 @@ func (a OrgConfig) mergeInstallationKeys(ikeys orgSyncInstallationKeys) orgSyncI
 	for k, v := range ikeys {
 		nk[k] = v
 	}
-	return ikeys
+	return nk
 }
 
 func (a OrgConfig) mergeYara(yara *orgSyncYara) *orgSyncYara {
@@ -980,6 +991,20 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("resources: %v", err)
+		}
+	}
+	// We will sync manually a few hives specifically here to avoid cases
+	// where a new resource uses a record and it's not there yet.
+	for _, hive := range []string{"secret", "yara", "lookup", "model"} {
+		if isEnabled, ok := options.SyncHives[hive]; ok && isEnabled && len(conf.Hives[hive]) > 0 {
+			justOne := orgSyncHives{
+				hive: conf.Hives[hive],
+			}
+			newOps, err := org.syncHive(justOne, options)
+			ops = append(ops, newOps...)
+			if err != nil {
+				return ops, fmt.Errorf("sync_hives %q: %+v ", hive, err)
+			}
 		}
 	}
 	if options.SyncExtensions {
