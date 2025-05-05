@@ -234,6 +234,8 @@ func TestSearchByTag(t *testing.T) {
 		}
 	}()
 
+	time.Sleep(2 * time.Second) // ensure models has time to flush as this is a list call
+
 	// List all sensors.
 	sensorsWithTag, err := org.GetSensorsWithTag("test")
 	if err != nil {
