@@ -19,3 +19,33 @@
 
 # intelliJ files
 .idea/
+
+# Local action tracking
+actions.md
+
+# Go build artifacts
+/firehose/firehose
+/limacharlie/limacharlie
+*.a
+*.o
+
+# Test artifacts
+coverage.txt
+coverage.html
+*.cover
+*.prof
+*.bench
+go.work
+go.work.sum
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Debug files
+debug
+debug.test
