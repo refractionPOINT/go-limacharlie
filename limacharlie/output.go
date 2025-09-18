@@ -103,6 +103,7 @@ type OutputConfig struct {
 	PayloadAsString   bool   `json:"is_payload_as_string,omitempty,string" yaml:"is_payload_as_string,omitempty"`
 	InvestigationID   string `json:"inv_id,omitempty" yaml:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty" yaml:"tag,omitempty"`
+	TagBlackList      string `json:"tag_black_list,omitempty" yaml:"tag_black_list,omitempty"`
 	Category          string `json:"cat,omitempty" yaml:"cat,omitempty"`
 	SensorID          string `json:"sid,omitempty" yaml:"sid,omitempty"`
 	Flat              bool   `json:"is_flat,omitempty,string" yaml:"is_flat,omitempty"`
