@@ -133,6 +133,8 @@ type OutputConfig struct {
 	Compressing       bool   `json:"is_compression,omitempty,string" yaml:"is_compression,omitempty"`
 	CategoryBlackList string `json:"cat_black_list,omitempty" yaml:"cat_black_list,omitempty"`
 	CategoryWhiteList string `json:"cat_white_list,omitempty" yaml:"cat_white_list,omitempty"`
+	RuleTagWhiteList  string `json:"rule_tag_white_list,omitempty" yaml:"rule_tag_white_list,omitempty"`
+	RuleTagBlackList  string `json:"rule_tag_black_list,omitempty" yaml:"rule_tag_black_list,omitempty"`
 	RegionName        string `json:"region_name,omitempty" yaml:"region_name,omitempty"`
 	EndpointURL       string `json:"endpoint_url,omitempty" yaml:"endpoint_url,omitempty"`
 	AuthHeaderName    string `json:"auth_header_name,omitempty" yaml:"auth_header_name,omitempty"`
