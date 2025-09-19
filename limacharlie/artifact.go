@@ -155,6 +155,10 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		}
 		chunk = chunk[:n]
 
+		// Create a copy of the chunk data to avoid race conditions
+		chunkData := make([]byte, len(chunk))
+		copy(chunkData, chunk)
+
 		// Create a copy of headers for this chunk to avoid race conditions
 		chunkHeaders := make(map[string]string)
 		for k, v := range headers {
@@ -184,7 +188,7 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		}
 
 		// Prepare the request.
-		req, err := http.NewRequest(http.MethodPost, reqUrl, bytes.NewBuffer(chunk))
+		req, err := http.NewRequest(http.MethodPost, reqUrl, bytes.NewBuffer(chunkData))
 		if err != nil {
 			return err
 		}
@@ -196,9 +200,11 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 			req.Header.Set(k, v)
 		}
 
+		// Capture the request in the closure to avoid it being modified in the next iteration
+		capturedReq := req
 		eg.Go(func() error {
 			// Send the request.
-			httpResp, err := c.Do(req)
+			httpResp, err := c.Do(capturedReq)
 			if err != nil {
 				return err
 			}
