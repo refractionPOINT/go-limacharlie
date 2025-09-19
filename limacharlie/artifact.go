@@ -155,6 +155,12 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		}
 		chunk = chunk[:n]
 
+		// Create a copy of headers for this chunk to avoid race conditions
+		chunkHeaders := make(map[string]string)
+		for k, v := range headers {
+			chunkHeaders[k] = v
+		}
+
 		// If this is the last chunk, set the part to "done".
 		endOffset += int64(n)
 		if endOffset > size {
@@ -163,9 +169,9 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		if size <= maxUploadFilePartSize {
 			// If the file is small enough, we can upload it in one go.
 		} else if endOffset != size {
-			headers["lc-part"] = fmt.Sprintf("%d", partId)
+			chunkHeaders["lc-part"] = fmt.Sprintf("%d", partId)
 		} else {
-			headers["lc-part"] = "done"
+			chunkHeaders["lc-part"] = "done"
 			// If this is the last part, we must ensure that all the
 			// other parts were done uploading since LC triggers the
 			// processing of the artifact upon receiving the last part.
@@ -186,7 +192,7 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Authorization", fmt.Sprintf("Basic %s", creds))
 		// Add the dynamic headers.
-		for k, v := range headers {
+		for k, v := range chunkHeaders {
 			req.Header.Set(k, v)
 		}
 
