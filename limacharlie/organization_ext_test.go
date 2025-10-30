@@ -205,13 +205,12 @@ func TestGetMITREReport(t *testing.T) {
 		report.OID, report.Coverage, len(report.Techniques), len(report.Tactics))
 
 	// Log some technique coverage details if available
-	count := 0
-	for id, tech := range report.Techniques {
-		if count < 3 {
-			t.Logf("Technique %s (%s): Covered=%v, Rules=%d",
-				id, tech.Name, tech.Covered, len(tech.DetectionRules))
-			count++
+	for i, tech := range report.Techniques {
+		if i >= 3 {
+			break
 		}
+		t.Logf("Technique %s (%s): Covered=%v, Rules=%d",
+			tech.TechniqueID, tech.Name, tech.Covered, len(tech.DetectionRules))
 	}
 }
 
