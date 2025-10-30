@@ -41,8 +41,8 @@ type UserOrgInfo struct {
 // APIKeyInfo contains information about an API key
 type APIKeyInfo struct {
 	KeyHash     string   `json:"key_hash,omitempty"`
-	Description string   `json:"key_name,omitempty"` // API returns "key_name"
-	Permissions []string `json:"priv,omitempty"`     // API returns "priv"
+	Description string   `json:"name,omitempty"` // API returns "name" from Firebase
+	Permissions []string `json:"priv,omitempty"` // API returns "priv"
 	CreatedAt   int64    `json:"created_at,omitempty"`
 	CreatedBy   string   `json:"created_by,omitempty"`
 	OID         string   `json:"oid,omitempty"`
@@ -56,11 +56,11 @@ type APIKeyCreate struct {
 
 // MITREReport contains the MITRE ATT&CK coverage report for an organization
 type MITREReport struct {
-	OID         string                            `json:"oid,omitempty"`
-	Techniques  map[string]MITRETechniqueCoverage `json:"techniques,omitempty"`
-	Tactics     map[string]MITRETacticCoverage    `json:"tactics,omitempty"`
-	Coverage    float64                           `json:"coverage_percentage,omitempty"`
-	GeneratedAt int64                             `json:"generated_at,omitempty"`
+	OID         string                         `json:"oid,omitempty"`
+	Techniques  []MITRETechniqueCoverage       `json:"techniques,omitempty"`
+	Tactics     map[string]MITRETacticCoverage `json:"tactics,omitempty"`
+	Coverage    float64                        `json:"coverage_percentage,omitempty"`
+	GeneratedAt int64                          `json:"generated_at,omitempty"`
 }
 
 // MITRETechniqueCoverage contains coverage information for a MITRE technique
