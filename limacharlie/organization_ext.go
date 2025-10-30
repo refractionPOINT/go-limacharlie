@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // UsageStats contains usage statistics for an organization
@@ -40,8 +41,8 @@ type UserOrgInfo struct {
 // APIKeyInfo contains information about an API key
 type APIKeyInfo struct {
 	KeyHash     string   `json:"key_hash,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	Description string   `json:"key_name,omitempty"` // API returns "key_name"
+	Permissions []string `json:"priv,omitempty"`     // API returns "priv"
 	CreatedAt   int64    `json:"created_at,omitempty"`
 	CreatedBy   string   `json:"created_by,omitempty"`
 	OID         string   `json:"oid,omitempty"`
@@ -49,7 +50,7 @@ type APIKeyInfo struct {
 
 // APIKeyCreate contains the response when creating a new API key
 type APIKeyCreate struct {
-	Key         string   `json:"key,omitempty"` // Only returned on creation
+	Key         string   `json:"api_key,omitempty"` // Only returned on creation
 	KeyHash     string   `json:"key_hash,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
@@ -207,10 +208,11 @@ func (org *Organization) CreateAPIKey(name string, permissions []string) (*APIKe
 	url := fmt.Sprintf("orgs/%s/keys", org.GetOID())
 
 	data := map[string]interface{}{
-		"description": name,
+		"key_name": name,
 	}
 	if permissions != nil && len(permissions) > 0 {
-		data["permissions"] = permissions
+		// API expects comma-separated string
+		data["perms"] = strings.Join(permissions, ",")
 	}
 
 	request := makeDefaultRequest(&response).withFormData(data)
@@ -225,9 +227,13 @@ func (org *Organization) CreateAPIKey(name string, permissions []string) (*APIKe
 // DeleteAPIKey deletes an API key
 // keyHash: the hash of the API key to delete
 func (org *Organization) DeleteAPIKey(keyHash string) error {
-	url := fmt.Sprintf("orgs/%s/keys/%s", org.GetOID(), keyHash)
+	url := fmt.Sprintf("orgs/%s/keys", org.GetOID())
 
-	request := makeDefaultRequest(nil)
+	data := map[string]interface{}{
+		"key_hash": keyHash,
+	}
+
+	request := makeDefaultRequest(nil).withFormData(data)
 
 	if err := org.client.reliableRequest(http.MethodDelete, url, request); err != nil {
 		return err
