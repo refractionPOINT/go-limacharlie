@@ -145,7 +145,7 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 		Total         int           `json:"total,omitempty"`
 	}
 
-	urlPath := "orgs"
+	urlPath := "user/orgs"
 	values := url.Values{}
 
 	if offset != nil {
