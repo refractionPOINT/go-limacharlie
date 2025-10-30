@@ -108,7 +108,7 @@ func (org *Organization) GetOrgErrors() ([]OrgError, error) {
 	var response struct {
 		Errors []OrgError `json:"errors"`
 	}
-	url := fmt.Sprintf("orgs/%s/errors", org.GetOID())
+	url := fmt.Sprintf("errors/%s", org.GetOID())
 
 	request := makeDefaultRequest(&response)
 
@@ -121,7 +121,7 @@ func (org *Organization) GetOrgErrors() ([]OrgError, error) {
 
 // DismissOrgError dismisses a specific error for the organization
 func (org *Organization) DismissOrgError(component string) error {
-	url := fmt.Sprintf("orgs/%s/errors/%s", org.GetOID(), component)
+	url := fmt.Sprintf("errors/%s/%s", org.GetOID(), component)
 
 	request := makeDefaultRequest(nil)
 
@@ -179,7 +179,7 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 // GetAPIKeys retrieves the list of API keys for the organization
 func (org *Organization) GetAPIKeys() ([]APIKeyInfo, error) {
 	var response struct {
-		Keys []APIKeyInfo `json:"keys"`
+		APIKeys map[string]APIKeyInfo `json:"api_keys"`
 	}
 	url := fmt.Sprintf("orgs/%s/keys", org.GetOID())
 
@@ -189,7 +189,14 @@ func (org *Organization) GetAPIKeys() ([]APIKeyInfo, error) {
 		return nil, err
 	}
 
-	return response.Keys, nil
+	// Convert map to slice and populate KeyHash from map keys
+	keys := make([]APIKeyInfo, 0, len(response.APIKeys))
+	for hash, keyInfo := range response.APIKeys {
+		keyInfo.KeyHash = hash
+		keys = append(keys, keyInfo)
+	}
+
+	return keys, nil
 }
 
 // CreateAPIKey creates a new API key for the organization
