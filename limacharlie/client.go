@@ -381,7 +381,15 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 
 	ctx, _ := context.WithTimeout(context.Background(), request.timeout)
 
-	r, err := http.NewRequestWithContext(ctx, verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
+	// Build the URL - if urlRoot is a full URL (starts with http), use it as base, otherwise concatenate
+	var fullURL string
+	if strings.HasPrefix(request.urlRoot, "http://") || strings.HasPrefix(request.urlRoot, "https://") {
+		fullURL = fmt.Sprintf("%s%s", request.urlRoot, path)
+	} else {
+		fullURL = fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path)
+	}
+
+	r, err := http.NewRequestWithContext(ctx, verb, fullURL, body)
 	if err != nil {
 		return 0, err
 	}

@@ -57,6 +57,7 @@ func TestGetSchemasForPlatform(t *testing.T) {
 	schemas, err := org.GetSchemasForPlatform("windows")
 	if err != nil {
 		t.Errorf("GetSchemasForPlatform(windows): %v", err)
+		return
 	}
 	a.NotNil(schemas)
 	a.Greater(len(schemas.EventTypes), 0, "should have event types for windows platform")
@@ -66,6 +67,7 @@ func TestGetSchemasForPlatform(t *testing.T) {
 	schemasLinux, err := org.GetSchemasForPlatform("linux")
 	if err != nil {
 		t.Errorf("GetSchemasForPlatform(linux): %v", err)
+		return
 	}
 	a.NotNil(schemasLinux)
 	t.Logf("Linux platform has %d event types", len(schemasLinux.EventTypes))
@@ -74,6 +76,7 @@ func TestGetSchemasForPlatform(t *testing.T) {
 	schemasMac, err := org.GetSchemasForPlatform("macos")
 	if err != nil {
 		t.Errorf("GetSchemasForPlatform(macos): %v", err)
+		return
 	}
 	a.NotNil(schemasMac)
 	t.Logf("macOS platform has %d event types", len(schemasMac.EventTypes))
@@ -82,6 +85,7 @@ func TestGetSchemasForPlatform(t *testing.T) {
 	schemasChrome, err := org.GetSchemasForPlatform("chrome")
 	if err != nil {
 		t.Errorf("GetSchemasForPlatform(chrome): %v", err)
+		return
 	}
 	a.NotNil(schemasChrome)
 	t.Logf("Chrome platform has %d event types", len(schemasChrome.EventTypes))

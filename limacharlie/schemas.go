@@ -25,7 +25,11 @@ type Schema struct {
 // GetSchemas retrieves a list of all schemas available for the organization.
 func (o *Organization) GetSchemas() (*Schemas, error) {
 	resp := Schemas{}
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/schema", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	urlPath := fmt.Sprintf("orgs/%s/schema", o.GetOID())
+
+	request := makeDefaultRequest(&resp)
+
+	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -35,12 +39,14 @@ func (o *Organization) GetSchemas() (*Schemas, error) {
 // platform: platform name (e.g., "windows", "linux", "macos", "chrome")
 func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) {
 	resp := Schemas{}
+	urlPath := fmt.Sprintf("orgs/%s/schema", o.GetOID())
+
 	values := url.Values{}
 	values.Set("platform", platform)
 
 	request := makeDefaultRequest(&resp).withURLValues(values)
 
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/schema", o.client.options.OID), request); err != nil {
+	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -51,9 +57,12 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 	var resp struct {
 		Platforms []string `json:"platforms"`
 	}
+	urlPath := fmt.Sprintf("orgs/%s/platforms", o.GetOID())
+
+	request := makeDefaultRequest(&resp)
 
 	// This endpoint returns the ontology of platform names
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/platforms", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return resp.Platforms, nil
@@ -62,7 +71,11 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 // GetSchema retrieves a specific schema definition based on the provided schema name.
 func (o *Organization) GetSchema(name string) (*SchemaResponse, error) {
 	resp := SchemaResponse{}
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/schema/%s", o.client.options.OID, name), makeDefaultRequest(&resp)); err != nil {
+	urlPath := fmt.Sprintf("orgs/%s/schema/%s", o.GetOID(), name)
+
+	request := makeDefaultRequest(&resp)
+
+	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -71,7 +84,11 @@ func (o *Organization) GetSchema(name string) (*SchemaResponse, error) {
 // ResetSchemas resets the schema definition for all schemas in the organization.
 func (o *Organization) ResetSchemas() (bool, error) {
 	resp := map[string]bool{}
-	if err := o.client.reliableRequest(http.MethodDelete, fmt.Sprintf("orgs/%s/schema", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	urlPath := fmt.Sprintf("orgs/%s/schema", o.GetOID())
+
+	request := makeDefaultRequest(&resp)
+
+	if err := o.client.reliableRequest(http.MethodDelete, urlPath, request); err != nil {
 		return false, err
 	}
 	if val, ok := resp["success"]; ok {

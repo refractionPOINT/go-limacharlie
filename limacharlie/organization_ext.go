@@ -50,10 +50,8 @@ type APIKeyInfo struct {
 
 // APIKeyCreate contains the response when creating a new API key
 type APIKeyCreate struct {
-	Key         string   `json:"api_key,omitempty"` // Only returned on creation
-	KeyHash     string   `json:"key_hash,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	Key     string `json:"api_key,omitempty"` // Only returned on creation
+	KeyHash string `json:"key_hash,omitempty"`
 }
 
 // MITREReport contains the MITRE ATT&CK coverage report for an organization

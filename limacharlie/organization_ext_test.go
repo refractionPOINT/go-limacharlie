@@ -128,10 +128,8 @@ func TestAPIKeyLifecycle(t *testing.T) {
 	a.NotNil(createdKey)
 	a.NotEmpty(createdKey.Key) // Key value only returned on creation
 	a.NotEmpty(createdKey.KeyHash)
-	a.Equal(testKeyName, createdKey.Description)
-	a.Equal(testPermissions, createdKey.Permissions)
 
-	t.Logf("Created API key: Hash=%s, Description=%s", createdKey.KeyHash, createdKey.Description)
+	t.Logf("Created API key: Hash=%s", createdKey.KeyHash)
 
 	// Store key hash for cleanup
 	keyHashToDelete := createdKey.KeyHash
