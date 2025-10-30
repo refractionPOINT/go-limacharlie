@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type SchemaDescription = string
@@ -28,6 +29,34 @@ func (o *Organization) GetSchemas() (*Schemas, error) {
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// GetSchemasForPlatform retrieves event type schemas filtered by platform
+// platform: platform name (e.g., "windows", "linux", "macos", "chrome")
+func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) {
+	resp := Schemas{}
+	values := url.Values{}
+	values.Set("platform", platform)
+
+	request := makeDefaultRequest(&resp).withURLValues(values)
+
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/schema", o.client.options.OID), request); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetPlatformNames retrieves the list of platform names available in LimaCharlie
+func (o *Organization) GetPlatformNames() ([]string, error) {
+	var resp struct {
+		Platforms []string `json:"platforms"`
+	}
+
+	// This endpoint returns the ontology of platform names
+	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/platforms", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+		return nil, err
+	}
+	return resp.Platforms, nil
 }
 
 // GetSchema retrieves a specific schema definition based on the provided schema name.
