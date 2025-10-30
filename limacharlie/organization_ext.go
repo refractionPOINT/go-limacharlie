@@ -8,15 +8,15 @@ import (
 
 // UsageStats contains usage statistics for an organization
 type UsageStats struct {
-	OID                string                 `json:"oid,omitempty"`
-	DataRetention      int64                  `json:"data_retention_days,omitempty"`
-	TotalSensors       int64                  `json:"total_sensors,omitempty"`
-	OnlineSensors      int64                  `json:"online_sensors,omitempty"`
-	EventsIngested     int64                  `json:"events_ingested,omitempty"`
-	DetectionsGenerated int64                 `json:"detections_generated,omitempty"`
-	StorageUsedGB      float64                `json:"storage_used_gb,omitempty"`
-	Period             string                 `json:"period,omitempty"`
-	Extra              map[string]interface{} `json:"extra,omitempty"`
+	OID                 string                 `json:"oid,omitempty"`
+	DataRetention       int64                  `json:"data_retention_days,omitempty"`
+	TotalSensors        int64                  `json:"total_sensors,omitempty"`
+	OnlineSensors       int64                  `json:"online_sensors,omitempty"`
+	EventsIngested      int64                  `json:"events_ingested,omitempty"`
+	DetectionsGenerated int64                  `json:"detections_generated,omitempty"`
+	StorageUsedGB       float64                `json:"storage_used_gb,omitempty"`
+	Period              string                 `json:"period,omitempty"`
+	Extra               map[string]interface{} `json:"extra,omitempty"`
 }
 
 // OrgError represents an error log entry for an organization
@@ -57,28 +57,28 @@ type APIKeyCreate struct {
 
 // MITREReport contains the MITRE ATT&CK coverage report for an organization
 type MITREReport struct {
-	OID        string                            `json:"oid,omitempty"`
-	Techniques map[string]MITRETechniqueCoverage `json:"techniques,omitempty"`
-	Tactics    map[string]MITRETacticCoverage    `json:"tactics,omitempty"`
-	Coverage   float64                           `json:"coverage_percentage,omitempty"`
-	GeneratedAt int64                            `json:"generated_at,omitempty"`
+	OID         string                            `json:"oid,omitempty"`
+	Techniques  map[string]MITRETechniqueCoverage `json:"techniques,omitempty"`
+	Tactics     map[string]MITRETacticCoverage    `json:"tactics,omitempty"`
+	Coverage    float64                           `json:"coverage_percentage,omitempty"`
+	GeneratedAt int64                             `json:"generated_at,omitempty"`
 }
 
 // MITRETechniqueCoverage contains coverage information for a MITRE technique
 type MITRETechniqueCoverage struct {
-	TechniqueID  string   `json:"technique_id,omitempty"`
-	Name         string   `json:"name,omitempty"`
-	Covered      bool     `json:"covered,omitempty"`
+	TechniqueID    string   `json:"technique_id,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	Covered        bool     `json:"covered,omitempty"`
 	DetectionRules []string `json:"detection_rules,omitempty"`
-	Tactic       string   `json:"tactic,omitempty"`
+	Tactic         string   `json:"tactic,omitempty"`
 }
 
 // MITRETacticCoverage contains coverage information for a MITRE tactic
 type MITRETacticCoverage struct {
-	TacticName       string  `json:"tactic_name,omitempty"`
-	TechniquesTotal  int     `json:"techniques_total,omitempty"`
-	TechniquesCovered int    `json:"techniques_covered,omitempty"`
-	Coverage         float64 `json:"coverage_percentage,omitempty"`
+	TacticName        string  `json:"tactic_name,omitempty"`
+	TechniquesTotal   int     `json:"techniques_total,omitempty"`
+	TechniquesCovered int     `json:"techniques_covered,omitempty"`
+	Coverage          float64 `json:"coverage_percentage,omitempty"`
 }
 
 // SensorTimeData contains timestamp information for when a sensor has data

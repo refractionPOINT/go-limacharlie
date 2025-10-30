@@ -47,3 +47,73 @@ func TestSchemas(t *testing.T) {
 		t.Error("expected error for invalid event type, got nil")
 	}
 }
+
+// TestGetSchemasForPlatform tests retrieving schemas filtered by platform
+func TestGetSchemasForPlatform(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// Test with Windows platform
+	schemas, err := org.GetSchemasForPlatform("windows")
+	if err != nil {
+		t.Errorf("GetSchemasForPlatform(windows): %v", err)
+	}
+	a.NotNil(schemas)
+	a.Greater(len(schemas.EventTypes), 0, "should have event types for windows platform")
+	t.Logf("Windows platform has %d event types", len(schemas.EventTypes))
+
+	// Test with Linux platform
+	schemasLinux, err := org.GetSchemasForPlatform("linux")
+	if err != nil {
+		t.Errorf("GetSchemasForPlatform(linux): %v", err)
+	}
+	a.NotNil(schemasLinux)
+	t.Logf("Linux platform has %d event types", len(schemasLinux.EventTypes))
+
+	// Test with macOS platform
+	schemasMac, err := org.GetSchemasForPlatform("macos")
+	if err != nil {
+		t.Errorf("GetSchemasForPlatform(macos): %v", err)
+	}
+	a.NotNil(schemasMac)
+	t.Logf("macOS platform has %d event types", len(schemasMac.EventTypes))
+
+	// Test with Chrome platform
+	schemasChrome, err := org.GetSchemasForPlatform("chrome")
+	if err != nil {
+		t.Errorf("GetSchemasForPlatform(chrome): %v", err)
+	}
+	a.NotNil(schemasChrome)
+	t.Logf("Chrome platform has %d event types", len(schemasChrome.EventTypes))
+}
+
+// TestGetPlatformNames tests retrieving the list of platform names
+func TestGetPlatformNames(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	platforms, err := org.GetPlatformNames()
+	if err != nil {
+		t.Errorf("GetPlatformNames(): %v", err)
+	}
+	a.NotNil(platforms)
+	a.Greater(len(platforms), 0, "should have at least one platform")
+
+	// Log all platforms
+	t.Logf("Available platforms: %v", platforms)
+
+	// Check for expected platforms
+	expectedPlatforms := []string{"windows", "linux", "macos", "chrome"}
+	for _, expected := range expectedPlatforms {
+		found := false
+		for _, platform := range platforms {
+			if platform == expected {
+				found = true
+				break
+			}
+		}
+		if found {
+			t.Logf("Found expected platform: %s", expected)
+		}
+	}
+}
