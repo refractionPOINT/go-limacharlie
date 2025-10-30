@@ -181,7 +181,7 @@ func (org *Organization) GetAPIKeys() ([]APIKeyInfo, error) {
 	var response struct {
 		Keys []APIKeyInfo `json:"keys"`
 	}
-	url := fmt.Sprintf("orgs/%s/apikeys", org.GetOID())
+	url := fmt.Sprintf("orgs/%s/keys", org.GetOID())
 
 	request := makeDefaultRequest(&response)
 
@@ -197,7 +197,7 @@ func (org *Organization) GetAPIKeys() ([]APIKeyInfo, error) {
 // permissions: optional list of permissions for the key
 func (org *Organization) CreateAPIKey(name string, permissions []string) (*APIKeyCreate, error) {
 	var response APIKeyCreate
-	url := fmt.Sprintf("orgs/%s/apikeys", org.GetOID())
+	url := fmt.Sprintf("orgs/%s/keys", org.GetOID())
 
 	data := map[string]interface{}{
 		"description": name,
@@ -218,7 +218,7 @@ func (org *Organization) CreateAPIKey(name string, permissions []string) (*APIKe
 // DeleteAPIKey deletes an API key
 // keyHash: the hash of the API key to delete
 func (org *Organization) DeleteAPIKey(keyHash string) error {
-	url := fmt.Sprintf("orgs/%s/apikeys/%s", org.GetOID(), keyHash)
+	url := fmt.Sprintf("orgs/%s/keys/%s", org.GetOID(), keyHash)
 
 	request := makeDefaultRequest(nil)
 
@@ -254,7 +254,7 @@ func (org *Organization) GetTimeWhenSensorHasData(sid string, start, end int64) 
 	}
 
 	var response SensorTimeData
-	urlPath := fmt.Sprintf("insight/%s/timeline/%s", org.GetOID(), sid)
+	urlPath := fmt.Sprintf("insight/%s/%s/overview", org.GetOID(), sid)
 
 	values := url.Values{}
 	values.Set("start", fmt.Sprintf("%d", start))
