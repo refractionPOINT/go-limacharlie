@@ -48,7 +48,7 @@ var OutputTypes = struct {
 	SMTP:             "smtp",
 	Humio:            "humio",
 	Kafka:            "kafka",
-	AzureStorageBlob: "azure_storage_blog",
+	AzureStorageBlob: "azure_storage_blob",
 	AzureEventHub:    "azure_event_hub",
 	Elastic:          "elastic",
 	Tines:            "tines",
