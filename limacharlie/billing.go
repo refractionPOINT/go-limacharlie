@@ -3,7 +3,6 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 )
 
 const (
