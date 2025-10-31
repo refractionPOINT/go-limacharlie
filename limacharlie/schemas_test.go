@@ -55,11 +55,7 @@ func TestGetSchemasForPlatform(t *testing.T) {
 
 	// Test with Windows platform
 	schemas, err := org.GetSchemasForPlatform("windows")
-	if err != nil {
-		t.Logf("GetSchemasForPlatform(windows) returned error (may not be supported): %v", err)
-		t.Skip("Platform filtering not supported in this environment")
-		return
-	}
+	a.NoError(err, "GetSchemasForPlatform(windows) should succeed")
 	a.NotNil(schemas)
 	a.Greater(len(schemas.EventTypes), 0, "should have event types for windows platform")
 	t.Logf("Windows platform has %d event types", len(schemas.EventTypes))
@@ -98,10 +94,7 @@ func TestGetPlatformNames(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	platforms, err := org.GetPlatformNames()
-	if err != nil {
-		t.Logf("GetPlatformNames() returned error (may not be available): %v", err)
-		return
-	}
+	a.NoError(err, "GetPlatformNames should succeed")
 	a.NotNil(platforms)
 	if len(platforms) == 0 {
 		t.Log("GetPlatformNames() returned empty list - may not be available in test environment")

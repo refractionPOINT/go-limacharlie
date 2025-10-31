@@ -44,10 +44,7 @@ func TestDismissOrgError(t *testing.T) {
 	t.Logf("Attempting to dismiss error for component: %s", componentToDismiss)
 
 	err = org.DismissOrgError(componentToDismiss)
-	if err != nil {
-		t.Logf("DismissOrgError() returned error (might not be dismissible): %v", err)
-		return
-	}
+	a.NoError(err, "DismissOrgError should succeed")
 
 	// Verify error was dismissed by checking if it's gone
 	time.Sleep(2 * time.Second) // Give it a moment
@@ -74,11 +71,7 @@ func TestListUserOrgs(t *testing.T) {
 
 	// Test basic list
 	orgs, err := org.ListUserOrgs(nil, nil, nil, nil, nil, true)
-	if err != nil {
-		// This might not be available in all auth modes
-		t.Logf("ListUserOrgs() returned error (may not be available): %v", err)
-		return
-	}
+	a.NoError(err, "ListUserOrgs should succeed")
 
 	a.NotNil(orgs)
 	t.Logf("User has access to %d organizations", len(orgs))
@@ -97,10 +90,7 @@ func TestListUserOrgsWithPagination(t *testing.T) {
 	limit := 5
 
 	orgs, err := org.ListUserOrgs(&offset, &limit, nil, nil, nil, true)
-	if err != nil {
-		t.Logf("ListUserOrgs() with pagination returned error: %v", err)
-		return
-	}
+	a.NoError(err, "ListUserOrgs with pagination should succeed")
 
 	a.NotNil(orgs)
 	a.LessOrEqual(len(orgs), limit)
@@ -168,12 +158,7 @@ func TestAPIKeyLifecycle(t *testing.T) {
 
 	// 4. Delete the API key
 	err = org.DeleteAPIKey(keyHashToDelete)
-	if err != nil {
-		// Deletion might fail in some environments
-		t.Logf("DeleteAPIKey() returned error (may not be deletable): %v", err)
-		// Still try to clean up via defer
-		return
-	}
+	a.NoError(err, "DeleteAPIKey should succeed")
 	t.Logf("Deleted API key: %s", keyHashToDelete)
 
 	// Clear the defer cleanup since we successfully deleted it
@@ -198,11 +183,7 @@ func TestGetMITREReport(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	report, err := org.GetMITREReport()
-	if err != nil {
-		// MITRE report might not be available in all environments
-		t.Logf("GetMITREReport() returned error (may not be available): %v", err)
-		return
-	}
+	a.NoError(err, "GetMITREReport should succeed")
 
 	a.NotNil(report)
 	if report.OID == "" {
@@ -251,11 +232,7 @@ func TestGetTimeWhenSensorHasData(t *testing.T) {
 	start := end - (24 * 3600) // 24 hours ago
 
 	timeline, err := org.GetTimeWhenSensorHasData(testSID, start, end)
-	if err != nil {
-		// Sensor might not have data or feature might not be available
-		t.Logf("GetTimeWhenSensorHasData() returned error: %v", err)
-		return
-	}
+	a.NoError(err, "GetTimeWhenSensorHasData should succeed")
 
 	a.NotNil(timeline)
 	a.Equal(testSID, timeline.SID)

@@ -12,11 +12,7 @@ func TestGetUsageStats(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	stats, err := org.GetUsageStats()
-	if err != nil {
-		// Usage stats might not be available in all environments
-		t.Logf("GetUsageStats() returned error (may not be available): %v", err)
-		return
-	}
+	a.NoError(err, "GetUsageStats should succeed")
 
 	a.NotNil(stats)
 	// Should at least have the OID populated
@@ -34,11 +30,7 @@ func TestBillingOrgStatus(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	status, err := org.GetBillingOrgStatus()
-	if err != nil {
-		// Billing might not be configured in test environment
-		t.Logf("GetBillingOrgStatus() returned error (billing may not be configured): %v", err)
-		return
-	}
+	a.NoError(err, "GetBillingOrgStatus should succeed")
 
 	a.NotNil(status)
 	if status.OID == "" {
@@ -54,11 +46,7 @@ func TestBillingOrgDetails(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	details, err := org.GetBillingOrgDetails()
-	if err != nil {
-		// Billing might not be configured in test environment
-		t.Logf("GetBillingOrgDetails() returned error (billing may not be configured): %v", err)
-		return
-	}
+	a.NoError(err, "GetBillingOrgDetails should succeed")
 
 	a.NotNil(details)
 	a.NotEmpty(details.OID)
@@ -71,11 +59,7 @@ func TestGetSKUDefinitions(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	skus, err := org.GetSKUDefinitions()
-	if err != nil {
-		// SKU definitions might not be available in all environments
-		t.Logf("GetSKUDefinitions() returned error (may not be available): %v", err)
-		return
-	}
+	a.NoError(err, "GetSKUDefinitions should succeed")
 
 	a.NotNil(skus)
 	// SKUs might be empty in test environments
@@ -95,11 +79,7 @@ func TestGetBillingInvoiceURL(t *testing.T) {
 	month := 1
 
 	invoiceURL, err := org.GetBillingInvoiceURL(year, month, "")
-	if err != nil {
-		// Invoice might not exist for the specified month
-		t.Logf("GetBillingInvoiceURL() returned error (invoice may not exist): %v", err)
-		return
-	}
+	a.NoError(err, "GetBillingInvoiceURL should succeed")
 
 	a.NotNil(invoiceURL)
 	a.NotEmpty(invoiceURL.URL)
@@ -118,11 +98,7 @@ func TestGetBillingInvoiceURLWithFormat(t *testing.T) {
 	format := "pdf"
 
 	invoiceURL, err := org.GetBillingInvoiceURL(year, month, format)
-	if err != nil {
-		// Invoice might not exist
-		t.Logf("GetBillingInvoiceURL() with format returned error: %v", err)
-		return
-	}
+	a.NoError(err, "GetBillingInvoiceURL with format should succeed")
 
 	a.NotNil(invoiceURL)
 	a.Equal("pdf", invoiceURL.Format)
@@ -155,11 +131,7 @@ func TestGetBillingAvailablePlans(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	plans, err := org.GetBillingAvailablePlans()
-	if err != nil {
-		// Available plans might not be accessible in all environments
-		t.Logf("GetBillingAvailablePlans() returned error: %v", err)
-		return
-	}
+	a.NoError(err, "GetBillingAvailablePlans should succeed")
 
 	a.NotNil(plans)
 	t.Logf("Retrieved %d billing plans", len(plans))
@@ -174,11 +146,7 @@ func TestGetBillingUserAuthRequirements(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	authReq, err := org.GetBillingUserAuthRequirements()
-	if err != nil {
-		// Auth requirements might not be accessible
-		t.Logf("GetBillingUserAuthRequirements() returned error: %v", err)
-		return
-	}
+	a.NoError(err, "GetBillingUserAuthRequirements should succeed")
 
 	a.NotNil(authReq)
 	t.Logf("Auth requirements: MFARequired=%v, MFAEnabled=%v", authReq.MFARequired, authReq.MFAEnabled)
