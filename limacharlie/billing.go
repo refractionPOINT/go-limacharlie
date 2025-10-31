@@ -26,7 +26,7 @@ type BillingOrgDetails struct {
 	OID              string                 `json:"oid,omitempty"`
 	Name             string                 `json:"name,omitempty"`
 	Plan             string                 `json:"plan,omitempty"`
-	Status           string                 `json:"status,omitempty"`
+	Status           map[string]interface{} `json:"status,omitempty"` // Status is an object, not a string
 	BillingEmail     string                 `json:"billing_email,omitempty"`
 	PaymentMethod    string                 `json:"payment_method,omitempty"`
 	CurrentPeriodEnd int64                  `json:"current_period_end,omitempty"`
