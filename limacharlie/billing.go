@@ -114,14 +114,11 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (*
 
 	var invoiceURL BillingInvoiceURL
 	urlPath := fmt.Sprintf("orgs/%s/invoice_url/%d/%02d", org.GetOID(), year, month)
+	if format != "" {
+		urlPath = fmt.Sprintf("%s?format=%s", urlPath, format)
+	}
 
 	request := makeDefaultRequest(&invoiceURL).withURLRoot(billingRootURL + "/")
-
-	if format != "" {
-		values := url.Values{}
-		values.Set("format", format)
-		request = request.withURLValues(values)
-	}
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
@@ -167,9 +164,9 @@ func (org *Organization) GetBillingUserAuthRequirements() (*BillingUserAuthRequi
 // GetSKUDefinitions retrieves the SKU pricing definitions for the organization
 func (org *Organization) GetSKUDefinitions() ([]SKUDefinition, error) {
 	var skus []SKUDefinition
-	url := fmt.Sprintf("orgs/%s/sku-definitions", org.GetOID())
+	url := fmt.Sprintf("sku-definitions/%s", org.GetOID())
 
-	request := makeDefaultRequest(&skus).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&skus)
 
 	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
 		return nil, err
