@@ -99,7 +99,7 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (m
 		return nil, fmt.Errorf("invalid month: %d (must be 1-12)", month)
 	}
 
-	var response map[string]interface{}
+	response := make(map[string]interface{})
 	urlPath := fmt.Sprintf("orgs/%s/invoice_url/%d/%02d", org.GetOID(), year, month)
 	if format != "" {
 		urlPath = fmt.Sprintf("%s?format=%s", urlPath, format)
