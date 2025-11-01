@@ -13,13 +13,8 @@ func TestGetUsageStats(t *testing.T) {
 
 	stats, err := org.GetUsageStats()
 	a.NoError(err, "GetUsageStats should succeed")
+	a.NotNil(stats, "Usage stats should not be nil")
 
-	a.NotNil(stats)
-	// Should at least have the OID populated
-	if stats.OID == "" {
-		t.Log("Usage stats returned empty OID - may not be configured in test environment")
-		return
-	}
 	t.Logf("Usage stats: OID=%s, TotalSensors=%d, OnlineSensors=%d",
 		stats.OID, stats.TotalSensors, stats.OnlineSensors)
 }
@@ -31,12 +26,8 @@ func TestBillingOrgStatus(t *testing.T) {
 
 	status, err := org.GetBillingOrgStatus()
 	a.NoError(err, "GetBillingOrgStatus should succeed")
+	a.NotNil(status, "Billing status should not be nil")
 
-	a.NotNil(status)
-	if status.OID == "" {
-		t.Log("Billing status returned empty OID - may not be configured in test environment")
-		return
-	}
 	t.Logf("Billing status: OID=%s, Status=%s", status.OID, status.Status)
 }
 
@@ -47,12 +38,8 @@ func TestBillingOrgDetails(t *testing.T) {
 
 	details, err := org.GetBillingOrgDetails()
 	a.NoError(err, "GetBillingOrgDetails should succeed")
+	a.NotNil(details, "Billing details should not be nil")
 
-	a.NotNil(details)
-	if details.OID == "" {
-		t.Log("Billing details returned empty OID - may not be configured in test environment")
-		return
-	}
 	t.Logf("Billing details: OID=%s, Name=%s, Plan=%s", details.OID, details.Name, details.Plan)
 }
 
@@ -105,10 +92,16 @@ func TestGetBillingInvoiceURLWithFormat(t *testing.T) {
 	format := "pdf"
 
 	invoiceURL, err := org.GetBillingInvoiceURL(year, month, format)
+	// Format parameter might cause parsing issues with the API response
+	// Log the error for debugging but don't fail the test if it's a parsing error
 	if err != nil {
-		// Format parameter may not be supported in test environment
-		t.Logf("GetBillingInvoiceURL with format returned error (may not be supported): %v", err)
-		return
+		if err.Error() == "error parsing response: unexpected end of JSON input" {
+			t.Logf("GetBillingInvoiceURL with format returned empty response body - format parameter may not be supported by API")
+			t.Skip("Skipping due to API not supporting format parameter")
+			return
+		}
+		// For other errors, fail the test
+		a.NoError(err, "GetBillingInvoiceURL with format should succeed or return empty body")
 	}
 
 	a.NotNil(invoiceURL)
