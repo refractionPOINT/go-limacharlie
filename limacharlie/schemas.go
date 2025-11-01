@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 type SchemaDescription = string
@@ -49,8 +50,8 @@ func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) 
 
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		// Platform filtering may not be supported - return nil, nil to indicate feature unavailable
-		if restErr, ok := err.(RESTError); ok {
-			if restErr.StatusCode == http.StatusBadRequest {
+		if _, ok := err.(RESTError); ok {
+			if strings.Contains(err.Error(), "400") {
 				return nil, nil
 			}
 		}
@@ -72,8 +73,8 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 	// This endpoint returns the ontology of platform names
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		// Endpoint may not be available - return nil, nil to indicate feature unavailable
-		if restErr, ok := err.(RESTError); ok {
-			if restErr.StatusCode == http.StatusNotFound {
+		if _, ok := err.(RESTError); ok {
+			if strings.Contains(err.Error(), "404") {
 				return nil, nil
 			}
 		}
