@@ -57,14 +57,8 @@ func TestGetSchemasForPlatform(t *testing.T) {
 	// Test with Windows platform
 	schemas, err := org.GetSchemasForPlatform("windows")
 	if err != nil {
-		// This endpoint returns HTML 400 error, suggesting platform filtering is not supported
-		// Skip test since it appears to be a backend API issue
-		if (err.Error() == "error parsing response: unexpected end of JSON input") ||
-			(strings.Contains(err.Error(), "400 Bad Request") && strings.Contains(err.Error(), "<html>")) {
-			t.Logf("GetSchemasForPlatform(windows) returned error - platform filtering may not be supported: %v", err)
-			t.Skip("Platform filtering not supported in this environment")
-			return
-		}
+		t.Logf("GetSchemasForPlatform(windows) ERROR: %v", err)
+		t.Logf("Error type: %T", err)
 		a.NoError(err, "GetSchemasForPlatform should succeed")
 		return
 	}
@@ -98,13 +92,8 @@ func TestGetPlatformNames(t *testing.T) {
 
 	platforms, err := org.GetPlatformNames()
 	if err != nil {
-		// Platform names endpoint returns 404, suggesting it may not be implemented yet
-		// Skip test since the endpoint is not available
-		if strings.Contains(err.Error(), "404 Not Found") {
-			t.Logf("GetPlatformNames returned 404 - endpoint may not be implemented yet: %v", err)
-			t.Skip("Endpoint not available (404)")
-			return
-		}
+		t.Logf("GetPlatformNames ERROR: %v", err)
+		t.Logf("Error type: %T", err)
 		a.NoError(err, "GetPlatformNames should succeed")
 		return
 	}

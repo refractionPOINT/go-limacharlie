@@ -92,16 +92,12 @@ func TestGetBillingInvoiceURLWithFormat(t *testing.T) {
 	format := "pdf"
 
 	invoiceURL, err := org.GetBillingInvoiceURL(year, month, format)
-	// Format parameter might cause parsing issues with the API response
-	// Log the error for debugging but don't fail the test if it's a parsing error
 	if err != nil {
-		if err.Error() == "error parsing response: unexpected end of JSON input" {
-			t.Logf("GetBillingInvoiceURL with format returned empty response body - format parameter may not be supported by API")
-			t.Skip("Skipping due to API not supporting format parameter")
-			return
-		}
-		// For other errors, fail the test
-		a.NoError(err, "GetBillingInvoiceURL with format should succeed or return empty body")
+		t.Logf("GetBillingInvoiceURL with format ERROR: %v", err)
+		t.Logf("Error type: %T", err)
+		t.Logf("Year: %d, Month: %d, Format: %s", year, month, format)
+		a.NoError(err, "GetBillingInvoiceURL with format should succeed")
+		return
 	}
 
 	a.NotNil(invoiceURL)

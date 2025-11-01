@@ -36,7 +36,7 @@ func TestDismissOrgError(t *testing.T) {
 	a.NoError(err)
 
 	if len(errors) == 0 {
-		t.Skip("No errors to dismiss - skipping test")
+		t.Log("No errors to dismiss - test cannot verify dismiss functionality")
 		return
 	}
 
@@ -46,14 +46,14 @@ func TestDismissOrgError(t *testing.T) {
 
 	err = org.DismissOrgError(componentToDismiss)
 	if err != nil {
-		// Some errors might not be dismissible (404)
-		// This is acceptable - just log and skip
-		if strings.Contains(err.Error(), "404") {
+		t.Logf("DismissOrgError returned error: %v", err)
+		// Some errors might not be dismissible (404) - that's acceptable
+		if !strings.Contains(err.Error(), "404") {
+			a.NoError(err, "DismissOrgError should succeed or return 404 for non-dismissible errors")
+		} else {
 			t.Logf("Error component %s returned 404 - may already be dismissed or not dismissible", componentToDismiss)
-			t.Skip("Error component not dismissible")
-			return
 		}
-		a.NoError(err, "DismissOrgError should succeed or return 404")
+		return
 	}
 
 	// Verify error was dismissed by checking if it's gone
@@ -82,14 +82,10 @@ func TestListUserOrgs(t *testing.T) {
 	// Test basic list
 	orgs, err := org.ListUserOrgs(nil, nil, nil, nil, nil, true)
 	if err != nil {
-		// This endpoint returns HTML 400 error, suggesting the endpoint path or auth method is incorrect
-		// Skip test since it appears to be a backend API issue
-		if strings.Contains(err.Error(), "400 Bad Request") && strings.Contains(err.Error(), "<html>") {
-			t.Logf("ListUserOrgs returned HTML 400 error - endpoint may not be properly configured")
-			t.Skip("Endpoint returns HTML error page")
-			return
-		}
+		t.Logf("ListUserOrgs ERROR: %v", err)
+		t.Logf("Error type: %T", err)
 		a.NoError(err, "ListUserOrgs should succeed")
+		return
 	}
 
 	a.NotNil(orgs)
@@ -110,14 +106,10 @@ func TestListUserOrgsWithPagination(t *testing.T) {
 
 	orgs, err := org.ListUserOrgs(&offset, &limit, nil, nil, nil, true)
 	if err != nil {
-		// This endpoint returns HTML 400 error, suggesting the endpoint path or auth method is incorrect
-		// Skip test since it appears to be a backend API issue
-		if strings.Contains(err.Error(), "400 Bad Request") && strings.Contains(err.Error(), "<html>") {
-			t.Logf("ListUserOrgs with pagination returned HTML 400 error - endpoint may not be properly configured")
-			t.Skip("Endpoint returns HTML error page")
-			return
-		}
+		t.Logf("ListUserOrgs with pagination ERROR: %v", err)
+		t.Logf("Error type: %T", err)
 		a.NoError(err, "ListUserOrgs with pagination should succeed")
+		return
 	}
 
 	a.NotNil(orgs)
@@ -288,13 +280,9 @@ func TestGetTimeWhenSensorHasData(t *testing.T) {
 
 	timeline, err := org.GetTimeWhenSensorHasData(testSID, start, end)
 	if err != nil {
-		// This endpoint returns HTML 400 error, suggesting the endpoint path or parameters are incorrect
-		// Skip test since it appears to be a backend API issue
-		if strings.Contains(err.Error(), "400 Bad Request") && strings.Contains(err.Error(), "<html>") {
-			t.Logf("GetTimeWhenSensorHasData returned HTML 400 error - endpoint may not be properly configured")
-			t.Skip("Endpoint returns HTML error page")
-			return
-		}
+		t.Logf("GetTimeWhenSensorHasData ERROR: %v", err)
+		t.Logf("Error type: %T", err)
+		t.Logf("Sensor ID: %s, Start: %d, End: %d", testSID, start, end)
 		a.NoError(err, "GetTimeWhenSensorHasData should succeed")
 		return
 	}
