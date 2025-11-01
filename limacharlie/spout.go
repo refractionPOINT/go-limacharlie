@@ -14,14 +14,20 @@ import (
 
 // FutureResults is a queue to receive specific events based on investigation_id.
 type FutureResults struct {
-	queue chan interface{}
-	mu    sync.Mutex
+	queue           chan interface{}
+	mu              sync.Mutex
+	results         []interface{}
+	newResultSignal chan struct{}
+	WasReceived     bool
 }
 
 // NewFutureResults creates a new FutureResults instance.
 func NewFutureResults(bufferSize int) *FutureResults {
 	return &FutureResults{
-		queue: make(chan interface{}, bufferSize),
+		queue:           make(chan interface{}, bufferSize),
+		results:         make([]interface{}, 0),
+		newResultSignal: make(chan struct{}, 1),
+		WasReceived:     false,
 	}
 }
 
@@ -48,6 +54,33 @@ func (f *FutureResults) GetWithTimeout(timeout time.Duration) (interface{}, erro
 func (f *FutureResults) addResult(result interface{}) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	// Check if this is a CLOUD_NOTIFICATION
+	if m, ok := result.(map[string]interface{}); ok {
+		if routing, ok := m["routing"].(map[string]interface{}); ok {
+			if eventType, ok := routing["event_type"].(string); ok && eventType == "CLOUD_NOTIFICATION" {
+				f.WasReceived = true
+				// Still send to queue for backward compatibility
+				select {
+				case f.queue <- result:
+					return true
+				default:
+					return false
+				}
+			}
+		}
+	}
+
+	// For non-CLOUD_NOTIFICATION events, accumulate for batch retrieval
+	f.results = append(f.results, result)
+
+	// Signal that new results are available (non-blocking)
+	select {
+	case f.newResultSignal <- struct{}{}:
+	default:
+	}
+
+	// Also send to queue for backward compatibility with Get()
 	select {
 	case f.queue <- result:
 		return true
@@ -56,11 +89,35 @@ func (f *FutureResults) addResult(result interface{}) bool {
 	}
 }
 
+// GetNewResponses retrieves all accumulated results, blocking for up to the specified timeout.
+// Returns a slice of results, or an empty slice if the timeout is reached.
+// This method clears the accumulated results after retrieval.
+func (f *FutureResults) GetNewResponses(timeout time.Duration) []interface{} {
+	// Wait for signal or timeout
+	select {
+	case <-f.newResultSignal:
+		// New results are available
+		f.mu.Lock()
+		defer f.mu.Unlock()
+
+		// Get accumulated results
+		ret := f.results
+		f.results = make([]interface{}, 0)
+
+		return ret
+
+	case <-time.After(timeout):
+		// Timeout reached, return empty slice
+		return []interface{}{}
+	}
+}
+
 // Close closes the future results queue.
 func (f *FutureResults) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	close(f.queue)
+	close(f.newResultSignal)
 }
 
 type futureRegistration struct {
@@ -100,6 +157,7 @@ type Spout struct {
 	cat              string
 	sid              string
 	userID           string
+	extraParams      map[string]interface{}
 	dropped          int64
 	isStop           bool
 	queue            chan interface{}
@@ -194,6 +252,13 @@ func WithUserID(uid string) SpoutOption {
 func WithReconnect(enabled bool) SpoutOption {
 	return func(s *Spout) {
 		s.reconnectEnabled = enabled
+	}
+}
+
+// WithExtraParams sets additional parameters to be sent with the spout request.
+func WithExtraParams(params map[string]interface{}) SpoutOption {
+	return func(s *Spout) {
+		s.extraParams = params
 	}
 }
 
@@ -320,10 +385,38 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 		return nil, err
 	}
 
-	// Send header
-	if err := conn.WriteJSON(header); err != nil {
-		conn.Close()
-		return nil, err
+	// If there are extra params, merge them with the header
+	if len(s.extraParams) > 0 {
+		// Marshal header to JSON
+		headerBytes, err := json.Marshal(header)
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to marshal header: %v", err)
+		}
+
+		// Unmarshal into a map
+		var headerMap map[string]interface{}
+		if err := json.Unmarshal(headerBytes, &headerMap); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to unmarshal header: %v", err)
+		}
+
+		// Add extra params to the map
+		for k, v := range s.extraParams {
+			headerMap[k] = v
+		}
+
+		// Send merged map
+		if err := conn.WriteJSON(headerMap); err != nil {
+			conn.Close()
+			return nil, err
+		}
+	} else {
+		// Send header as-is
+		if err := conn.WriteJSON(header); err != nil {
+			conn.Close()
+			return nil, err
+		}
 	}
 
 	return conn, nil

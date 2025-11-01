@@ -519,3 +519,138 @@ func TestSpout_ReconnectOption(t *testing.T) {
 	assert.False(t, spout2.reconnectEnabled, "reconnect should be disabled when specified")
 	spout2.Shutdown()
 }
+
+func TestFutureResults_GetNewResponses(t *testing.T) {
+	// Create a FutureResults
+	future := NewFutureResults(10)
+	defer future.Close()
+
+	// Test adding multiple results
+	testData1 := map[string]interface{}{"test": "data1"}
+	testData2 := map[string]interface{}{"test": "data2"}
+	testData3 := map[string]interface{}{"test": "data3"}
+
+	success := future.addResult(testData1)
+	assert.True(t, success, "should be able to add result 1")
+	success = future.addResult(testData2)
+	assert.True(t, success, "should be able to add result 2")
+	success = future.addResult(testData3)
+	assert.True(t, success, "should be able to add result 3")
+
+	// Test batch retrieval
+	results := future.GetNewResponses(1 * time.Second)
+	assert.Len(t, results, 3, "should retrieve all 3 results")
+
+	// Verify the results
+	assert.Equal(t, testData1, results[0])
+	assert.Equal(t, testData2, results[1])
+	assert.Equal(t, testData3, results[2])
+
+	// Test that accumulated results are cleared after retrieval
+	results = future.GetNewResponses(100 * time.Millisecond)
+	assert.Empty(t, results, "should return empty slice after timeout")
+}
+
+func TestFutureResults_WasReceived(t *testing.T) {
+	// Create a FutureResults
+	future := NewFutureResults(10)
+	defer future.Close()
+
+	// Initially wasReceived should be false
+	assert.False(t, future.WasReceived, "wasReceived should start as false")
+
+	// Add a CLOUD_NOTIFICATION event
+	cloudNotification := map[string]interface{}{
+		"routing": map[string]interface{}{
+			"event_type": "CLOUD_NOTIFICATION",
+		},
+		"event": map[string]interface{}{},
+	}
+	success := future.addResult(cloudNotification)
+	assert.True(t, success, "should be able to add CLOUD_NOTIFICATION")
+
+	// Verify wasReceived is now true
+	assert.True(t, future.WasReceived, "wasReceived should be true after CLOUD_NOTIFICATION")
+
+	// Verify the notification is in the queue (for backward compatibility)
+	msg, ok := future.Get()
+	assert.True(t, ok, "should get notification from queue")
+	assert.Equal(t, cloudNotification, msg)
+}
+
+func TestFutureResults_WasReceivedWithRegularEvents(t *testing.T) {
+	// Create a FutureResults
+	future := NewFutureResults(10)
+	defer future.Close()
+
+	// Add regular events (not CLOUD_NOTIFICATION)
+	regularEvent := map[string]interface{}{
+		"routing": map[string]interface{}{
+			"event_type": "SOME_OTHER_EVENT",
+		},
+		"event": map[string]interface{}{
+			"data": "test",
+		},
+	}
+	success := future.addResult(regularEvent)
+	assert.True(t, success, "should be able to add regular event")
+
+	// Verify wasReceived is still false
+	assert.False(t, future.WasReceived, "wasReceived should remain false for non-CLOUD_NOTIFICATION events")
+
+	// Verify the event is both in queue and accumulated results
+	msg, ok := future.Get()
+	assert.True(t, ok, "should get event from queue")
+	assert.Equal(t, regularEvent, msg)
+
+	results := future.GetNewResponses(1 * time.Second)
+	assert.Len(t, results, 1, "should have 1 accumulated result")
+	assert.Equal(t, regularEvent, results[0])
+}
+
+func TestSpout_ExtraParams(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	// Test creating a spout with extra params
+	extraParams := map[string]interface{}{
+		"custom_param1": "value1",
+		"custom_param2": 123,
+		"custom_param3": true,
+	}
+
+	spout, err := NewSpout(org, "event", WithExtraParams(extraParams))
+	require.NoError(t, err)
+	defer spout.Shutdown()
+
+	// Verify extra params are stored
+	assert.Equal(t, extraParams, spout.extraParams, "extra params should be stored")
+
+	// Note: We can't easily test that the extra params are actually sent to the server
+	// without mocking the WebSocket connection, but the implementation will include them
+	// in the header via connectWebSocket method
+}
+
+func TestSpout_ExtraParamsWithStart(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	// Create spout with extra params
+	extraParams := map[string]interface{}{
+		"test_param": "test_value",
+	}
+
+	spout, err := NewSpout(org, "event", WithExtraParams(extraParams))
+	require.NoError(t, err)
+	defer spout.Shutdown()
+
+	// Start the spout - this will use connectWebSocket which handles extra params
+	err = spout.Start()
+	require.NoError(t, err)
+
+	// If we get here without error, the connection was successful
+	// which means the server accepted our request with extra params
+	assert.NotNil(t, spout.conn, "connection should be established")
+}
