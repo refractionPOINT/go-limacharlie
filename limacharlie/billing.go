@@ -59,18 +59,6 @@ type BillingUserAuthRequirements struct {
 	Extra       map[string]interface{} `json:"extra,omitempty"`
 }
 
-// SKUDefinition contains pricing information for a specific SKU
-type SKUDefinition struct {
-	SKU         string                 `json:"sku,omitempty"`
-	Name        string                 `json:"name,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	Price       float64                `json:"price,omitempty"`
-	Currency    string                 `json:"currency,omitempty"`
-	Unit        string                 `json:"unit,omitempty"`
-	Category    string                 `json:"category,omitempty"`
-	Extra       map[string]interface{} `json:"extra,omitempty"`
-}
-
 // GetBillingOrgStatus retrieves the billing status for the organization
 func (org *Organization) GetBillingOrgStatus() (*BillingOrgStatus, error) {
 	var status BillingOrgStatus
@@ -123,6 +111,11 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (*
 		return nil, err
 	}
 
+	// Check if we got a valid response
+	if invoiceURL.URL == "" {
+		return nil, fmt.Errorf("billing service returned empty invoice URL")
+	}
+
 	invoiceURL.Year = fmt.Sprintf("%d", year)
 	invoiceURL.Month = fmt.Sprintf("%02d", month)
 	if format != "" {
@@ -158,18 +151,4 @@ func (org *Organization) GetBillingUserAuthRequirements() (*BillingUserAuthRequi
 	}
 
 	return &authReq, nil
-}
-
-// GetSKUDefinitions retrieves the SKU pricing definitions for the organization
-func (org *Organization) GetSKUDefinitions() ([]SKUDefinition, error) {
-	var skus []SKUDefinition
-	url := fmt.Sprintf("orgs/%s/sku-definitions", org.GetOID())
-
-	request := makeDefaultRequest(&skus).withURLRoot(billingRootURL + "/")
-
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
-		return nil, err
-	}
-
-	return skus, nil
 }

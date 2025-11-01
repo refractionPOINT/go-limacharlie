@@ -43,21 +43,6 @@ func TestBillingOrgDetails(t *testing.T) {
 	t.Logf("Billing details: OID=%s, Name=%s, Plan=%s", details.OID, details.Name, details.Plan)
 }
 
-// TestGetSKUDefinitions tests retrieving SKU pricing definitions
-func TestGetSKUDefinitions(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-
-	skus, err := org.GetSKUDefinitions()
-	a.NoError(err)
-	a.NotNil(skus)
-	// SKUs might be empty in test environments
-	t.Logf("Retrieved %d SKU definitions", len(skus))
-	if len(skus) > 0 {
-		t.Logf("First SKU: %s - %s", skus[0].SKU, skus[0].Name)
-	}
-}
-
 // TestGetBillingInvoiceURL tests generating invoice download URLs
 func TestGetBillingInvoiceURL(t *testing.T) {
 	a := assert.New(t)
