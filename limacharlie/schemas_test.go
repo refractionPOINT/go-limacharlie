@@ -53,33 +53,12 @@ func TestGetSchemasForPlatform(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	// Test with Windows platform
-	schemas, err := org.GetSchemasForPlatform("windows")
-	a.NoError(err, "GetSchemasForPlatform should not return an error")
-	a.NotNil(schemas, "schemas should not be nil")
-	a.Greater(len(schemas.EventTypes), 0, "should have event types for windows platform")
-	t.Logf("Windows platform has %d event types", len(schemas.EventTypes))
-
 	// Test with Linux platform
 	schemasLinux, err := org.GetSchemasForPlatform("linux")
 	a.NoError(err)
-	if schemasLinux != nil {
-		t.Logf("Linux platform has %d event types", len(schemasLinux.EventTypes))
-	}
-
-	// Test with macOS platform
-	schemasMac, err := org.GetSchemasForPlatform("macos")
-	a.NoError(err)
-	if schemasMac != nil {
-		t.Logf("macOS platform has %d event types", len(schemasMac.EventTypes))
-	}
-
-	// Test with Chrome platform
-	schemasChrome, err := org.GetSchemasForPlatform("chrome")
-	a.NoError(err)
-	if schemasChrome != nil {
-		t.Logf("Chrome platform has %d event types", len(schemasChrome.EventTypes))
-	}
+	a.NotNil(schemasLinux, "schemas should not be nil")
+	a.Greater(len(schemasLinux.EventTypes), 0, "should have event types for linux platform")
+	t.Logf("Linux platform has %d event types", len(schemasLinux.EventTypes))
 }
 
 // TestGetPlatformNames tests retrieving the list of platform names

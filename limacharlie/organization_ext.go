@@ -83,7 +83,7 @@ type MITRETacticCoverage struct {
 // SensorTimeData contains timestamp information for when a sensor has data
 type SensorTimeData struct {
 	SID        string  `json:"sid,omitempty"`
-	Timestamps []int64 `json:"timestamps,omitempty"`
+	Timestamps []int64 `json:"overview,omitempty"` // API returns "overview" not "timestamps"
 	Start      int64   `json:"start,omitempty"`
 	End        int64   `json:"end,omitempty"`
 }
@@ -120,7 +120,7 @@ func (org *Organization) GetOrgErrors() ([]OrgError, error) {
 
 // DismissOrgError dismisses a specific error for the organization
 func (org *Organization) DismissOrgError(component string) error {
-	url := fmt.Sprintf("errors/%s/%s", org.GetOID(), component)
+	url := fmt.Sprintf("errors/%s/%s", org.GetOID(), url.PathEscape(component))
 
 	request := makeDefaultRequest(nil)
 
@@ -163,9 +163,8 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 	if sortOrder != nil && *sortOrder != "" {
 		values.Set("sort_order", *sortOrder)
 	}
-	if withNames {
-		values.Set("with_names", "true")
-	}
+	// Note: with_names is NOT sent to API - it's used client-side in Python SDK
+	// The API always returns full org info, we just don't need to filter it
 
 	request := makeDefaultRequest(&response).withURLValues(values)
 
