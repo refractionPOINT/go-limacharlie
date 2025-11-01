@@ -49,12 +49,6 @@ func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) 
 	request := makeDefaultRequest(&resp).withURLValues(values)
 
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
-		// Platform filtering may not be supported - return nil, nil to indicate feature unavailable
-		if _, ok := err.(RESTError); ok {
-			if strings.Contains(err.Error(), "400") {
-				return nil, nil
-			}
-		}
 		return nil, err
 	}
 	return &resp, nil
@@ -72,12 +66,6 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 
 	// This endpoint returns the ontology of platform names
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
-		// Endpoint may not be available - return nil, nil to indicate feature unavailable
-		if _, ok := err.(RESTError); ok {
-			if strings.Contains(err.Error(), "404") {
-				return nil, nil
-			}
-		}
 		return nil, err
 	}
 	return resp.Platforms, nil

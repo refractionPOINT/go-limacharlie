@@ -170,12 +170,6 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 	request := makeDefaultRequest(&response).withURLValues(values)
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
-		// This endpoint requires user-based authentication, not API keys
-		if _, ok := err.(RESTError); ok {
-			if strings.Contains(err.Error(), "400") {
-				return nil, nil
-			}
-		}
 		return nil, err
 	}
 
@@ -282,12 +276,6 @@ func (org *Organization) GetTimeWhenSensorHasData(sid string, start, end int64) 
 	request := makeDefaultRequest(&response).withURLValues(values)
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
-		// This endpoint may not be available with current authentication method
-		if _, ok := err.(RESTError); ok {
-			if strings.Contains(err.Error(), "400") {
-				return nil, nil
-			}
-		}
 		return nil, err
 	}
 
