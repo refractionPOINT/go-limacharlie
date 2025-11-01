@@ -66,31 +66,27 @@ func TestDismissOrgError(t *testing.T) {
 
 // TestListUserOrgs tests listing organizations accessible to the user
 func TestListUserOrgs(t *testing.T) {
+	t.Skip("ListUserOrgs requires user-level authentication which is not available in test environment")
+
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
 	// Test basic list
 	orgs, err := org.ListUserOrgs(nil, nil, nil, nil, nil, true)
-
-	// This endpoint requires user-level authentication, not org-level API keys
-	// If we get an authentication error or empty results, skip the test
-	if err != nil {
-		t.Skipf("ListUserOrgs requires user-level authentication: %v", err)
-		return
-	}
-
+	a.NoError(err)
 	a.NotNil(orgs)
+
 	t.Logf("User has access to %d organizations", len(orgs))
 
 	if len(orgs) > 0 {
 		t.Logf("First org: OID=%s, Name=%s, Region=%s", orgs[0].OID, orgs[0].Name, orgs[0].Region)
-	} else {
-		t.Log("Note: 0 organizations returned - this may be expected with org-level API keys")
 	}
 }
 
 // TestListUserOrgsWithPagination tests pagination parameters
 func TestListUserOrgsWithPagination(t *testing.T) {
+	t.Skip("ListUserOrgs requires user-level authentication which is not available in test environment")
+
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
@@ -98,15 +94,9 @@ func TestListUserOrgsWithPagination(t *testing.T) {
 	limit := 5
 
 	orgs, err := org.ListUserOrgs(&offset, &limit, nil, nil, nil, true)
-
-	// This endpoint requires user-level authentication, not org-level API keys
-	// If we get an error, skip the test
-	if err != nil {
-		t.Skipf("ListUserOrgsWithPagination requires user-level authentication: %v", err)
-		return
-	}
-
+	a.NoError(err)
 	a.NotNil(orgs)
+
 	a.LessOrEqual(len(orgs), limit)
 	t.Logf("Retrieved %d organizations with limit=%d", len(orgs), limit)
 }
