@@ -444,6 +444,16 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		return resp.StatusCode, err
 	}
 
+	// If no response target is provided, we're done
+	if request.response == nil {
+		return resp.StatusCode, nil
+	}
+
+	// If response body is empty, don't try to unmarshal
+	if respData.Len() == 0 {
+		return resp.StatusCode, nil
+	}
+
 	// If the response is not a well structured
 	// datatype (and is a map[]interface{} instead)
 	// we will perform a CleanUnmarshal to better
