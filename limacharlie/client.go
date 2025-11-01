@@ -233,6 +233,14 @@ func getHTTPClient() *http.Client {
 }
 
 func (c *Client) reliableRequest(verb string, path string, request restRequest) (err error) {
+	// If no JWT is ready and we have an API key, prime it (similar to Python SDK behavior).
+	// This prevents sending empty JWT on first request which causes billing server to complain.
+	if c.options.JWT == "" && c.options.APIKey != "" {
+		if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
+			return err
+		}
+	}
+
 	request.nRetries++
 	for request.nRetries > 0 {
 		var statusCode int
