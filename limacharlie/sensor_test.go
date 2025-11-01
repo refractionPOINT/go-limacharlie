@@ -291,3 +291,55 @@ func TestActive(t *testing.T) {
 		t.Errorf("expected sensor to be online: %v", err)
 	}
 }
+
+func TestSensor_Request(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a).WithInvestigationID("test-cicd-request")
+	defer org.Close()
+
+	// List all sensors to find an online one
+	sensors, err := org.ListSensors()
+	require.NoError(t, err)
+	require.NotEmpty(t, sensors, "no sensors found")
+
+	// Find an online Linux sensor
+	var targetSID string
+	for sid, sensor := range sensors {
+		if sensor.Platform == Platforms.Linux {
+			isOnline, err := sensor.IsOnline()
+			if err == nil && isOnline {
+				targetSID = sid
+				break
+			}
+		}
+	}
+	require.NotEmpty(t, targetSID, "no online Linux sensor found")
+
+	// Create a sensor instance
+	sensor := org.GetSensor(targetSID)
+	require.NotNil(t, sensor)
+
+	// Make organization interactive
+	err = org.MakeInteractive()
+	require.NoError(t, err)
+
+	// Send a request and get FutureResults
+	future, err := sensor.Request("os_version")
+	require.NoError(t, err)
+	require.NotNil(t, future)
+	defer future.Close()
+
+	// Wait for response with timeout
+	resp, err := future.GetWithTimeout(30 * time.Second)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// Verify response structure
+	if m, ok := resp.(map[string]interface{}); ok {
+		// Check for expected fields in system info
+		require.Contains(t, m, "event")
+		require.NotEmpty(t, m["event"])
+	} else {
+		t.Errorf("unexpected response type: %T", resp)
+	}
+}
