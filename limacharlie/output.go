@@ -48,7 +48,7 @@ var OutputTypes = struct {
 	SMTP:             "smtp",
 	Humio:            "humio",
 	Kafka:            "kafka",
-	AzureStorageBlob: "azure_storage_blog",
+	AzureStorageBlob: "azure_storage_blob",
 	AzureEventHub:    "azure_event_hub",
 	Elastic:          "elastic",
 	Tines:            "tines",
@@ -103,6 +103,7 @@ type OutputConfig struct {
 	PayloadAsString   bool   `json:"is_payload_as_string,omitempty,string" yaml:"is_payload_as_string,omitempty"`
 	InvestigationID   string `json:"inv_id,omitempty" yaml:"inv_id,omitempty"`
 	Tag               string `json:"tag,omitempty" yaml:"tag,omitempty"`
+	TagBlackList      string `json:"tag_black_list,omitempty" yaml:"tag_black_list,omitempty"`
 	Category          string `json:"cat,omitempty" yaml:"cat,omitempty"`
 	SensorID          string `json:"sid,omitempty" yaml:"sid,omitempty"`
 	Flat              bool   `json:"is_flat,omitempty,string" yaml:"is_flat,omitempty"`
@@ -126,14 +127,18 @@ type OutputConfig struct {
 	FromEmail         string `json:"from_email,omitempty" yaml:"from_email,omitempty"`
 	Readable          bool   `json:"is_readable,omitempty,string" yaml:"is_readable,omitempty"`
 	Subject           string `json:"subject,omitempty" yaml:"subject,omitempty"`
+	Template          string `json:"template,omitempty" yaml:"template,omitempty"`
 	StartTLS          bool   `json:"is_starttls,omitempty,string" yaml:"is_starttls,omitempty"`
 	AuthLogin         bool   `json:"is_authlogin,omitempty,string" yaml:"is_authlogin,omitempty"`
 	Indexing          bool   `json:"is_indexing,omitempty,string" yaml:"is_indexing,omitempty"`
 	Compressing       bool   `json:"is_compression,omitempty,string" yaml:"is_compression,omitempty"`
 	CategoryBlackList string `json:"cat_black_list,omitempty" yaml:"cat_black_list,omitempty"`
 	CategoryWhiteList string `json:"cat_white_list,omitempty" yaml:"cat_white_list,omitempty"`
+	RuleTagWhiteList  string `json:"rule_tag_white_list,omitempty" yaml:"rule_tag_white_list,omitempty"`
+	RuleTagBlackList  string `json:"rule_tag_black_list,omitempty" yaml:"rule_tag_black_list,omitempty"`
 	RegionName        string `json:"region_name,omitempty" yaml:"region_name,omitempty"`
 	EndpointURL       string `json:"endpoint_url,omitempty" yaml:"endpoint_url,omitempty"`
+	ForcePathStyle    bool   `json:"is_force_path_style,omitempty,string" yaml:"is_force_path_style,omitempty"`
 	AuthHeaderName    string `json:"auth_header_name,omitempty" yaml:"auth_header_name,omitempty"`
 	AuthHeaderValue   string `json:"auth_header_value,omitempty" yaml:"auth_header_value,omitempty"`
 	RoutingTopic      string `json:"routing_topic,omitempty" yaml:"routing_topic,omitempty"`
@@ -154,6 +159,9 @@ type OutputConfig struct {
 	Addresses         string `json:"addresses,omitempty" yaml:"addresses,omitempty"`
 	APIKey            string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
 	Schema            string `json:"schema,omitempty" yaml:"schema,omitempty"`
+	BlobContainer     string `json:"blob_container,omitempty" yaml:"blob_container,omitempty"`
+	AccountName       string `json:"account_name,omitempty" yaml:"account_name,omitempty"`
+	ConnectionString  string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {

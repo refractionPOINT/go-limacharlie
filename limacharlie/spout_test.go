@@ -396,8 +396,6 @@ func TestSpout_SimpleRequest(t *testing.T) {
 }
 
 func TestFutureResults(t *testing.T) {
-	a := assert.New(t)
-
 	// Create a FutureResults
 	future := NewFutureResults(10)
 	defer future.Close()
