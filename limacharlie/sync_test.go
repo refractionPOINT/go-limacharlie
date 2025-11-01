@@ -41,6 +41,7 @@ func TestSyncPushOutputs(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 	defer deleteAllOutputs(org)
+	deleteAllOutputs(org)
 
 	outputs, err := org.Outputs()
 	a.NoError(err)
