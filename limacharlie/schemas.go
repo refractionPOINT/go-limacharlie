@@ -61,8 +61,7 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 	}
 	urlPath := "ontology"
 
-	// Ontology endpoint doesn't use the standard /v1/ prefix
-	request := makeDefaultRequest(&resp).withURLRoot("/")
+	request := makeDefaultRequest(&resp)
 
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
