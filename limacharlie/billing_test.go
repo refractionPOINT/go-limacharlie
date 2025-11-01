@@ -49,12 +49,7 @@ func TestGetSKUDefinitions(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	skus, err := org.GetSKUDefinitions()
-	if err != nil {
-		// SKU definitions endpoint may not be available in test environment (404)
-		t.Logf("GetSKUDefinitions returned error (may not be available): %v", err)
-		return
-	}
-
+	a.NoError(err)
 	a.NotNil(skus)
 	// SKUs might be empty in test environments
 	t.Logf("Retrieved %d SKU definitions", len(skus))
@@ -92,12 +87,7 @@ func TestGetBillingInvoiceURLWithFormat(t *testing.T) {
 	format := "pdf"
 
 	invoiceURL, err := org.GetBillingInvoiceURL(year, month, format)
-	if err != nil {
-		// API may return empty body when format parameter is used
-		t.Logf("GetBillingInvoiceURL with format returned error (API limitation): %v", err)
-		return
-	}
-
+	a.NoError(err)
 	a.NotNil(invoiceURL)
 	a.Equal("pdf", invoiceURL.Format)
 	t.Logf("Invoice URL with format: %s", invoiceURL.URL)
@@ -129,12 +119,7 @@ func TestGetBillingAvailablePlans(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	plans, err := org.GetBillingAvailablePlans()
-	if err != nil {
-		// This endpoint requires user-based authentication, not API keys
-		t.Logf("GetBillingAvailablePlans returned error (requires user auth): %v", err)
-		return
-	}
-
+	a.NoError(err)
 	a.NotNil(plans)
 	t.Logf("Retrieved %d billing plans", len(plans))
 	for i, plan := range plans {
@@ -148,12 +133,7 @@ func TestGetBillingUserAuthRequirements(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	authReq, err := org.GetBillingUserAuthRequirements()
-	if err != nil {
-		// This endpoint requires user-based authentication, not API keys
-		t.Logf("GetBillingUserAuthRequirements returned error (requires user auth): %v", err)
-		return
-	}
-
+	a.NoError(err)
 	a.NotNil(authReq)
 	t.Logf("Auth requirements: MFARequired=%v, MFAEnabled=%v", authReq.MFARequired, authReq.MFAEnabled)
 }
