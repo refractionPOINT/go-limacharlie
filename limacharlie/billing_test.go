@@ -69,12 +69,12 @@ func TestGetBillingInvoiceURLWithFormat(t *testing.T) {
 
 	year := 2024
 	month := 1
-	format := "pdf"
+	format := "json"
 
 	invoiceURL, err := org.GetBillingInvoiceURL(year, month, format)
 	a.NoError(err)
 	a.NotNil(invoiceURL)
-	a.Equal("pdf", invoiceURL.Format)
+	a.Equal("json", invoiceURL.Format)
 	t.Logf("Invoice URL with format: %s", invoiceURL.URL)
 }
 
