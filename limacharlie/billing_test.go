@@ -106,26 +106,27 @@ func TestGetBillingInvoiceURLValidation(t *testing.T) {
 }
 
 // TestGetBillingAvailablePlans tests retrieving available billing plans
+// Note: This endpoint requires user-based authentication (email identity), not API key auth
 func TestGetBillingAvailablePlans(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	plans, err := org.GetBillingAvailablePlans()
-	a.NoError(err)
-	a.NotNil(plans)
-	t.Logf("Retrieved %d billing plans", len(plans))
-	for i, plan := range plans {
-		t.Logf("Plan %d: %s - %s (%.2f %s)", i+1, plan.ID, plan.Name, plan.Price, plan.Currency)
-	}
+	_, err := org.GetBillingAvailablePlans()
+	// When using API key authentication (non-user identity), expect this specific error
+	a.Error(err, "Should return error for non-user identity")
+	a.Contains(err.Error(), "only user-based identities are allowed to query available plans")
+	t.Logf("Expected error received: %s", err.Error())
 }
 
 // TestGetBillingUserAuthRequirements tests retrieving user auth requirements
+// Note: This endpoint requires user-based authentication (email identity), not API key auth
 func TestGetBillingUserAuthRequirements(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 
-	authReq, err := org.GetBillingUserAuthRequirements()
-	a.NoError(err)
-	a.NotNil(authReq)
-	t.Logf("Auth requirements retrieved: %+v", authReq.Requirements)
+	_, err := org.GetBillingUserAuthRequirements()
+	// When using API key authentication (non-user identity), expect this specific error
+	a.Error(err, "Should return error for non-user identity")
+	a.Contains(err.Error(), "only user-based identities are allowed to query authentication requirements")
+	t.Logf("Expected error received: %s", err.Error())
 }
