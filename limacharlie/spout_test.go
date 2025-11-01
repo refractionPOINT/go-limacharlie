@@ -394,3 +394,130 @@ func TestSpout_SimpleRequest(t *testing.T) {
 		t.Errorf("unexpected response type: %T", resp)
 	}
 }
+
+func TestFutureResults(t *testing.T) {
+	a := assert.New(t)
+
+	// Create a FutureResults
+	future := NewFutureResults(10)
+	defer future.Close()
+
+	// Test adding results
+	testData := map[string]interface{}{"test": "data"}
+	success := future.addResult(testData)
+	assert.True(t, success, "should be able to add result")
+
+	// Test retrieving result
+	result, ok := future.Get()
+	assert.True(t, ok, "should be able to get result")
+	assert.Equal(t, testData, result, "result should match what was added")
+
+	// Test timeout
+	_, err := future.GetWithTimeout(100 * time.Millisecond)
+	assert.Error(t, err, "should timeout when no data available")
+	assert.Contains(t, err.Error(), "timeout", "error should mention timeout")
+}
+
+func TestSpout_FutureResults(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	spout, err := NewSpout(org, "event")
+	defer spout.Shutdown()
+	require.NoError(t, err)
+
+	// Create a FutureResults
+	future := NewFutureResults(10)
+	trackingID := "test-tracking-id-123"
+
+	// Register the future
+	spout.RegisterFutureResults(trackingID, future, 1*time.Hour)
+
+	// Verify it was registered
+	spout.futuresMu.RLock()
+	_, exists := spout.futures[trackingID]
+	spout.futuresMu.RUnlock()
+	assert.True(t, exists, "future should be registered")
+
+	// Create a test message with the tracking ID
+	testMsg := map[string]interface{}{
+		"routing": map[string]interface{}{
+			"investigation_id": trackingID,
+		},
+		"data": "test",
+	}
+	msgBytes, _ := json.Marshal(testMsg)
+
+	// Process the message
+	err = spout.processMessage(msgBytes)
+	assert.NoError(t, err, "should process message without error")
+
+	// Verify the message was routed to the future
+	result, err := future.GetWithTimeout(1 * time.Second)
+	assert.NoError(t, err, "should get result from future")
+	if m, ok := result.(map[string]interface{}); ok {
+		assert.Equal(t, "test", m["data"], "message should be routed to future")
+	}
+}
+
+func TestSpout_FutureResultsCleanup(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	spout, err := NewSpout(org, "event")
+	defer spout.Shutdown()
+	require.NoError(t, err)
+
+	// Create a FutureResults with very short TTL
+	future := NewFutureResults(10)
+	trackingID := "test-tracking-id-expired"
+
+	// Register the future with short TTL
+	spout.RegisterFutureResults(trackingID, future, 100*time.Millisecond)
+
+	// Verify it was registered
+	spout.futuresMu.RLock()
+	_, exists := spout.futures[trackingID]
+	spout.futuresMu.RUnlock()
+	assert.True(t, exists, "future should be registered")
+
+	// Wait for it to expire
+	time.Sleep(200 * time.Millisecond)
+
+	// Manually trigger cleanup
+	spout.futuresMu.Lock()
+	now := time.Now()
+	for tid, reg := range spout.futures {
+		if now.After(reg.expiry) {
+			reg.future.Close()
+			delete(spout.futures, tid)
+		}
+	}
+	spout.futuresMu.Unlock()
+
+	// Verify it was cleaned up
+	spout.futuresMu.RLock()
+	_, exists = spout.futures[trackingID]
+	spout.futuresMu.RUnlock()
+	assert.False(t, exists, "expired future should be cleaned up")
+}
+
+func TestSpout_ReconnectOption(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	// Test with reconnect enabled (default)
+	spout1, err := NewSpout(org, "event")
+	require.NoError(t, err)
+	assert.True(t, spout1.reconnectEnabled, "reconnect should be enabled by default")
+	spout1.Shutdown()
+
+	// Test with reconnect disabled
+	spout2, err := NewSpout(org, "event", WithReconnect(false))
+	require.NoError(t, err)
+	assert.False(t, spout2.reconnectEnabled, "reconnect should be disabled when specified")
+	spout2.Shutdown()
+}
