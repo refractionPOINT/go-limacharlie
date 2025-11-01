@@ -54,20 +54,27 @@ func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) 
 }
 
 // GetPlatformNames retrieves the list of platform names available in LimaCharlie
-// Returns nil, nil if the endpoint is not available
+// from the ontology endpoint. This endpoint does not require authentication.
 func (o *Organization) GetPlatformNames() ([]string, error) {
 	var resp struct {
-		Platforms []string `json:"platforms"`
+		Platforms map[string]int `json:"platforms"`
 	}
-	urlPath := fmt.Sprintf("orgs/%s/platforms", o.GetOID())
+	urlPath := "ontology"
 
-	request := makeDefaultRequest(&resp)
+	// Ontology endpoint doesn't use the standard /v1/ prefix
+	request := makeDefaultRequest(&resp).withURLRoot("/")
 
-	// This endpoint returns the ontology of platform names
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
-	return resp.Platforms, nil
+
+	// Extract platform names from map keys
+	platforms := make([]string, 0, len(resp.Platforms))
+	for platform := range resp.Platforms {
+		platforms = append(platforms, platform)
+	}
+
+	return platforms, nil
 }
 
 // GetSchema retrieves a specific schema definition based on the provided schema name.
