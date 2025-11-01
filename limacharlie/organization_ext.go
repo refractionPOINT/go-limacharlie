@@ -166,7 +166,7 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 	// Note: with_names is NOT sent to API - it's used client-side in Python SDK
 	// The API always returns full org info, we just don't need to filter it
 
-	request := makeDefaultRequest(&response).withURLValues(values)
+	request := makeDefaultRequest(&response).withQueryData(values)
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
@@ -272,7 +272,7 @@ func (org *Organization) GetTimeWhenSensorHasData(sid string, start, end int64) 
 	values.Set("start", fmt.Sprintf("%d", start))
 	values.Set("end", fmt.Sprintf("%d", end))
 
-	request := makeDefaultRequest(&response).withURLValues(values)
+	request := makeDefaultRequest(&response).withQueryData(values)
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err

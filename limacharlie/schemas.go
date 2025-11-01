@@ -45,7 +45,7 @@ func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) 
 	values := url.Values{}
 	values.Set("platform", platform)
 
-	request := makeDefaultRequest(&resp).withURLValues(values)
+	request := makeDefaultRequest(&resp).withQueryData(values)
 
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
