@@ -11,26 +11,17 @@ const (
 
 // BillingOrgStatus contains the billing status information for an organization
 type BillingOrgStatus struct {
-	OID            string                 `json:"oid,omitempty"`
-	Status         string                 `json:"status,omitempty"`
-	BillingEmail   string                 `json:"billing_email,omitempty"`
-	PaymentMethod  string                 `json:"payment_method,omitempty"`
-	TrialEndDate   int64                  `json:"trial_end_date,omitempty"`
-	SubscriptionID string                 `json:"subscription_id,omitempty"`
-	Extra          map[string]interface{} `json:"extra,omitempty"`
+	IsPastDue bool `json:"is_past_due,omitempty"`
 }
 
 // BillingOrgDetails contains detailed billing information for an organization
+// The structure matches the actual billing service response which includes
+// Stripe customer and subscription objects
 type BillingOrgDetails struct {
-	OID              string                 `json:"oid,omitempty"`
-	Name             string                 `json:"name,omitempty"`
-	Plan             string                 `json:"plan,omitempty"`
-	Status           map[string]interface{} `json:"status,omitempty"` // Status is an object, not a string
-	BillingEmail     string                 `json:"billing_email,omitempty"`
-	PaymentMethod    string                 `json:"payment_method,omitempty"`
-	CurrentPeriodEnd int64                  `json:"current_period_end,omitempty"`
-	UsageThisMonth   map[string]interface{} `json:"usage_this_month,omitempty"`
-	Extra            map[string]interface{} `json:"extra,omitempty"`
+	Customer       map[string]interface{} `json:"customer,omitempty"`         // Stripe Customer object
+	Status         map[string]interface{} `json:"status,omitempty"`           // Contains "is_past_due" bool
+	UpcomingInvoice map[string]interface{} `json:"upcoming_invoice,omitempty"` // Stripe Invoice object
+	Unified        map[string]interface{} `json:"unified,omitempty"`          // Optional unified billing data
 }
 
 // BillingInvoiceURL contains the URL to download an invoice
@@ -53,10 +44,9 @@ type BillingPlan struct {
 }
 
 // BillingUserAuthRequirements contains authentication requirements for the user
+// The structure matches the actual billing service response
 type BillingUserAuthRequirements struct {
-	MFARequired bool                   `json:"mfa_required,omitempty"`
-	MFAEnabled  bool                   `json:"mfa_enabled,omitempty"`
-	Extra       map[string]interface{} `json:"extra,omitempty"`
+	Requirements map[string]interface{} `json:"requirements,omitempty"` // Contains "methods", "mfa", etc.
 }
 
 // GetBillingOrgStatus retrieves the billing status for the organization
@@ -127,16 +117,19 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (*
 
 // GetBillingAvailablePlans retrieves the list of available billing plans for the user
 func (org *Organization) GetBillingAvailablePlans() ([]BillingPlan, error) {
-	var plans []BillingPlan
+	// Server wraps response in {"plans": [...]}
+	var response struct {
+		Plans []BillingPlan `json:"plans"`
+	}
 	url := "user/self/plans"
 
-	request := makeDefaultRequest(&plans).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&response).withURLRoot(billingRootURL + "/")
 
 	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
-	return plans, nil
+	return response.Plans, nil
 }
 
 // GetBillingUserAuthRequirements retrieves the authentication requirements for the current user

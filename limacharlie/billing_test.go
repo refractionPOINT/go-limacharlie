@@ -28,7 +28,7 @@ func TestBillingOrgStatus(t *testing.T) {
 	a.NoError(err, "GetBillingOrgStatus should succeed")
 	a.NotNil(status, "Billing status should not be nil")
 
-	t.Logf("Billing status: OID=%s, Status=%s", status.OID, status.Status)
+	t.Logf("Billing status: IsPastDue=%v", status.IsPastDue)
 }
 
 // TestBillingOrgDetails tests retrieving detailed billing information
@@ -39,8 +39,10 @@ func TestBillingOrgDetails(t *testing.T) {
 	details, err := org.GetBillingOrgDetails()
 	a.NoError(err, "GetBillingOrgDetails should succeed")
 	a.NotNil(details, "Billing details should not be nil")
+	a.NotNil(details.Customer, "Customer details should not be nil")
+	a.NotNil(details.Status, "Status should not be nil")
 
-	t.Logf("Billing details: OID=%s, Name=%s, Plan=%s", details.OID, details.Name, details.Plan)
+	t.Logf("Billing details retrieved successfully with customer and status data")
 }
 
 // TestGetBillingInvoiceURL tests generating invoice download URLs
@@ -120,5 +122,5 @@ func TestGetBillingUserAuthRequirements(t *testing.T) {
 	authReq, err := org.GetBillingUserAuthRequirements()
 	a.NoError(err)
 	a.NotNil(authReq)
-	t.Logf("Auth requirements: MFARequired=%v, MFAEnabled=%v", authReq.MFARequired, authReq.MFAEnabled)
+	t.Logf("Auth requirements retrieved: %+v", authReq.Requirements)
 }
