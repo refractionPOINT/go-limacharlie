@@ -120,7 +120,7 @@ func (org *Organization) GetOrgErrors() ([]OrgError, error) {
 
 // DismissOrgError dismisses a specific error for the organization
 func (org *Organization) DismissOrgError(component string) error {
-	url := fmt.Sprintf("errors/%s/%s", org.GetOID(), url.PathEscape(component))
+	url := fmt.Sprintf("errors/%s/%s", org.GetOID(), component)
 
 	request := makeDefaultRequest(nil)
 
