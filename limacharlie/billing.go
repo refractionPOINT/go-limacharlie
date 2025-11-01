@@ -18,10 +18,10 @@ type BillingOrgStatus struct {
 // The structure matches the actual billing service response which includes
 // Stripe customer and subscription objects
 type BillingOrgDetails struct {
-	Customer       map[string]interface{} `json:"customer,omitempty"`         // Stripe Customer object
-	Status         map[string]interface{} `json:"status,omitempty"`           // Contains "is_past_due" bool
+	Customer        map[string]interface{} `json:"customer,omitempty"`         // Stripe Customer object
+	Status          map[string]interface{} `json:"status,omitempty"`           // Contains "is_past_due" bool
 	UpcomingInvoice map[string]interface{} `json:"upcoming_invoice,omitempty"` // Stripe Invoice object
-	Unified        map[string]interface{} `json:"unified,omitempty"`          // Optional unified billing data
+	Unified         map[string]interface{} `json:"unified,omitempty"`          // Optional unified billing data
 }
 
 // BillingInvoiceURL contains the URL to download an invoice
