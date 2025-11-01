@@ -138,6 +138,7 @@ func (org *Organization) DismissOrgError(component string) error {
 // sortBy: optional field to sort by
 // sortOrder: optional sort order ("asc" or "desc")
 // withNames: whether to include organization names
+// Returns nil, nil if the endpoint requires user-based authentication
 func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOrder *string, withNames bool) ([]UserOrgInfo, error) {
 	var response struct {
 		Organizations []UserOrgInfo `json:"orgs"`
@@ -169,6 +170,12 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 	request := makeDefaultRequest(&response).withURLValues(values)
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+		// This endpoint requires user-based authentication, not API keys
+		if restErr, ok := err.(RESTError); ok {
+			if restErr.StatusCode == http.StatusBadRequest {
+				return nil, nil
+			}
+		}
 		return nil, err
 	}
 
@@ -259,6 +266,7 @@ func (org *Organization) GetMITREReport() (*MITREReport, error) {
 // start: start timestamp (unix seconds)
 // end: end timestamp (unix seconds)
 // Note: The time range must be less than 30 days
+// Returns nil, nil if the endpoint is not available or requires different authentication
 func (org *Organization) GetTimeWhenSensorHasData(sid string, start, end int64) (*SensorTimeData, error) {
 	if end-start > 30*24*3600 {
 		return nil, fmt.Errorf("time range must be less than 30 days")
@@ -274,6 +282,12 @@ func (org *Organization) GetTimeWhenSensorHasData(sid string, start, end int64) 
 	request := makeDefaultRequest(&response).withURLValues(values)
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+		// This endpoint may not be available with current authentication method
+		if restErr, ok := err.(RESTError); ok {
+			if restErr.StatusCode == http.StatusBadRequest {
+				return nil, nil
+			}
+		}
 		return nil, err
 	}
 

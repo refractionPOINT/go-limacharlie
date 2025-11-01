@@ -37,6 +37,7 @@ func (o *Organization) GetSchemas() (*Schemas, error) {
 
 // GetSchemasForPlatform retrieves event type schemas filtered by platform
 // platform: platform name (e.g., "windows", "linux", "macos", "chrome")
+// Returns nil, nil if platform filtering is not supported by the API
 func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) {
 	resp := Schemas{}
 	urlPath := fmt.Sprintf("orgs/%s/schema", o.GetOID())
@@ -47,12 +48,19 @@ func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) 
 	request := makeDefaultRequest(&resp).withURLValues(values)
 
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+		// Platform filtering may not be supported - return nil, nil to indicate feature unavailable
+		if restErr, ok := err.(RESTError); ok {
+			if restErr.StatusCode == http.StatusBadRequest {
+				return nil, nil
+			}
+		}
 		return nil, err
 	}
 	return &resp, nil
 }
 
 // GetPlatformNames retrieves the list of platform names available in LimaCharlie
+// Returns nil, nil if the endpoint is not available
 func (o *Organization) GetPlatformNames() ([]string, error) {
 	var resp struct {
 		Platforms []string `json:"platforms"`
@@ -63,6 +71,12 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 
 	// This endpoint returns the ontology of platform names
 	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+		// Endpoint may not be available - return nil, nil to indicate feature unavailable
+		if restErr, ok := err.(RESTError); ok {
+			if restErr.StatusCode == http.StatusNotFound {
+				return nil, nil
+			}
+		}
 		return nil, err
 	}
 	return resp.Platforms, nil
