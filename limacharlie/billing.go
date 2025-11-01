@@ -163,9 +163,9 @@ func (org *Organization) GetBillingUserAuthRequirements() (*BillingUserAuthRequi
 // GetSKUDefinitions retrieves the SKU pricing definitions for the organization
 func (org *Organization) GetSKUDefinitions() ([]SKUDefinition, error) {
 	var skus []SKUDefinition
-	url := fmt.Sprintf("sku-definitions/%s", org.GetOID())
+	url := fmt.Sprintf("orgs/%s/sku-definitions", org.GetOID())
 
-	request := makeDefaultRequest(&skus)
+	request := makeDefaultRequest(&skus).withURLRoot(billingRootURL + "/")
 
 	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
 		return nil, err
