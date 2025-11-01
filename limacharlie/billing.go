@@ -25,6 +25,9 @@ type BillingOrgDetails struct {
 }
 
 // BillingInvoiceURL contains the URL to download an invoice
+// Deprecated: GetBillingInvoiceURL now returns map[string]interface{} to support
+// different response formats (url, invoice, lines, csv). This struct is kept for
+// backward compatibility but is no longer used by the API.
 type BillingInvoiceURL struct {
 	URL    string `json:"url,omitempty"`
 	Year   string `json:"year,omitempty"`
@@ -77,11 +80,18 @@ func (org *Organization) GetBillingOrgDetails() (*BillingOrgDetails, error) {
 	return &details, nil
 }
 
-// GetBillingInvoiceURL retrieves the URL to download an invoice for a specific month
-// year: the year of the invoice (e.g., 2023)
-// month: the month of the invoice (1-12)
-// format: optional format parameter (e.g., "pdf", "csv")
-func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (*BillingInvoiceURL, error) {
+// GetBillingInvoiceURL retrieves invoice information for a specific month.
+// The response structure varies based on the format parameter:
+// - format="" (default): Returns {"url": "..."}
+// - format="json": Returns {"invoice": {...}} (full Stripe Invoice object)
+// - format="simple_json": Returns {"lines": [...]}
+// - format="simple_csv": Returns {"csv": "..."}
+//
+// Parameters:
+// - year: the year of the invoice (e.g., 2023)
+// - month: the month of the invoice (1-12)
+// - format: optional format parameter ("json", "simple_json", "simple_csv", or "" for URL only)
+func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (map[string]interface{}, error) {
 	if year < 2000 || year > 3000 {
 		return nil, fmt.Errorf("invalid year: %d", year)
 	}
@@ -89,30 +99,19 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (*
 		return nil, fmt.Errorf("invalid month: %d (must be 1-12)", month)
 	}
 
-	var invoiceURL BillingInvoiceURL
+	var response map[string]interface{}
 	urlPath := fmt.Sprintf("orgs/%s/invoice_url/%d/%02d", org.GetOID(), year, month)
 	if format != "" {
 		urlPath = fmt.Sprintf("%s?format=%s", urlPath, format)
 	}
 
-	request := makeDefaultRequest(&invoiceURL).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&response).withURLRoot(billingRootURL + "/")
 
 	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 
-	// Check if we got a valid response
-	if invoiceURL.URL == "" {
-		return nil, fmt.Errorf("billing service returned empty invoice URL")
-	}
-
-	invoiceURL.Year = fmt.Sprintf("%d", year)
-	invoiceURL.Month = fmt.Sprintf("%02d", month)
-	if format != "" {
-		invoiceURL.Format = format
-	}
-
-	return &invoiceURL, nil
+	return response, nil
 }
 
 // GetBillingAvailablePlans retrieves the list of available billing plans for the user

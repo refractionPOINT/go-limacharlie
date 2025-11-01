@@ -54,14 +54,15 @@ func TestGetBillingInvoiceURL(t *testing.T) {
 	year := 2024
 	month := 1
 
-	invoiceURL, err := org.GetBillingInvoiceURL(year, month, "")
+	response, err := org.GetBillingInvoiceURL(year, month, "")
 	a.NoError(err, "GetBillingInvoiceURL should succeed")
 
-	a.NotNil(invoiceURL)
-	a.NotEmpty(invoiceURL.URL)
-	a.Equal("2024", invoiceURL.Year)
-	a.Equal("01", invoiceURL.Month)
-	t.Logf("Invoice URL generated: %s", invoiceURL.URL)
+	a.NotNil(response)
+	a.Contains(response, "url", "Response should contain 'url' field")
+	url, ok := response["url"].(string)
+	a.True(ok, "url field should be a string")
+	a.NotEmpty(url, "URL should not be empty")
+	t.Logf("Invoice URL generated: %s", url)
 }
 
 // TestGetBillingInvoiceURLWithFormat tests invoice URL with format parameter
@@ -73,11 +74,15 @@ func TestGetBillingInvoiceURLWithFormat(t *testing.T) {
 	month := 1
 	format := "json"
 
-	invoiceURL, err := org.GetBillingInvoiceURL(year, month, format)
+	response, err := org.GetBillingInvoiceURL(year, month, format)
 	a.NoError(err)
-	a.NotNil(invoiceURL)
-	a.Equal("json", invoiceURL.Format)
-	t.Logf("Invoice URL with format: %s", invoiceURL.URL)
+	a.NotNil(response)
+	// When format="json", server returns {"invoice": {...}} instead of {"url": "..."}
+	a.Contains(response, "invoice", "Response should contain 'invoice' field when format=json")
+	invoice, ok := response["invoice"].(map[string]interface{})
+	a.True(ok, "invoice field should be a map")
+	a.NotNil(invoice, "Invoice data should not be nil")
+	t.Logf("Invoice data retrieved with format=json, invoice object has %d fields", len(invoice))
 }
 
 // TestGetBillingInvoiceURLValidation tests input validation
