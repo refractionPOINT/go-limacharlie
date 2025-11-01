@@ -2,7 +2,6 @@ package limacharlie
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -45,16 +44,7 @@ func TestDismissOrgError(t *testing.T) {
 	t.Logf("Attempting to dismiss error for component: %s", componentToDismiss)
 
 	err = org.DismissOrgError(componentToDismiss)
-	if err != nil {
-		t.Logf("DismissOrgError returned error: %v", err)
-		// Some errors might not be dismissible (404) - that's acceptable
-		if !strings.Contains(err.Error(), "404") {
-			a.NoError(err, "DismissOrgError should succeed or return 404 for non-dismissible errors")
-		} else {
-			t.Logf("Error component %s returned 404 - may already be dismissed or not dismissible", componentToDismiss)
-		}
-		return
-	}
+	a.NoError(err)
 
 	// Verify error was dismissed by checking if it's gone
 	time.Sleep(2 * time.Second) // Give it a moment
@@ -82,11 +72,7 @@ func TestListUserOrgs(t *testing.T) {
 	// Test basic list
 	orgs, err := org.ListUserOrgs(nil, nil, nil, nil, nil, true)
 	a.NoError(err)
-
-	if orgs == nil {
-		t.Log("ListUserOrgs returned nil - requires user-based authentication (not API keys)")
-		return
-	}
+	a.NotNil(orgs)
 
 	t.Logf("User has access to %d organizations", len(orgs))
 
@@ -105,11 +91,7 @@ func TestListUserOrgsWithPagination(t *testing.T) {
 
 	orgs, err := org.ListUserOrgs(&offset, &limit, nil, nil, nil, true)
 	a.NoError(err)
-
-	if orgs == nil {
-		t.Log("ListUserOrgs with pagination returned nil - requires user-based authentication (not API keys)")
-		return
-	}
+	a.NotNil(orgs)
 
 	a.LessOrEqual(len(orgs), limit)
 	t.Logf("Retrieved %d organizations with limit=%d", len(orgs), limit)
@@ -176,38 +158,7 @@ func TestAPIKeyLifecycle(t *testing.T) {
 
 	// 4. Delete the API key
 	err = org.DeleteAPIKey(keyHashToDelete)
-	if err != nil {
-		// API returns "api key not found" error even though we just created it
-		// This suggests the delete endpoint might have a bug or use different identifier
-		// For now, verify the key is actually gone from the list even if delete returned error
-		if strings.Contains(err.Error(), "api key not found") {
-			t.Logf("DeleteAPIKey returned 'api key not found' error: %v", err)
-			t.Logf("Checking if key was actually deleted despite error...")
-			time.Sleep(2 * time.Second)
-			keysAfterDelete, err := org.GetAPIKeys()
-			a.NoError(err)
-
-			// Check if key is still in the list
-			stillExists := false
-			for _, key := range keysAfterDelete {
-				if key.KeyHash == keyHashToDelete {
-					stillExists = true
-					break
-				}
-			}
-
-			if !stillExists {
-				t.Log("API key was successfully removed from list despite delete error")
-				keyHashToDelete = "" // Clear defer cleanup
-				return
-			} else {
-				a.Fail("Delete returned error and key still exists in list")
-				return
-			}
-		}
-		a.NoError(err, "DeleteAPIKey should succeed")
-		return
-	}
+	a.NoError(err)
 	t.Logf("Deleted API key: %s", keyHashToDelete)
 
 	// Clear the defer cleanup since we successfully deleted it
@@ -278,11 +229,7 @@ func TestGetTimeWhenSensorHasData(t *testing.T) {
 
 	timeline, err := org.GetTimeWhenSensorHasData(testSID, start, end)
 	a.NoError(err)
-
-	if timeline == nil {
-		t.Log("GetTimeWhenSensorHasData returned nil - endpoint not available with current authentication")
-		return
-	}
+	a.NotNil(timeline)
 
 	a.Equal(testSID, timeline.SID)
 	a.Equal(start, timeline.Start)
