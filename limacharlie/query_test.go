@@ -79,7 +79,7 @@ func TestQuery_WithFilter(t *testing.T) {
 
 	// Query with a filter condition
 	resp, err := org.Query(QueryRequest{
-		Query:      "-1h | * | * | event.PROCESS_ID is set",
+		Query:      "-1h | * | * | event/PROCESS_ID is set",
 		Stream:     "event",
 		LimitEvent: 50,
 	})
@@ -210,7 +210,7 @@ func TestQuery_EmptyResults(t *testing.T) {
 	// Query with a condition that should return no results
 	// Use a very specific condition that's unlikely to match
 	resp, err := org.Query(QueryRequest{
-		Query:      "-1m | * | * | event.FILE_PATH == '/this/path/should/never/exist/12345.txt'",
+		Query:      "-1m | * | * | event/FILE_PATH == '/this/path/should/never/exist/12345.txt'",
 		Stream:     "event",
 		LimitEvent: 100,
 	})
