@@ -105,6 +105,37 @@ func (org *Organization) GenericGETRequest(path string, query Dict, response int
 	return org.client.reliableRequest(http.MethodGet, path, q)
 }
 
+// GenericPOSTRequest makes a generic POST request to the LC API
+func (org *Organization) GenericPOSTRequest(path string, data Dict, response interface{}) error {
+	q := makeDefaultRequest(response)
+	q = q.withFormData(data)
+	return org.client.reliableRequest(http.MethodPost, path, q)
+}
+
+// GenericDELETERequest makes a generic DELETE request to the LC API
+func (org *Organization) GenericDELETERequest(path string, response interface{}) error {
+	q := makeDefaultRequest(response)
+	return org.client.reliableRequest(http.MethodDelete, path, q)
+}
+
+// GenericPUTRequest makes a generic PUT request to the LC API
+func (org *Organization) GenericPUTRequest(path string, data Dict, response interface{}) error {
+	q := makeDefaultRequest(response)
+	q = q.withFormData(data)
+	return org.client.reliableRequest(http.MethodPut, path, q)
+}
+
+// GenericRequest makes a generic HTTP request to the LC API with the specified method
+func (org *Organization) GenericRequest(method, path string, data Dict, response interface{}) error {
+	q := makeDefaultRequest(response)
+	if data != nil && (method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch) {
+		q = q.withFormData(data)
+	} else if data != nil {
+		q = q.withQueryData(data)
+	}
+	return org.client.reliableRequest(method, path, q)
+}
+
 func (org *Organization) EventByAtom(sensorID, atom string) (EventContainer, error) {
 	event := EventContainer{}
 	q := makeDefaultRequest(&event)
