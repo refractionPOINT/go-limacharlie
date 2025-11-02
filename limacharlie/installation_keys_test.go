@@ -10,50 +10,35 @@ func TestInstallationKeys(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
 	_, err := org.InstallationKeys()
-	if err != nil {
-		t.Errorf("InstallationKeys(): %v", err)
-	}
+	a.NoError(err)
 
 	iid, err := org.AddInstallationKey(InstallationKey{
 		Description: "testcicd",
 		Tags:        []string{"t1", "t2"},
 	})
-	if err != nil {
-		t.Errorf("AddInstallationKey(): %v", err)
-	}
-	if iid == "" {
-		t.Error("invalid iid")
-	}
+	a.NoError(err)
+	a.NotEmpty(iid, "installation key ID should not be empty")
+
 	keys, err := org.InstallationKeys()
-	if err != nil {
-		t.Errorf("InstallationKeys(): %v", err)
-	}
+	a.NoError(err)
+
 	isFound := false
 	for _, k := range keys {
 		if k.ID == iid {
-			if len(k.Tags) != 2 {
-				t.Errorf("Tags not set properly: %#v", k.Tags)
-			}
+			a.Equal(2, len(k.Tags), "Tags should be set properly")
 			isFound = true
 			break
 		}
 	}
-	if !isFound {
-		t.Errorf("key not found: %#v", keys)
-	}
+	a.True(isFound, "key should be found in the list")
+
 	k, err := org.InstallationKey(iid)
-	if err != nil {
-		t.Errorf("InstallationKey(): %v", err)
-	} else {
-		if k.CreatedAt == 0 {
-			t.Errorf("InstallationKey missing data(): %#v", k)
-		}
-		if err := org.DelInstallationKey(iid); err != nil {
-			t.Errorf("DelInstallationKey(): %v", err)
-		}
-		k, err = org.InstallationKey(iid)
-		if err == nil {
-			t.Errorf("InstallationKey() should be deleted: %#v", k)
-		}
-	}
+	a.NoError(err)
+	a.NotZero(k.CreatedAt, "InstallationKey should have CreatedAt data")
+
+	err = org.DelInstallationKey(iid)
+	a.NoError(err)
+
+	k, err = org.InstallationKey(iid)
+	a.Error(err, "InstallationKey should be deleted and return error")
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 )
 
 type Payload struct {
@@ -40,7 +41,7 @@ func (org Organization) Payloads() (map[PayloadName]Payload, error) {
 func (org Organization) Payload(name PayloadName) ([]byte, error) {
 	resp := payloadGetPointer{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("payload/%s/%s", org.client.options.OID, name), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
 		return nil, err
 	}
 	httpResp, err := http.Get(resp.URL)
@@ -59,7 +60,7 @@ func (org Organization) Payload(name PayloadName) ([]byte, error) {
 func (org Organization) DeletePayload(name PayloadName) error {
 	resp := Dict{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("payload/%s/%s", org.client.options.OID, name), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
 		return err
 	}
 	return nil
@@ -73,7 +74,7 @@ func (org Organization) CreatePayloadFromBytes(name PayloadName, data []byte) er
 func (org Organization) CreatePayloadFromReader(name PayloadName, data io.Reader) error {
 	resp := payloadPutPointer{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("payload/%s/%s", org.client.options.OID, name), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
 		return err
 	}
 	c := &http.Client{}

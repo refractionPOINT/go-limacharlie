@@ -420,7 +420,7 @@ func (h *HiveClient) Rename(args HiveArgs, newName string) (*HiveResp, error) {
 
 	target := "rename"
 	params := url.Values{}
-	params.Add("new_name", url.PathEscape(newName))
+	params.Add("new_name", newName)
 
 	var hiveResp HiveResp
 	req := makeDefaultRequest(&hiveResp).withFormData(params).withTimeout(30 * time.Second)

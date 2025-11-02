@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -127,7 +128,7 @@ func (org *Organization) InstallationKey(iid string) (*InstallationKey, error) {
 	resp := InstallationKey{}
 
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("installationkeys/%s/%s", org.client.options.OID, iid), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("installationkeys/%s/%s", org.client.options.OID, url.PathEscape(iid)), request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
