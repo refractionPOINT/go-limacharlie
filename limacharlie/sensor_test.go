@@ -328,7 +328,7 @@ func TestSensor_Request(t *testing.T) {
 	future, err := sensor.Request("os_version")
 	require.NoError(t, err)
 	require.NotNil(t, future)
-	defer future.Close()
+	// Note: future will be cleaned up by org.Close() via Spout.Shutdown()
 
 	// Wait for response with timeout
 	resp, err := future.GetWithTimeout(30 * time.Second)
