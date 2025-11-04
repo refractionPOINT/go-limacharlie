@@ -125,17 +125,24 @@ type futureRegistration struct {
 	expiry time.Time
 }
 
+// ResumeContext holds WebSocket session context information.
+type ResumeContext struct {
+	StreamID string `json:"stream_id,omitempty"`
+	OID      string `json:"oid,omitempty"`
+}
+
 // LiveStreamRequest represents the header sent to the WebSocket server.
 type LiveStreamRequest struct {
-	OrgID           string `json:"oid,omitempty"`
-	APIKey          string `json:"api_key,omitempty"`
-	JWT             string `json:"jwt,omitempty"`
-	StreamType      string `json:"type,omitempty"`
-	Tag             string `json:"tag,omitempty"`
-	Category        string `json:"cat,omitempty"`
-	InvestigationID string `json:"inv_id,omitempty"`
-	SensorID        string `json:"sid,omitempty"`
-	UserID          string `json:"uid,omitempty"`
+	OrgID           string        `json:"oid,omitempty"`
+	APIKey          string        `json:"api_key,omitempty"`
+	JWT             string        `json:"jwt,omitempty"`
+	StreamType      string        `json:"type,omitempty"`
+	Tag             string        `json:"tag,omitempty"`
+	Category        string        `json:"cat,omitempty"`
+	InvestigationID string        `json:"inv_id,omitempty"`
+	SensorID        string        `json:"sid,omitempty"`
+	UserID          string        `json:"uid,omitempty"`
+	ResumeContext   ResumeContext `json:"resume_context,omitempty"`
 }
 
 const (
@@ -275,6 +282,9 @@ func (s *Spout) Start() error {
 		InvestigationID: s.invID,
 		SensorID:        s.sid,
 		UserID:          s.userID,
+		ResumeContext: ResumeContext{
+			OID: s.org.GetOID(),
+		},
 	}
 
 	// Connect to WebSocket
@@ -514,6 +524,9 @@ func (s *Spout) reconnect() error {
 		InvestigationID: s.invID,
 		SensorID:        s.sid,
 		UserID:          s.userID,
+		ResumeContext: ResumeContext{
+			OID: s.org.GetOID(),
+		},
 	}
 
 	conn, err := s.connectWebSocket(header)
