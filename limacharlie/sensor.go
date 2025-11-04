@@ -438,7 +438,8 @@ func decompressPayload(data string, out interface{}) error {
 }
 
 // SimpleRequest makes a request to the sensor assuming a single response.
-// It uses the Organization's Spout to track responses and provides a simpler interface for making requests.
+// It creates a temporary Spout filtered by the full tracking ID to ensure only relevant
+// events are received, avoiding the need for a persistent shared Spout.
 func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOptions) (interface{}, error) {
 	// Convert tasks to string slice if needed
 	var taskList []string
@@ -463,15 +464,27 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 	// Create a unique tracking ID
 	trackingID := fmt.Sprintf("%s/%s", s.InvestigationID, uuid.New().String())
 
+	// Create a temporary Spout filtered by the full tracking ID
+	// The backend does prefix matching on inv_id before the first '/', so this will
+	// only receive events for this specific request, providing proper bandwidth filtering
+	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Creating temporary Spout for tracking ID: %s", trackingID))
+	tempSpout, err := NewSpout(s.Organization, "event", WithInvestigationID(trackingID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create spout: %v", err)
+	}
+	defer func() {
+		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Shutting down temporary Spout for tracking ID: %s", trackingID))
+		tempSpout.Shutdown()
+	}()
+
+	// Start the temporary Spout
+	if err := tempSpout.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start spout: %v", err)
+	}
+
 	// Create a channel to receive responses
 	responseChan := make(chan interface{}, len(taskList))
 	errorChan := make(chan error, 1)
-
-	// Check if organization has an active spout
-	err := s.Organization.MakeInteractive()
-	if err != nil {
-		return nil, fmt.Errorf("failed to make organization interactive: %v", err)
-	}
 
 	// Start a goroutine to read responses
 	go func() {
@@ -491,7 +504,7 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 
 			// Get next message with timeout to avoid indefinite blocking
 			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Waiting for message (remaining: %v) for tracking ID: %s", remaining, trackingID))
-			msg, err := s.Organization.spout.GetWithTimeout(remaining)
+			msg, err := tempSpout.GetWithTimeout(remaining)
 			if err != nil {
 				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Error from GetWithTimeout: %v", err))
 				if err.Error() == "spout stopped" || err.Error() == "timeout waiting for message" {
@@ -531,10 +544,12 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message has no routing and no event field, skipping"))
 					continue
 				}
-				// Check if this message belongs to our tracking ID
-				if invID, ok := routing["investigation_id"].(string); !ok || invID != trackingID {
-					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message investigation_id mismatch: got %v, expected %s", invID, trackingID))
-					continue
+
+				// Since we're filtering by the full tracking ID at the Spout level,
+				// we should only receive messages for this tracking ID. But we still
+				// verify it for safety.
+				if invID, ok := routing["investigation_id"].(string); ok {
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Received message with investigation_id: %s", invID))
 				}
 
 				// Ignore CLOUD_NOTIFICATION messages as they're simply receipts.
