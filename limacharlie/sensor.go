@@ -505,9 +505,30 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 
 			// Process the message
 			if m, ok := msg.(map[string]interface{}); ok {
-				routing, ok := m["routing"].(map[string]interface{})
-				if !ok {
-					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message has no routing"))
+				routing, hasRouting := m["routing"].(map[string]interface{})
+
+				// Handle messages without routing (common for sensor command responses)
+				if !hasRouting {
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message has no routing, checking for event field"))
+
+					// Accept message if it has an event field (indicates it's a valid sensor response)
+					if _, hasEvent := m["event"]; hasEvent {
+						s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message has event field, accepting as valid response"))
+
+						// Add to responses
+						responses = append(responses, msg)
+						s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response (no routing), total: %d, needed: %d", len(responses), len(taskList)))
+
+						// If not waiting for completion and we have all responses, we're done
+						if !opts.UntilCompletion && len(responses) >= len(taskList) {
+							s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Have all responses, breaking"))
+							break
+						}
+						continue
+					}
+
+					// Message has no routing and no event - skip it
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message has no routing and no event field, skipping"))
 					continue
 				}
 				// Check if this message belongs to our tracking ID
@@ -522,7 +543,7 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 					continue
 				}
 
-				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Processing message with event_type: %v", routing["event_type"]))
+				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Processing message with routing, event_type: %v", routing["event_type"]))
 
 				// Check for completion receipt
 				if errMsg, ok := m["ERROR_MESSAGE"].(string); opts.UntilCompletion && ok && errMsg == "done" {
@@ -535,7 +556,7 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 
 				// Add to responses
 				responses = append(responses, msg)
-				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response, total: %d, needed: %d", len(responses), len(taskList)))
+				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response (with routing), total: %d, needed: %d", len(responses), len(taskList)))
 
 				// If not waiting for completion and we have all responses, we're done
 				if !opts.UntilCompletion && len(responses) >= len(taskList) {
