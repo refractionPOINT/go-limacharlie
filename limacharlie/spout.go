@@ -296,53 +296,21 @@ func (s *Spout) Start() error {
 
 	// Create a channel to signal connection success
 	connected := make(chan bool, 1)
-	timeout := time.After(10 * time.Second)
 
-	// Start reading messages in a separate goroutine
-	go func() {
-		defer close(connected)
-		for {
-			// Set read deadline
-			if err := s.conn.SetReadDeadline(time.Now().Add(cloudTimeout)); err != nil {
-				s.org.logger.Info(fmt.Sprintf("error setting read deadline: %v", err))
-				return
-			}
+	// Start the main message reading goroutine immediately with the connected signal
+	// This ensures there's only ever ONE goroutine reading from the WebSocket,
+	// avoiding race conditions and the "unexpected EOF" errors
+	go s.readMessages(connected)
 
-			// Read message
-			_, message, err := s.conn.ReadMessage()
-			if err != nil {
-				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) && !s.isStop {
-					s.org.logger.Info(fmt.Sprintf("error reading message: %v", err))
-				}
-				return
-			}
-
-			// Check for connected event
-			var data map[string]interface{}
-			if err := json.Unmarshal(message, &data); err == nil {
-				if trace, ok := data["__trace"].(string); ok && trace == "connected" {
-					connected <- true
-					return
-				}
-			}
-
-			// Process the message normally
-			if err := s.processMessage(message); err != nil {
-				s.org.logger.Info(fmt.Sprintf("error processing message: %v", err))
-				continue
-			}
-		}
-	}()
+	// Start the futures cleanup goroutine
+	go s.cleanupFutures()
 
 	// Wait for connection confirmation or timeout
 	select {
 	case <-connected:
-		// Start the main message reading goroutine
-		go s.readMessages()
-		// Start the futures cleanup goroutine
-		go s.cleanupFutures()
+		s.org.logger.Info("WebSocket connection confirmed")
 		return nil
-	case <-timeout:
+	case <-time.After(10 * time.Second):
 		s.Shutdown()
 		return fmt.Errorf("timeout waiting for connection confirmation")
 	}
@@ -434,9 +402,12 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 
 // readMessages continuously reads messages from the WebSocket connection.
 // It includes auto-reconnect logic similar to the Python implementation.
-func (s *Spout) readMessages() {
+// If connectedSignal is provided, it will be signaled when the initial "connected" trace message is received.
+func (s *Spout) readMessages(connectedSignal chan bool) {
 	defer s.Shutdown()
 	s.org.logger.Info("Starting to read messages")
+
+	isConnected := connectedSignal == nil // If no signal channel, assume already connected
 
 	// Outer loop for auto-reconnect
 	for {
@@ -472,6 +443,22 @@ func (s *Spout) readMessages() {
 							s.org.logger.Info(fmt.Sprintf("stream closed: %v", err))
 						}
 						return
+					}
+
+					// Check for connected trace message (only if we haven't signaled yet)
+					if !isConnected {
+						var data map[string]interface{}
+						if err := json.Unmarshal(message, &data); err == nil {
+							if trace, ok := data["__trace"].(string); ok && trace == "connected" {
+								s.org.logger.Info("Received connected trace message")
+								isConnected = true
+								if connectedSignal != nil {
+									connectedSignal <- true
+									close(connectedSignal)
+								}
+								continue // Skip processing this trace message
+							}
+						}
 					}
 
 					// Process message
