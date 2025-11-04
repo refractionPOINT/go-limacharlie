@@ -556,9 +556,11 @@ func (s *Spout) processMessage(message []byte) error {
 		// Check if this message should be routed to a registered FutureResults
 		if routing, ok := m["routing"].(map[string]interface{}); ok {
 			if invID, ok := routing["investigation_id"].(string); ok && invID != "" {
+				s.org.logger.Info(fmt.Sprintf("[Spout] Message with investigation_id: %s", invID))
 				s.futuresMu.RLock()
 				if reg, exists := s.futures[invID]; exists {
 					s.futuresMu.RUnlock()
+					s.org.logger.Info(fmt.Sprintf("[Spout] Routing to registered FutureResults for: %s", invID))
 					// Try to add to the future's queue
 					if !reg.future.addResult(data) {
 						atomic.AddInt64(&s.dropped, 1)
@@ -567,9 +569,12 @@ func (s *Spout) processMessage(message []byte) error {
 					return nil
 				}
 				s.futuresMu.RUnlock()
+				s.org.logger.Info(fmt.Sprintf("[Spout] No registered FutureResults for: %s, adding to global queue", invID))
 			}
 		}
 	}
+
+	s.org.logger.Info(fmt.Sprintf("[Spout] Adding message to global queue"))
 
 	select {
 	case s.queue <- data:
@@ -587,6 +592,18 @@ func (s *Spout) Get() (interface{}, error) {
 		return msg, nil
 	case <-s.ctx.Done():
 		return nil, errors.New("spout stopped")
+	}
+}
+
+// GetWithTimeout returns the next message from the queue with a timeout.
+func (s *Spout) GetWithTimeout(timeout time.Duration) (interface{}, error) {
+	select {
+	case msg := <-s.queue:
+		return msg, nil
+	case <-s.ctx.Done():
+		return nil, errors.New("spout stopped")
+	case <-time.After(timeout):
+		return nil, errors.New("timeout waiting for message")
 	}
 }
 

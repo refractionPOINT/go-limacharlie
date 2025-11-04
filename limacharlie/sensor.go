@@ -478,39 +478,51 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 		deadline := time.Now().Add(opts.Timeout)
 		responses := []interface{}{}
 		completionCount := 0
+		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Starting response goroutine for tracking ID: %s", trackingID))
 
 		for {
-			// Check if we've hit the deadline
-			if time.Now().After(deadline) {
+			// Calculate remaining time until deadline
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Deadline exceeded for tracking ID: %s", trackingID))
 				errorChan <- fmt.Errorf("timeout waiting for responses")
 				return
 			}
 
-			// Get next message with timeout
-			msg, err := s.Organization.spout.Get()
+			// Get next message with timeout to avoid indefinite blocking
+			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Waiting for message (remaining: %v) for tracking ID: %s", remaining, trackingID))
+			msg, err := s.Organization.spout.GetWithTimeout(remaining)
 			if err != nil {
-				if err.Error() == "spout stopped" {
-					break
+				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Error from GetWithTimeout: %v", err))
+				if err.Error() == "spout stopped" || err.Error() == "timeout waiting for message" {
+					errorChan <- fmt.Errorf("timeout waiting for responses")
+					return
 				}
 				errorChan <- err
 				return
 			}
+			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Received message from spout"))
 
 			// Process the message
 			if m, ok := msg.(map[string]interface{}); ok {
 				routing, ok := m["routing"].(map[string]interface{})
 				if !ok {
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message has no routing"))
 					continue
 				}
 				// Check if this message belongs to our tracking ID
 				if invID, ok := routing["investigation_id"].(string); !ok || invID != trackingID {
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Message investigation_id mismatch: got %v, expected %s", invID, trackingID))
 					continue
 				}
 
 				// Ignore CLOUD_NOTIFICATION messages as they're simply receipts.
 				if et, ok := routing["event_type"].(string); ok && et == "CLOUD_NOTIFICATION" {
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Ignoring CLOUD_NOTIFICATION"))
 					continue
 				}
+
+				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Processing message with event_type: %v", routing["event_type"]))
 
 				// Check for completion receipt
 				if errMsg, ok := m["ERROR_MESSAGE"].(string); opts.UntilCompletion && ok && errMsg == "done" {
@@ -523,20 +535,24 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 
 				// Add to responses
 				responses = append(responses, msg)
+				s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response, total: %d, needed: %d", len(responses), len(taskList)))
 
 				// If not waiting for completion and we have all responses, we're done
 				if !opts.UntilCompletion && len(responses) >= len(taskList) {
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Have all responses, breaking"))
 					break
 				}
 			}
 		}
 
+		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Sending response to channel, responses count: %d", len(responses)))
 		// Return the appropriate response
 		if len(taskList) == 1 && len(responses) > 0 {
 			responseChan <- responses[0]
 		} else {
 			responseChan <- responses
 		}
+		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Response sent to channel"))
 	}()
 	// Send the tasks
 	if err := s.Task(taskList[0], TaskingOptions{InvestigationID: trackingID}); err != nil {
