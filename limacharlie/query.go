@@ -47,11 +47,12 @@ type QueryIterator struct {
 // For cursor-based pagination, use QueryAll() to get an iterator.
 //
 // Example:
-//   resp, err := org.Query(QueryRequest{
-//       Query: "-1h | * | * | event.FILE_PATH ends with '.exe'",
-//       Stream: "event",
-//       LimitEvent: 1000,
-//   })
+//
+//	resp, err := org.Query(QueryRequest{
+//	    Query: "-1h | * | * | event.FILE_PATH ends with '.exe'",
+//	    Stream: "event",
+//	    LimitEvent: 1000,
+//	})
 func (org *Organization) Query(req QueryRequest) (*QueryResponse, error) {
 	return org.QueryWithContext(context.Background(), req)
 }
@@ -154,22 +155,23 @@ func (org *Organization) QueryWithContext(ctx context.Context, req QueryRequest)
 // The iterator will automatically fetch subsequent pages as you call Next().
 //
 // Example:
-//   iter, err := org.QueryAll(QueryRequest{
-//       Query: "-1h | * | * | event.FILE_PATH ends with '.exe'",
-//       Stream: "event",
-//       Cursor: "-", // Start pagination
-//   })
-//   if err != nil {
-//       return err
-//   }
 //
-//   for iter.HasMore() {
-//       resp, err := iter.Next()
-//       if err != nil {
-//           return err
-//       }
-//       // Process resp.Results...
-//   }
+//	iter, err := org.QueryAll(QueryRequest{
+//	    Query: "-1h | * | * | event.FILE_PATH ends with '.exe'",
+//	    Stream: "event",
+//	    Cursor: "-", // Start pagination
+//	})
+//	if err != nil {
+//	    return err
+//	}
+//
+//	for iter.HasMore() {
+//	    resp, err := iter.Next()
+//	    if err != nil {
+//	        return err
+//	    }
+//	    // Process resp.Results...
+//	}
 func (org *Organization) QueryAll(req QueryRequest) (*QueryIterator, error) {
 	return org.QueryAllWithContext(context.Background(), req)
 }

@@ -580,17 +580,18 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 //   - Use GetNewResponses() to batch retrieve accumulated responses
 //
 // Example:
-//   future, err := sensor.Request("os_version")
-//   if err != nil {
-//       return err
-//   }
-//   defer future.Close()
 //
-//   // Wait for response with timeout
-//   resp, err := future.GetWithTimeout(30 * time.Second)
-//   if err != nil {
-//       return err
-//   }
+//	future, err := sensor.Request("os_version")
+//	if err != nil {
+//	    return err
+//	}
+//	defer future.Close()
+//
+//	// Wait for response with timeout
+//	resp, err := future.GetWithTimeout(30 * time.Second)
+//	if err != nil {
+//	    return err
+//	}
 func (s *Sensor) Request(tasks interface{}) (*FutureResults, error) {
 	// Convert tasks to string slice if needed
 	var taskList []string
