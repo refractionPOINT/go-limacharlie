@@ -608,6 +608,19 @@ func TestFutureResults_WasReceivedWithRegularEvents(t *testing.T) {
 	assert.Equal(t, regularEvent, results[0])
 }
 
+func TestFutureResults_IdempotentClose(t *testing.T) {
+	// Create a FutureResults
+	future := NewFutureResults(10)
+
+	// Call Close() multiple times - should not panic
+	future.Close()
+	future.Close()
+	future.Close()
+
+	// Test passes if no panic occurred
+	assert.True(t, true, "Close() should be idempotent and not panic on multiple calls")
+}
+
 func TestSpout_ExtraParams(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)

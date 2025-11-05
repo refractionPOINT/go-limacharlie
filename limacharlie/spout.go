@@ -19,6 +19,7 @@ type FutureResults struct {
 	results         []interface{}
 	newResultSignal chan struct{}
 	WasReceived     bool
+	closed          bool
 }
 
 // NewFutureResults creates a new FutureResults instance.
@@ -28,6 +29,7 @@ func NewFutureResults(bufferSize int) *FutureResults {
 		results:         make([]interface{}, 0),
 		newResultSignal: make(chan struct{}, 1),
 		WasReceived:     false,
+		closed:          false,
 	}
 }
 
@@ -113,9 +115,14 @@ func (f *FutureResults) GetNewResponses(timeout time.Duration) []interface{} {
 }
 
 // Close closes the future results queue.
+// This method is idempotent and safe to call multiple times.
 func (f *FutureResults) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.closed {
+		return
+	}
+	f.closed = true
 	close(f.queue)
 	close(f.newResultSignal)
 }
