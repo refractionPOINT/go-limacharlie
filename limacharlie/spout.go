@@ -271,21 +271,11 @@ func WithExtraParams(params map[string]interface{}) SpoutOption {
 
 // Start begins receiving data from limacharlie.io.
 func (s *Spout) Start() error {
-	// Log JWT status for debugging
-	jwt := s.org.GetCurrentJWT()
-	jwtPrefix := ""
-	if len(jwt) > 20 {
-		jwtPrefix = jwt[:20] + "..."
-	} else {
-		jwtPrefix = jwt
-	}
-	s.org.logger.Info(fmt.Sprintf("[Spout] Starting with JWT prefix: %s, OID: %s, InvID: %s", jwtPrefix, s.org.GetOID(), s.invID))
-
 	// Create WebSocket connection
 	header := LiveStreamRequest{
 		OrgID:           s.org.GetOID(),
 		APIKey:          s.org.client.options.APIKey,
-		JWT:             jwt,
+		JWT:             s.org.GetCurrentJWT(),
 		StreamType:      s.dataType,
 		Tag:             s.tag,
 		Category:        s.cat,
@@ -373,12 +363,6 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 		return nil, err
 	}
 
-	// Log what we're about to send (without full JWT for security)
-	s.org.logger.Info(fmt.Sprintf("[Spout] Sending WebSocket header - OID: %s, JWT present: %t, InvID: %s",
-		header.OrgID,
-		len(header.JWT) > 0,
-		header.InvestigationID))
-
 	// If there are extra params, merge them with the header
 	if len(s.extraParams) > 0 {
 		// Marshal header to JSON
@@ -418,7 +402,6 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 	var errorMsg map[string]interface{}
 	if err := conn.ReadJSON(&errorMsg); err == nil {
 		if errText, ok := errorMsg["error"].(string); ok {
-			s.org.logger.Info(fmt.Sprintf("[Spout] Server rejected connection: %s", errText))
 			conn.Close()
 			return nil, fmt.Errorf("server rejected connection: %s", errText)
 		}
@@ -441,7 +424,6 @@ func (s *Spout) readMessages(connectedSignal chan bool) {
 	s.mu.Lock()
 	if s.conn != nil {
 		s.conn.SetCloseHandler(func(code int, text string) error {
-			s.org.logger.Info(fmt.Sprintf("[Spout] WebSocket closed by server: code=%d, text=%s", code, text))
 			return nil
 		})
 	}
@@ -596,11 +578,9 @@ func (s *Spout) processMessage(message []byte) error {
 		// Check if this message should be routed to a registered FutureResults
 		if routing, ok := m["routing"].(map[string]interface{}); ok {
 			if invID, ok := routing["investigation_id"].(string); ok && invID != "" {
-				s.org.logger.Info(fmt.Sprintf("[Spout] Message with investigation_id: %s", invID))
 				s.futuresMu.RLock()
 				if reg, exists := s.futures[invID]; exists {
 					s.futuresMu.RUnlock()
-					s.org.logger.Info(fmt.Sprintf("[Spout] Routing to registered FutureResults for: %s", invID))
 					// Try to add to the future's queue
 					if !reg.future.addResult(data) {
 						atomic.AddInt64(&s.dropped, 1)
@@ -609,12 +589,9 @@ func (s *Spout) processMessage(message []byte) error {
 					return nil
 				}
 				s.futuresMu.RUnlock()
-				s.org.logger.Info(fmt.Sprintf("[Spout] No registered FutureResults for: %s, adding to global queue", invID))
 			}
 		}
 	}
-
-	s.org.logger.Info(fmt.Sprintf("[Spout] Adding message to global queue"))
 
 	select {
 	case s.queue <- data:
