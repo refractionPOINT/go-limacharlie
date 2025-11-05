@@ -134,7 +134,7 @@ func (org *Organization) Authorize(permissionsNeeded []string) (string, []Permis
 	}
 
 	if len(missing) > 0 {
-		return "", NoPermission(), fmt.Errorf("unauthorized, missing permissions: '%q'", missing)
+		return "", NoPermission(), fmt.Errorf("unauthorized, missing permissions: %q", missing)
 	}
 
 	ident := ""

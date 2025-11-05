@@ -478,7 +478,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 }
 
 type WhoAmIJsonResponse struct {
-	UserPermissions *map[string][]string `json:"user_perms:omitempty"`
+	UserPermissions *map[string][]string `json:"user_perms,omitempty"`
 	Organizations   *[]string            `json:"orgs"`
 	Permissions     *[]string            `json:"perms"`
 	Identity        *string              `json:"ident"`
