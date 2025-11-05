@@ -43,7 +43,7 @@ func TestQuery_DetectStream(t *testing.T) {
 
 	// Query the detect stream
 	resp, err := org.Query(QueryRequest{
-		Query:      "-24h | * | * | true",
+		Query:      "-24h | * | * | / exists",
 		Stream:     "detect",
 		LimitEvent: 50,
 	})
@@ -61,7 +61,7 @@ func TestQuery_WithSpecificEventType(t *testing.T) {
 
 	// Query for specific event types
 	resp, err := org.Query(QueryRequest{
-		Query:      "-1h | * | NEW_PROCESS DNS_REQUEST | true",
+		Query:      "-1h | * | NEW_PROCESS DNS_REQUEST | / exists",
 		Stream:     "event",
 		LimitEvent: 100,
 	})
@@ -79,7 +79,7 @@ func TestQuery_WithFilter(t *testing.T) {
 
 	// Query with a filter condition
 	resp, err := org.Query(QueryRequest{
-		Query:      "-1h | * | * | event/PROCESS_ID is set",
+		Query:      "-1h | * | * | event/PROCESS_ID is not 0",
 		Stream:     "event",
 		LimitEvent: 50,
 	})
@@ -109,7 +109,7 @@ func TestQueryAll_Pagination(t *testing.T) {
 
 	// Create an iterator for paginated queries
 	iter, err := org.QueryAll(QueryRequest{
-		Query:      "-6h | * | * | true",
+		Query:      "-6h | * | * | / exists",
 		Stream:     "event",
 		LimitEvent: 10, // Small limit to force pagination
 		Cursor:     "-",
@@ -154,7 +154,7 @@ func TestQueryAll_SinglePage(t *testing.T) {
 
 	// Create an iterator with a large limit (should fit in one page)
 	iter, err := org.QueryAll(QueryRequest{
-		Query:      "-10m | * | * | true",
+		Query:      "-10m | * | * | / exists",
 		Stream:     "event",
 		LimitEvent: 1000,
 		Cursor:     "-",
@@ -229,7 +229,7 @@ func TestQuery_DefaultStream(t *testing.T) {
 
 	// Query without specifying stream (should default to "event")
 	resp, err := org.Query(QueryRequest{
-		Query:      "-1h | * | * | true",
+		Query:      "-1h | * | * | / exists",
 		LimitEvent: 50,
 		// Stream not specified
 	})
@@ -281,7 +281,7 @@ func TestQuery_RecentTimeframe(t *testing.T) {
 	for _, tf := range timeframes {
 		t.Run(tf, func(t *testing.T) {
 			resp, err := org.Query(QueryRequest{
-				Query:      tf + " | * | * | true",
+				Query:      tf + " | * | * | / exists",
 				Stream:     "event",
 				LimitEvent: 50,
 			})
@@ -308,7 +308,7 @@ func TestQuery_Timeout(t *testing.T) {
 	// Note: The timeout is set in the HTTP client in query.go to 120 seconds
 	// A very large query should complete within that time or error
 	resp, err := org.Query(QueryRequest{
-		Query:      "-24h | * | * | true",
+		Query:      "-24h | * | * | / exists",
 		Stream:     "event",
 		LimitEvent: 10000,
 	})
