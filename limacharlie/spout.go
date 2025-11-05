@@ -186,6 +186,7 @@ func NewSpout(org *Organization, dataType string, opts ...SpoutOption) (*Spout, 
 	sp := &Spout{
 		org:              org,
 		dataType:         dataType,
+		userID:           org.client.options.UID, // Default to organization's UID for JWT auth
 		isParse:          true,
 		maxBuffer:        1024,
 		futures:          make(map[string]*futureRegistration),
