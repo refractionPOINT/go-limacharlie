@@ -398,19 +398,6 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 		}
 	}
 
-	// Wait briefly to see if server sends an error before accepting the connection
-	conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	var errorMsg map[string]interface{}
-	if err := conn.ReadJSON(&errorMsg); err == nil {
-		if errText, ok := errorMsg["error"].(string); ok {
-			conn.Close()
-			return nil, fmt.Errorf("server rejected connection: %s", errText)
-		}
-		// If it's not an error message, it might be the first real message
-		// We'll handle it in readMessages, so reset deadline
-	}
-	conn.SetReadDeadline(time.Time{}) // Clear deadline
-
 	return conn, nil
 }
 
