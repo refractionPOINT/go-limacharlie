@@ -24,7 +24,7 @@ func (s *OrgTestSuite) TestAuthorize() {
 func (s *OrgTestSuite) TestAuthorizeMissingPermission() {
 	org := getTestOrgFromEnv(s.Assertions)
 	_, _, err := org.Authorize([]string{"org.get", "foo.bar"})
-	s.EqualError(err, "unauthorized, missing permissions: '[\"foo.bar\"]'")
+	s.EqualError(err, "unauthorized, missing permissions: [\"foo.bar\"]")
 }
 
 func TestOrgURLs(t *testing.T) {

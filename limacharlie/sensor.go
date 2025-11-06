@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Sensor struct {
@@ -64,6 +66,11 @@ type TaskingOptions struct {
 	InvestigationID      string
 	InvestigationContext string
 	IdempotentKey        string
+}
+
+type SimpleRequestOptions struct {
+	Timeout         time.Duration
+	UntilCompletion bool
 }
 
 func (t *TagInfo) UnmarshalJSON(b []byte) error {
@@ -428,4 +435,190 @@ func decompressPayload(data string, out interface{}) error {
 		return err
 	}
 	return nil
+}
+
+// SimpleRequest makes a request to the sensor assuming a single response.
+// It uses the shared organization Spout to receive responses, similar to Request()
+// but waits synchronously for the response before returning.
+func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOptions) (interface{}, error) {
+	// Convert tasks to string slice if needed
+	var taskList []string
+	switch t := tasks.(type) {
+	case string:
+		taskList = []string{t}
+	case []string:
+		taskList = t
+	default:
+		return nil, fmt.Errorf("tasks must be string or []string")
+	}
+
+	// Set default options
+	opts := SimpleRequestOptions{
+		Timeout:         30 * time.Second,
+		UntilCompletion: false,
+	}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// Ensure organization is in interactive mode (creates shared spout if needed)
+	if err := s.Organization.MakeInteractive(); err != nil {
+		return nil, fmt.Errorf("failed to make organization interactive: %v", err)
+	}
+
+	// Create a unique tracking ID
+	trackingID := fmt.Sprintf("%s/%s", s.InvestigationID, uuid.New().String())
+
+	// Create a new FutureResults to receive responses
+	future := NewFutureResults(100)
+	defer future.Close()
+
+	// Register the future with the shared organization spout
+	s.Organization.spout.RegisterFutureResults(trackingID, future, opts.Timeout+1*time.Minute)
+
+	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Registered future for tracking ID: %s", trackingID))
+
+	// Send the tasks
+	for _, task := range taskList {
+		if err := s.Task(task, TaskingOptions{InvestigationID: trackingID}); err != nil {
+			return nil, fmt.Errorf("failed to send task: %v", err)
+		}
+	}
+	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Sent task(s) for tracking ID: %s", trackingID))
+
+	// Wait for responses
+	deadline := time.Now().Add(opts.Timeout)
+	responses := []interface{}{}
+	completionCount := 0
+
+	for {
+		// Calculate remaining time until deadline
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Timeout waiting for responses (tracking ID: %s)", trackingID))
+			return nil, fmt.Errorf("timeout waiting for responses")
+		}
+
+		// Get next message with timeout
+		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Waiting for message (remaining: %v) for tracking ID: %s", remaining, trackingID))
+		msg, err := future.GetWithTimeout(remaining)
+		if err != nil {
+			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Error getting message: %v (tracking ID: %s)", err, trackingID))
+			return nil, fmt.Errorf("timeout waiting for responses")
+		}
+		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Received message for tracking ID: %s", trackingID))
+
+		// Process the message
+		if m, ok := msg.(map[string]interface{}); ok {
+			routing, hasRouting := m["routing"].(map[string]interface{})
+
+			// Handle messages without routing (common for sensor command responses)
+			if !hasRouting {
+				// Accept message if it has an event field (indicates it's a valid sensor response)
+				if _, hasEvent := m["event"]; hasEvent {
+					responses = append(responses, msg)
+					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response (no routing), total: %d, needed: %d", len(responses), len(taskList)))
+
+					// If not waiting for completion and we have all responses, we're done
+					if !opts.UntilCompletion && len(responses) >= len(taskList) {
+						break
+					}
+					continue
+				}
+				// Skip messages without event field
+				continue
+			}
+
+			// Ignore CLOUD_NOTIFICATION messages as they're simply receipts
+			if et, ok := routing["event_type"].(string); ok && et == "CLOUD_NOTIFICATION" {
+				continue
+			}
+
+			// Check for completion receipt
+			if errMsg, ok := m["ERROR_MESSAGE"].(string); opts.UntilCompletion && ok && errMsg == "done" {
+				completionCount++
+				if completionCount >= len(taskList) {
+					break
+				}
+				continue
+			}
+
+			// Add to responses
+			responses = append(responses, msg)
+			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response (with routing), total: %d, needed: %d", len(responses), len(taskList)))
+
+			// If not waiting for completion and we have all responses, we're done
+			if !opts.UntilCompletion && len(responses) >= len(taskList) {
+				break
+			}
+		}
+	}
+
+	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Completed successfully with %d response(s) (tracking ID: %s)", len(responses), trackingID))
+
+	// Return the appropriate response
+	if len(taskList) == 1 && len(responses) > 0 {
+		return responses[0], nil
+	}
+	return responses, nil
+}
+
+// Request sends tasks to the sensor and returns a FutureResults for manual response handling.
+// This provides more control than SimpleRequest() by allowing the caller to manage response collection.
+// Requires the organization to be in interactive mode (call org.MakeInteractive() or use WithInvestigationID()).
+//
+// The caller is responsible for reading responses from the returned FutureResults:
+//   - Use Get() to block until next response
+//   - Use GetWithTimeout() to wait with a timeout
+//   - Use GetNewResponses() to batch retrieve accumulated responses
+//
+// Example:
+//
+//	future, err := sensor.Request("os_version")
+//	if err != nil {
+//	    return err
+//	}
+//	defer future.Close()
+//
+//	// Wait for response with timeout
+//	resp, err := future.GetWithTimeout(30 * time.Second)
+//	if err != nil {
+//	    return err
+//	}
+func (s *Sensor) Request(tasks interface{}) (*FutureResults, error) {
+	// Convert tasks to string slice if needed
+	var taskList []string
+	switch t := tasks.(type) {
+	case string:
+		taskList = []string{t}
+	case []string:
+		taskList = t
+	default:
+		return nil, fmt.Errorf("tasks must be string or []string")
+	}
+
+	// Check if organization is interactive
+	if err := s.Organization.MakeInteractive(); err != nil {
+		return nil, fmt.Errorf("failed to make organization interactive: %v", err)
+	}
+
+	// Create a unique tracking ID
+	trackingID := fmt.Sprintf("%s/%s", s.InvestigationID, uuid.New().String())
+
+	// Create a new FutureResults with reasonable buffer size
+	future := NewFutureResults(100)
+
+	// Register the future with the organization's spout
+	// Use a 5 minute TTL for the registration
+	s.Organization.spout.RegisterFutureResults(trackingID, future, 5*time.Minute)
+
+	// Send the tasks
+	for _, task := range taskList {
+		if err := s.Task(task, TaskingOptions{InvestigationID: trackingID}); err != nil {
+			future.Close()
+			return nil, fmt.Errorf("failed to send task: %v", err)
+		}
+	}
+
+	return future, nil
 }

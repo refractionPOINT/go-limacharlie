@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type OrgValueInfo struct {
@@ -17,7 +18,7 @@ type OrgValue = string
 func (org Organization) OrgValueGet(name string) (*OrgValueInfo, error) {
 	resp := OrgValueInfo{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("configs/%s/%s", org.client.options.OID, name), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("configs/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -29,7 +30,7 @@ func (org Organization) OrgValueSet(name string, value string) error {
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"value": value,
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("configs/%s/%s", org.client.options.OID, name), request); err != nil {
+	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("configs/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
 		return err
 	}
 	return nil

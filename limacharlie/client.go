@@ -233,6 +233,14 @@ func getHTTPClient() *http.Client {
 }
 
 func (c *Client) reliableRequest(verb string, path string, request restRequest) (err error) {
+	// If no JWT is ready and we have an API key, prime it (similar to Python SDK behavior).
+	// This prevents sending empty JWT on first request which causes billing server to complain.
+	if c.options.JWT == "" && c.options.APIKey != "" {
+		if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
+			return err
+		}
+	}
+
 	request.nRetries++
 	for request.nRetries > 0 {
 		var statusCode int
@@ -381,7 +389,15 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 
 	ctx, _ := context.WithTimeout(context.Background(), request.timeout)
 
-	r, err := http.NewRequestWithContext(ctx, verb, fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path), body)
+	// Build the URL - if urlRoot is a full URL (starts with http), use it as base, otherwise concatenate
+	var fullURL string
+	if strings.HasPrefix(request.urlRoot, "http://") || strings.HasPrefix(request.urlRoot, "https://") {
+		fullURL = fmt.Sprintf("%s%s", request.urlRoot, path)
+	} else {
+		fullURL = fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path)
+	}
+
+	r, err := http.NewRequestWithContext(ctx, verb, fullURL, body)
 	if err != nil {
 		return 0, err
 	}
@@ -428,6 +444,16 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		return resp.StatusCode, err
 	}
 
+	// If no response target is provided, we're done
+	if request.response == nil {
+		return resp.StatusCode, nil
+	}
+
+	// If response body is empty, don't try to unmarshal
+	if respData.Len() == 0 {
+		return resp.StatusCode, nil
+	}
+
 	// If the response is not a well structured
 	// datatype (and is a map[]interface{} instead)
 	// we will perform a CleanUnmarshal to better
@@ -452,7 +478,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 }
 
 type WhoAmIJsonResponse struct {
-	UserPermissions *map[string][]string `json:"user_perms:omitempty"`
+	UserPermissions *map[string][]string `json:"user_perms,omitempty"`
 	Organizations   *[]string            `json:"orgs"`
 	Permissions     *[]string            `json:"perms"`
 	Identity        *string              `json:"ident"`
