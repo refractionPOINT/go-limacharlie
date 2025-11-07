@@ -476,15 +476,12 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 	// Register the future with the shared organization spout
 	s.Organization.spout.RegisterFutureResults(trackingID, future, opts.Timeout+1*time.Minute)
 
-	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Registered future for tracking ID: %s", trackingID))
-
 	// Send the tasks
 	for _, task := range taskList {
 		if err := s.Task(task, TaskingOptions{InvestigationID: trackingID}); err != nil {
 			return nil, fmt.Errorf("failed to send task: %v", err)
 		}
 	}
-	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Sent task(s) for tracking ID: %s", trackingID))
 
 	// Wait for responses
 	deadline := time.Now().Add(opts.Timeout)
@@ -500,13 +497,11 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 		}
 
 		// Get next message with timeout
-		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Waiting for message (remaining: %v) for tracking ID: %s", remaining, trackingID))
 		msg, err := future.GetWithTimeout(remaining)
 		if err != nil {
 			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Error getting message: %v (tracking ID: %s)", err, trackingID))
 			return nil, fmt.Errorf("timeout waiting for responses")
 		}
-		s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Received message for tracking ID: %s", trackingID))
 
 		// Process the message
 		if m, ok := msg.(map[string]interface{}); ok {
@@ -517,7 +512,6 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 				// Accept message if it has an event field (indicates it's a valid sensor response)
 				if _, hasEvent := m["event"]; hasEvent {
 					responses = append(responses, msg)
-					s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response (no routing), total: %d, needed: %d", len(responses), len(taskList)))
 
 					// If not waiting for completion and we have all responses, we're done
 					if !opts.UntilCompletion && len(responses) >= len(taskList) {
@@ -545,7 +539,6 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 
 			// Add to responses
 			responses = append(responses, msg)
-			s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Added response (with routing), total: %d, needed: %d", len(responses), len(taskList)))
 
 			// If not waiting for completion and we have all responses, we're done
 			if !opts.UntilCompletion && len(responses) >= len(taskList) {
@@ -553,8 +546,6 @@ func (s *Sensor) SimpleRequest(tasks interface{}, options ...SimpleRequestOption
 			}
 		}
 	}
-
-	s.Organization.logger.Info(fmt.Sprintf("[SimpleRequest] Completed successfully with %d response(s) (tracking ID: %s)", len(responses), trackingID))
 
 	// Return the appropriate response
 	if len(taskList) == 1 && len(responses) > 0 {

@@ -316,7 +316,6 @@ func (s *Spout) Start() error {
 	// Wait for connection confirmation or timeout
 	select {
 	case <-connected:
-		s.org.logger.Info("WebSocket connection confirmed")
 		return nil
 	case <-time.After(10 * time.Second):
 		s.Shutdown()
@@ -413,7 +412,6 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 // If connectedSignal is provided, it will be signaled when the initial "connected" trace message is received.
 func (s *Spout) readMessages(connectedSignal chan bool) {
 	defer s.Shutdown()
-	s.org.logger.Info("Starting to read messages")
 
 	// Set close handler to capture error messages from server
 	s.mu.Lock()
@@ -467,7 +465,6 @@ func (s *Spout) readMessages(connectedSignal chan bool) {
 						var data map[string]interface{}
 						if err := json.Unmarshal(message, &data); err == nil {
 							if trace, ok := data["__trace"].(string); ok && trace == "connected" {
-								s.org.logger.Info("Received connected trace message")
 								isConnected = true
 								if connectedSignal != nil {
 									connectedSignal <- true
@@ -497,12 +494,9 @@ func (s *Spout) readMessages(connectedSignal chan bool) {
 		}
 
 		// Attempt to reconnect
-		s.org.logger.Info("Attempting to reconnect...")
 		if err := s.reconnect(); err != nil {
 			s.org.logger.Info(fmt.Sprintf("reconnect failed: %v, retrying in 5 seconds...", err))
 			time.Sleep(5 * time.Second)
-		} else {
-			s.org.logger.Info("Reconnected successfully")
 		}
 	}
 }
@@ -638,7 +632,6 @@ func (s *Spout) Shutdown() {
 	}
 	s.isStop = true
 	s.mu.Unlock()
-	s.org.logger.Info("Shutting down Spout")
 
 	s.cancel()
 	if s.conn != nil {
