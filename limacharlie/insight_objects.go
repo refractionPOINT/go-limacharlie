@@ -115,40 +115,42 @@ type IOCLocationsResponse struct {
 
 // UnmarshalJSON custom unmarshaling to handle dynamic sensor ID keys
 func (r *IOCLocationsResponse) UnmarshalJSON(data []byte) error {
-	// Use an auxiliary type to unmarshal the known fields
-	type Aux struct {
-		FromCache bool              `json:"from_cache"`
-		Type      InsightObjectType `json:"type"`
-		Name      string            `json:"name"`
-	}
-
-	var aux Aux
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	// Copy the known fields
-	r.FromCache = aux.FromCache
-	r.Type = aux.Type
-	r.Name = aux.Name
-
-	// Now unmarshal into a map to get the dynamic sensor ID fields
-	var raw map[string]json.RawMessage
+	// Unmarshal into a generic map first
+	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	// All keys except the known fields are sensor IDs with location data
+	// Extract known fields with type assertions
+	if val, ok := raw["from_cache"].(bool); ok {
+		r.FromCache = val
+	}
+	if val, ok := raw["type"].(string); ok {
+		r.Type = InsightObjectType(val)
+	}
+	if val, ok := raw["name"].(string); ok {
+		r.Name = val
+	}
+
+	// Extract locations (all other keys are sensor IDs)
 	r.Locations = make(map[string]IOCLocation)
-	for key, val := range raw {
+	for key := range raw {
 		// Skip metadata fields
 		if key == "from_cache" || key == "type" || key == "name" {
 			continue
 		}
 
-		var loc IOCLocation
-		if err := json.Unmarshal(val, &loc); err == nil {
-			r.Locations[key] = loc
+		// Each location is a nested map, convert it to IOCLocation
+		if locData, ok := raw[key].(map[string]interface{}); ok {
+			// Convert to JSON and unmarshal to struct to properly handle all fields
+			locBytes, err := json.Marshal(locData)
+			if err != nil {
+				continue
+			}
+			var loc IOCLocation
+			if err := json.Unmarshal(locBytes, &loc); err == nil {
+				r.Locations[key] = loc
+			}
 		}
 	}
 
