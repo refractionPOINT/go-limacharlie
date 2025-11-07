@@ -225,6 +225,15 @@ func (org Organization) SearchIOCLocations(params IOCSearchParams) (*IOCLocation
 		return nil, err
 	}
 
+	// The API may not return name and type fields in the locations response,
+	// so populate them from the request parameters like the web app does
+	if resp.Name == "" {
+		resp.Name = params.SearchTerm
+	}
+	if resp.Type == "" {
+		resp.Type = params.ObjectType
+	}
+
 	return &resp, nil
 }
 
