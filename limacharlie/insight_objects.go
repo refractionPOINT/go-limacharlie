@@ -115,24 +115,30 @@ type IOCLocationsResponse struct {
 
 // UnmarshalJSON custom unmarshaling to handle dynamic sensor ID keys
 func (r *IOCLocationsResponse) UnmarshalJSON(data []byte) error {
-	// First unmarshal into a generic map
+	// Use an auxiliary type to unmarshal the known fields
+	type Aux struct {
+		FromCache bool              `json:"from_cache"`
+		Type      InsightObjectType `json:"type"`
+		Name      string            `json:"name"`
+	}
+
+	var aux Aux
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Copy the known fields
+	r.FromCache = aux.FromCache
+	r.Type = aux.Type
+	r.Name = aux.Name
+
+	// Now unmarshal into a map to get the dynamic sensor ID fields
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	// Extract known fields
-	if val, ok := raw["from_cache"]; ok {
-		json.Unmarshal(val, &r.FromCache)
-	}
-	if val, ok := raw["type"]; ok {
-		json.Unmarshal(val, &r.Type)
-	}
-	if val, ok := raw["name"]; ok {
-		json.Unmarshal(val, &r.Name)
-	}
-
-	// All other keys are sensor IDs with location data
+	// All keys except the known fields are sensor IDs with location data
 	r.Locations = make(map[string]IOCLocation)
 	for key, val := range raw {
 		// Skip metadata fields
