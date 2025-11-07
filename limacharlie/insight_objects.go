@@ -115,9 +115,9 @@ type IOCLocationsResponse struct {
 
 // UnmarshalJSON custom unmarshaling to handle dynamic sensor ID keys
 func (r *IOCLocationsResponse) UnmarshalJSON(data []byte) error {
-	// Unmarshal into a generic map first
-	var raw map[string]interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	// Use UnmarshalCleanJSON like other custom unmarshalers in this codebase
+	raw, err := UnmarshalCleanJSON(string(data))
+	if err != nil {
 		return err
 	}
 
