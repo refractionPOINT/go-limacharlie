@@ -113,46 +113,58 @@ type IOCLocationsResponse struct {
 	Locations map[string]IOCLocation `json:"-"` // Dynamic keys (sensor IDs), populated in UnmarshalJSON
 }
 
+// Temporary type to bypass custom UnmarshalJSON when unmarshaling known fields
+type tempIOCLocationsResponse IOCLocationsResponse
+
 // UnmarshalJSON custom unmarshaling to handle dynamic sensor ID keys
 func (r *IOCLocationsResponse) UnmarshalJSON(data []byte) error {
-	// Use UnmarshalCleanJSON like other custom unmarshalers in this codebase
-	raw, err := UnmarshalCleanJSON(string(data))
-	if err != nil {
+	// First unmarshal into a map to separate known fields from dynamic location keys
+	raw := map[string]interface{}{}
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	// Extract known fields with type assertions
-	if val, ok := raw["from_cache"].(bool); ok {
-		r.FromCache = val
-	}
-	if val, ok := raw["type"].(string); ok {
-		r.Type = InsightObjectType(val)
-	}
-	if val, ok := raw["name"].(string); ok {
-		r.Name = val
-	}
-
-	// Extract locations (all other keys are sensor IDs)
-	r.Locations = make(map[string]IOCLocation)
+	// Extract and store location data (all keys except the known metadata fields)
+	locations := make(map[string]IOCLocation)
 	for key := range raw {
-		// Skip metadata fields
+		// Skip metadata fields - we'll handle them via standard unmarshaling
 		if key == "from_cache" || key == "type" || key == "name" {
 			continue
 		}
 
 		// Each location is a nested map, convert it to IOCLocation
 		if locData, ok := raw[key].(map[string]interface{}); ok {
-			// Convert to JSON and unmarshal to struct to properly handle all fields
 			locBytes, err := json.Marshal(locData)
 			if err != nil {
 				continue
 			}
 			var loc IOCLocation
 			if err := json.Unmarshal(locBytes, &loc); err == nil {
-				r.Locations[key] = loc
+				locations[key] = loc
 			}
 		}
+
+		// Remove location keys from the map so they don't interfere with standard unmarshaling
+		delete(raw, key)
 	}
+
+	// Re-marshal the cleaned map (only known fields remain)
+	cleanedData, err := json.Marshal(raw)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshal into temporary type (bypasses this custom unmarshaler) to properly set known fields
+	temp := tempIOCLocationsResponse{}
+	if err := json.Unmarshal(cleanedData, &temp); err != nil {
+		return err
+	}
+
+	// Copy the properly unmarshaled known fields
+	*r = IOCLocationsResponse(temp)
+
+	// Add the locations we extracted earlier
+	r.Locations = locations
 
 	return nil
 }
