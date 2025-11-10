@@ -233,7 +233,6 @@ func (org *Organization) registerOutput(fhOpts FirehoseOutputOptions, dest strin
 	if err != nil {
 		return fmt.Errorf("could not add output: %s", err)
 	}
-	log.Debug().Msg("output registration done")
 	return nil
 }
 
@@ -242,7 +241,6 @@ func (org *Organization) unregisterOutput(fhOutputOpts FirehoseOutputOptions) {
 		return
 	}
 
-	log.Debug().Msg("unregistering output")
 	_, err := org.OutputDel("tmp_live_" + fhOutputOpts.UniqueName)
 	if err != nil {
 		log.Err(err).Msg("could not delete output")
@@ -333,11 +331,7 @@ func (fh *Firehose) Start() error {
 }
 
 func (fh *Firehose) handleConnections() {
-	log.Debug().Msg(fmt.Sprintf("listening for connections on %s:%d", fh.opts.ListenOnIP, fh.opts.ListenOnPort))
-
 	var err error
-
-	defer log.Debug().Msg(fmt.Sprintf("stopped listening for connections on %s:%d (%v)", fh.opts.ListenOnIP, fh.opts.ListenOnPort, err))
 
 	for fh.IsRunning() {
 		var conn net.Conn
@@ -359,8 +353,6 @@ func (fh *Firehose) handleConnections() {
 }
 
 func (fh *Firehose) handleConnection(conn net.Conn) {
-	log.Debug().Msg("new incoming connection")
-	defer log.Debug().Msg("incoming connection disconnected")
 	defer func() {
 		fh.mutex.Lock()
 		delete(fh.activeFeeders, conn)
@@ -410,7 +402,7 @@ func (fh *Firehose) handleMessage(raw []byte) {
 
 	if fh.opts.ParseMessage {
 		if err := json.Unmarshal([]byte(fhMessage.RawContent), &fhMessage.Content); err != nil {
-			log.Warn().Msg(fmt.Sprintf("error parsing: %v", fhMessage.RawContent))
+			log.Warn().Msg("error parsing message")
 			select {
 			case fh.ErrorMessages <- fhMessage:
 			default:
@@ -440,7 +432,6 @@ func (fh *Firehose) handleMessage(raw []byte) {
 
 // Shutdown stops the listener and delete the output previsouly registered if any
 func (fh *Firehose) Shutdown() {
-	log.Debug().Msg("closing firehose")
 	fh.mutex.Lock()
 
 	if !fh.isRunning {
@@ -469,7 +460,6 @@ func (fh *Firehose) Shutdown() {
 
 	close(fh.Messages)
 	close(fh.ErrorMessages)
-	log.Debug().Msg("firehose closed")
 }
 
 // IsRunning will return true if firehose has been started
