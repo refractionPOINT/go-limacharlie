@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -67,7 +68,7 @@ func (org *Organization) OnlineStats(start int64, end int64) (Stats, error) {
 		"start": start,
 		"end":   end,
 	})
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/online/stats", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/online/stats", org.client.options.OID), q); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -80,7 +81,7 @@ func (org *Organization) TrafficStats(start int64, end int64) (Stats, error) {
 		"start": start,
 		"end":   end,
 	})
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/traffic/stats", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/traffic/stats", org.client.options.OID), q); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -93,7 +94,7 @@ func (org *Organization) DetectionStats(start int64, end int64) (DetStats, error
 		"start": start,
 		"end":   end,
 	})
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/detections/stats", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/detections/stats", org.client.options.OID), q); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -102,27 +103,27 @@ func (org *Organization) DetectionStats(start int64, end int64) (DetStats, error
 func (org *Organization) GenericGETRequest(path string, query Dict, response interface{}) error {
 	q := makeDefaultRequest(response)
 	q = q.withQueryData(query)
-	return org.client.reliableRequest(http.MethodGet, path, q)
+	return org.client.reliableRequest(context.Background(), http.MethodGet, path, q)
 }
 
 // GenericPOSTRequest makes a generic POST request to the LC API
 func (org *Organization) GenericPOSTRequest(path string, data Dict, response interface{}) error {
 	q := makeDefaultRequest(response)
 	q = q.withFormData(data)
-	return org.client.reliableRequest(http.MethodPost, path, q)
+	return org.client.reliableRequest(context.Background(), http.MethodPost, path, q)
 }
 
 // GenericDELETERequest makes a generic DELETE request to the LC API
 func (org *Organization) GenericDELETERequest(path string, response interface{}) error {
 	q := makeDefaultRequest(response)
-	return org.client.reliableRequest(http.MethodDelete, path, q)
+	return org.client.reliableRequest(context.Background(), http.MethodDelete, path, q)
 }
 
 // GenericPUTRequest makes a generic PUT request to the LC API
 func (org *Organization) GenericPUTRequest(path string, data Dict, response interface{}) error {
 	q := makeDefaultRequest(response)
 	q = q.withFormData(data)
-	return org.client.reliableRequest(http.MethodPut, path, q)
+	return org.client.reliableRequest(context.Background(), http.MethodPut, path, q)
 }
 
 // GenericRequest makes a generic HTTP request to the LC API with the specified method
@@ -133,13 +134,13 @@ func (org *Organization) GenericRequest(method, path string, data Dict, response
 	} else if data != nil {
 		q = q.withQueryData(data)
 	}
-	return org.client.reliableRequest(method, path, q)
+	return org.client.reliableRequest(context.Background(), method, path, q)
 }
 
 func (org *Organization) EventByAtom(sensorID, atom string) (EventContainer, error) {
 	event := EventContainer{}
 	q := makeDefaultRequest(&event)
-	err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/%s/%s", org.client.options.OID, sensorID, atom), q)
+	err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/%s/%s", org.client.options.OID, sensorID, atom), q)
 	return event, err
 }
 
@@ -169,7 +170,7 @@ func (org *Organization) HistoricalDetections(detectionReq HistoricalDetectionsR
 	q := makeDefaultRequest(&results)
 	q = q.withQueryData(detectionReq)
 
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/detections", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/detections", org.client.options.OID), q); err != nil {
 		return results, err
 	}
 

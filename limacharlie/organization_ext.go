@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -95,7 +96,7 @@ func (org *Organization) GetUsageStats() (*UsageStats, error) {
 
 	request := makeDefaultRequest(&stats)
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +112,7 @@ func (org *Organization) GetOrgErrors() ([]OrgError, error) {
 
 	request := makeDefaultRequest(&response)
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -124,7 +125,7 @@ func (org *Organization) DismissOrgError(component string) error {
 
 	request := makeDefaultRequest(nil)
 
-	if err := org.client.reliableRequest(http.MethodDelete, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, url, request); err != nil {
 		return err
 	}
 
@@ -168,7 +169,7 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 
 	request := makeDefaultRequest(&response).withQueryData(values)
 
-	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 
@@ -184,7 +185,7 @@ func (org *Organization) GetAPIKeys() ([]APIKeyInfo, error) {
 
 	request := makeDefaultRequest(&response)
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -215,7 +216,7 @@ func (org *Organization) CreateAPIKey(name string, permissions []string) (*APIKe
 
 	request := makeDefaultRequest(&response).withFormData(data)
 
-	if err := org.client.reliableRequest(http.MethodPost, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, url, request); err != nil {
 		return nil, err
 	}
 
@@ -233,7 +234,7 @@ func (org *Organization) DeleteAPIKey(keyHash string) error {
 
 	request := makeDefaultRequest(nil).withFormData(data)
 
-	if err := org.client.reliableRequest(http.MethodDelete, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, url, request); err != nil {
 		return err
 	}
 
@@ -247,7 +248,7 @@ func (org *Organization) GetMITREReport() (*MITREReport, error) {
 
 	request := makeDefaultRequest(&report)
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -274,7 +275,7 @@ func (org *Organization) GetTimeWhenSensorHasData(sid string, start, end int64) 
 
 	request := makeDefaultRequest(&response).withQueryData(values)
 
-	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 

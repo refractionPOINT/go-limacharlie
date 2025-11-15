@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -190,7 +191,7 @@ func (o *Organization) GetURLs() (map[string]string, error) {
 
 	resp := SiteConnectivityInfo{}
 
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return nil, err
 	}
 	o.cachedURLs = &resp
@@ -213,7 +214,7 @@ func (o *Organization) GetSiteConnectivityInfo() (*SiteConnectivityInfo, error) 
 	}
 	resp := SiteConnectivityInfo{}
 
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return nil, err
 	}
 	o.cachedURLs = &resp
@@ -222,7 +223,7 @@ func (o *Organization) GetSiteConnectivityInfo() (*SiteConnectivityInfo, error) 
 
 func (o *Organization) GetInfo() (OrganizationInformation, error) {
 	resp := OrganizationInformation{}
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return OrganizationInformation{}, err
 	}
 	return resp, nil
@@ -231,7 +232,7 @@ func (o *Organization) GetInfo() (OrganizationInformation, error) {
 // GetOnlineCount Gets the amount of online sensor for the organization
 func (o *Organization) GetOnlineCount() (OnlineCount, error) {
 	resp := OnlineCount{}
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("online/%s", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("online/%s", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return OnlineCount{}, err
 	}
 	return resp, nil
@@ -261,7 +262,7 @@ func (o *Organization) CreateOrganization(location, name string, template ...int
 		req["template"] = yamlTemplate
 	}
 	request := makeDefaultRequest(&resp).withFormData(req).withTimeout(restCreateOrgTimeout)
-	if err := o.client.reliableRequest(http.MethodPost, "orgs/new", request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodPost, "orgs/new", request); err != nil {
 		return NewOrganizationResponse{}, err
 	}
 	return resp, nil
@@ -272,7 +273,7 @@ func (o *Organization) GetDeleteConfirmationToken() (string, error) {
 		ConfirmationToken string `json:"confirmation,omitempty"`
 	}{}
 	request := makeDefaultRequest(&resp)
-	if err := o.client.reliableRequest(http.MethodGet, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
 		return "", err
 	}
 	return resp.ConfirmationToken, nil
@@ -286,7 +287,7 @@ func (o *Organization) DeleteOrganization(confirmationToken string) (bool, error
 		"confirmation": confirmationToken,
 	}
 	request := makeDefaultRequest(&resp).withQueryData(req)
-	if err := o.client.reliableRequest(http.MethodDelete, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("orgs/%s/delete", o.client.options.OID), request); err != nil {
 		return false, err
 	}
 	return resp.Success, nil
@@ -296,7 +297,7 @@ func (o *Organization) SetQuota(quota int64) (bool, error) {
 	request := makeDefaultRequest(&resp).withQueryData(Dict{
 		"quota": quota,
 	})
-	if err := o.client.reliableRequest(http.MethodPost, fmt.Sprintf("orgs/%s/quota", o.client.options.OID), request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("orgs/%s/quota", o.client.options.OID), request); err != nil {
 		return false, err
 	}
 	if val, ok := resp["success"]; ok {
@@ -319,7 +320,7 @@ func (o *Organization) AddToGroup(gid string) (bool, error) {
 	request := makeDefaultRequest(&resp).withQueryData(Dict{
 		"oid": o.client.options.OID,
 	})
-	if err := o.client.reliableRequest(http.MethodPost, fmt.Sprintf("groups/%s/orgs", gid), request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("groups/%s/orgs", gid), request); err != nil {
 		return false, err
 	}
 	if val, ok := resp["success"]; ok {

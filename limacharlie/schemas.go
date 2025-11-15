@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,7 +30,7 @@ func (o *Organization) GetSchemas() (*Schemas, error) {
 
 	request := makeDefaultRequest(&resp)
 
-	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -47,7 +48,7 @@ func (o *Organization) GetSchemasForPlatform(platform string) (*Schemas, error) 
 
 	request := makeDefaultRequest(&resp).withQueryData(values)
 
-	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -63,7 +64,7 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 
 	request := makeDefaultRequest(&resp)
 
-	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 
@@ -83,7 +84,7 @@ func (o *Organization) GetSchema(name string) (*SchemaResponse, error) {
 
 	request := makeDefaultRequest(&resp)
 
-	if err := o.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -96,7 +97,7 @@ func (o *Organization) ResetSchemas() (bool, error) {
 
 	request := makeDefaultRequest(&resp)
 
-	if err := o.client.reliableRequest(http.MethodDelete, urlPath, request); err != nil {
+	if err := o.client.reliableRequest(context.Background(), http.MethodDelete, urlPath, request); err != nil {
 		return false, err
 	}
 	if val, ok := resp["success"]; ok {

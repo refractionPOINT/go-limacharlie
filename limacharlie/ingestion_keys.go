@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,7 +10,7 @@ import (
 func (org *Organization) GetIngestionKeys() (Dict, error) {
 	resp := map[string]Dict{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/ingestion_keys", org.GetOID()), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/ingestion_keys", org.GetOID()), request); err != nil {
 		return nil, err
 	}
 	keys, ok := resp["keys"]
@@ -26,7 +27,7 @@ func (org Organization) SetIngestionKeys(name string) (Dict, error) {
 		"name": name,
 	}
 	request := makeDefaultRequest(&resp).withFormData(req)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/ingestion_keys", org.GetOID()), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("insight/%s/ingestion_keys", org.GetOID()), request); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -37,7 +38,7 @@ func (org Organization) DelIngestionKeys(name string) (Dict, error) {
 	req := Dict{}
 	escapedName := url.QueryEscape(name)
 	request := makeDefaultRequest(&resp).withFormData(req)
-	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("insight/%s/ingestion_keys?name=%s", org.GetOID(), escapedName), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("insight/%s/ingestion_keys?name=%s", org.GetOID(), escapedName), request); err != nil {
 		return nil, err
 	}
 	return resp, nil

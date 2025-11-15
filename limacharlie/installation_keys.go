@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -113,7 +114,7 @@ func (org *Organization) InstallationKeys() ([]InstallationKey, error) {
 	resp := map[string]map[string]InstallationKey{}
 
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
 		return nil, err
 	}
 	keys := []InstallationKey{}
@@ -128,7 +129,7 @@ func (org *Organization) InstallationKey(iid string) (*InstallationKey, error) {
 	resp := InstallationKey{}
 
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("installationkeys/%s/%s", org.client.options.OID, url.PathEscape(iid)), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("installationkeys/%s/%s", org.client.options.OID, url.PathEscape(iid)), request); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -145,7 +146,7 @@ func (org *Organization) AddInstallationKey(k InstallationKey) (string, error) {
 		req["iid"] = k.ID
 	}
 	request := makeDefaultRequest(&resp).withFormData(req)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
 		return "", err
 	}
 	iid, _ := resp["iid"].(string)
@@ -158,7 +159,7 @@ func (org *Organization) DelInstallationKey(iid string) error {
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"iid": iid,
 	})
-	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
 		return err
 	}
 	return nil

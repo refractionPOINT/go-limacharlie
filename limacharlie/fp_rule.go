@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -22,7 +23,7 @@ type FPRule struct {
 func (org Organization) FPRules() (map[FPRuleName]FPRule, error) {
 	resp := map[FPRuleName]FPRule{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
 		return map[FPRuleName]FPRule{}, err
 	}
 	return resp, nil
@@ -54,7 +55,7 @@ func (org Organization) FPRuleAdd(name FPRuleName, detection interface{}, opts .
 		Name:      name,
 		Rule:      string(ruleBytes),
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
 		return err
 	}
 	return nil
@@ -66,7 +67,7 @@ func (org Organization) FPRuleDelete(name FPRuleName) error {
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"name": name,
 	})
-	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
 		return err
 	}
 	return nil

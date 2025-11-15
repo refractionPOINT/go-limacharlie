@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -197,7 +198,7 @@ func (org Organization) SearchIOCSummary(params IOCSearchParams) (*IOCSummaryRes
 	request := makeDefaultRequest(&resp).withQueryData(queryParams)
 
 	endpoint := fmt.Sprintf("insight/%s/objects/%s", org.client.options.OID, params.ObjectType)
-	if err := org.client.reliableRequest(http.MethodGet, endpoint, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, endpoint, request); err != nil {
 		return nil, err
 	}
 
@@ -221,7 +222,7 @@ func (org Organization) SearchIOCLocations(params IOCSearchParams) (*IOCLocation
 	request := makeDefaultRequest(&resp).withQueryData(queryParams)
 
 	endpoint := fmt.Sprintf("insight/%s/objects/%s", org.client.options.OID, params.ObjectType)
-	if err := org.client.reliableRequest(http.MethodGet, endpoint, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, endpoint, request); err != nil {
 		return nil, err
 	}
 
@@ -248,7 +249,7 @@ func (org Organization) SearchHostname(hostname string) ([]HostnameSearchResult,
 	request := makeDefaultRequest(&resp).withQueryData(queryParams)
 
 	endpoint := fmt.Sprintf("hostnames/%s", org.client.options.OID)
-	if err := org.client.reliableRequest(http.MethodGet, endpoint, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, endpoint, request); err != nil {
 		return nil, err
 	}
 
@@ -336,7 +337,7 @@ func (org Organization) InsightObjectsBatch(insightReq InsightObjectsBatchReques
 	}
 	var resp InsightObjectBatchResponse
 	request := makeDefaultRequest(&resp).withFormData(req)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/objects", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("insight/%s/objects", org.client.options.OID), request); err != nil {
 		return InsightObjectBatchResponse{}, err
 	}
 	return resp, nil
@@ -361,7 +362,7 @@ func (org Organization) insightObjects(insightReq InsightObjectsRequest, perObje
 	// }
 
 	request := makeDefaultRequest(resp).withQueryData(req)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("insight/%s/objects/%s", org.client.options.OID, insightReq.ObjectType), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("insight/%s/objects/%s", org.client.options.OID, insightReq.ObjectType), request); err != nil {
 		return err
 	}
 	return nil

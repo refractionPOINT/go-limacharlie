@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -349,5 +350,5 @@ func (org Organization) OutputDel(name string) (GenericJSON, error) {
 }
 
 func (org Organization) outputs(verb string, request restRequest) error {
-	return org.client.reliableRequest(verb, fmt.Sprintf("outputs/%s", org.client.options.OID), request)
+	return org.client.reliableRequest(context.Background(), verb, fmt.Sprintf("outputs/%s", org.client.options.OID), request)
 }

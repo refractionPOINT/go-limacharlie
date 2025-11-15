@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 )
@@ -59,7 +60,7 @@ func (org *Organization) GetBillingOrgStatus() (*BillingOrgStatus, error) {
 
 	request := makeDefaultRequest(&status).withURLRoot(billingRootURL + "/")
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +74,7 @@ func (org *Organization) GetBillingOrgDetails() (*BillingOrgDetails, error) {
 
 	request := makeDefaultRequest(&details).withURLRoot(billingRootURL + "/")
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +108,7 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (m
 
 	request := makeDefaultRequest(&response).withURLRoot(billingRootURL + "/")
 
-	if err := org.client.reliableRequest(http.MethodGet, urlPath, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
 	}
 
@@ -124,7 +125,7 @@ func (org *Organization) GetBillingAvailablePlans() ([]BillingPlan, error) {
 
 	request := makeDefaultRequest(&response).withURLRoot(billingRootURL + "/")
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 
@@ -138,7 +139,7 @@ func (org *Organization) GetBillingUserAuthRequirements() (*BillingUserAuthRequi
 
 	request := makeDefaultRequest(&authReq).withURLRoot(billingRootURL + "/")
 
-	if err := org.client.reliableRequest(http.MethodGet, url, request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
 	}
 

@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -21,7 +22,7 @@ var ResourceCategories = struct {
 }
 
 func (org Organization) resources(verb string, request restRequest) error {
-	return org.client.reliableRequest(verb, fmt.Sprintf("orgs/%s/resources", org.client.options.OID), request)
+	return org.client.reliableRequest(context.Background(), verb, fmt.Sprintf("orgs/%s/resources", org.client.options.OID), request)
 }
 
 type resourceGetResponse = map[string]map[string][]string
