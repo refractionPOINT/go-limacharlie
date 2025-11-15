@@ -350,7 +350,7 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 	return m, nil
 }
 
-func (org *Organization) ListSensorsFromSelectorIteratively(selector string, continuationToken string) (map[string]*Sensor, string, error) {
+func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context, selector string, continuationToken string) (map[string]*Sensor, string, error) {
 	m := map[string]*Sensor{}
 	lastToken := continuationToken
 
@@ -368,7 +368,7 @@ func (org *Organization) ListSensorsFromSelectorIteratively(selector string, con
 			"is_compressed": "true",
 		})
 	}
-	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 		return nil, "", err
 	}
 

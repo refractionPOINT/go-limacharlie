@@ -1,8 +1,8 @@
 package limacharlie
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
