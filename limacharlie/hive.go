@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -135,7 +136,7 @@ func NewHiveClient(org *Organization) *HiveClient {
 
 func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
 	var hiveSet HiveConfigData
-	if err := h.Organization.client.reliableRequest(http.MethodGet,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
 
 func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
 	var hiveSet HiveConfigData
-	if err := h.Organization.client.reliableRequest(http.MethodGet,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
@@ -164,7 +165,7 @@ func (h *HiveClient) Get(args HiveArgs) (*HiveData, error) {
 	}
 
 	var hiveSet HiveData
-	if err := h.Organization.client.reliableRequest(http.MethodGet,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s/%s/data", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
@@ -195,7 +196,7 @@ func (h *HiveClient) GetPublicByGUID(args HiveArgs, guid string) (*HiveData, err
 	var hiveData HiveData
 	req := makeDefaultRequest(&hiveData).withFormData(reqData)
 
-	if err := h.Organization.client.reliableRequest(http.MethodPost,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodPost,
 		fmt.Sprintf("hive-public/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
 		return nil, err
 	}
@@ -209,7 +210,7 @@ func (h *HiveClient) GetMTD(args HiveArgs) (*HiveData, error) {
 	}
 
 	var hd HiveData
-	if err := h.Organization.client.reliableRequest(http.MethodGet,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s/%s/mtd", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&hd)); err != nil {
 		return nil, err
 	}
@@ -272,7 +273,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 
 	var hiveResp HiveResp
 	req := makeDefaultRequest(&hiveResp).withFormData(reqDict).withTimeout(30 * time.Second)
-	if err := h.Organization.client.reliableRequest(http.MethodPost,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
 	}
@@ -330,7 +331,7 @@ func (h *HiveClient) Update(args HiveArgs) (*HiveResp, error) {
 
 	var updateResp HiveResp
 	req := makeDefaultRequest(&updateResp).withFormData(reqData)
-	if err := h.Organization.client.reliableRequest(http.MethodPost,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
 	}
@@ -400,7 +401,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 
 func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
 	var delResp interface{}
-	if err := h.Organization.client.reliableRequest(http.MethodDelete,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodDelete,
 		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&delResp)); err != nil {
 		return nil, err
 	}
@@ -424,7 +425,7 @@ func (h *HiveClient) Rename(args HiveArgs, newName string) (*HiveResp, error) {
 
 	var hiveResp HiveResp
 	req := makeDefaultRequest(&hiveResp).withFormData(params).withTimeout(30 * time.Second)
-	if err := h.Organization.client.reliableRequest(http.MethodPost,
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
 	}
@@ -525,7 +526,7 @@ func (b *HiveBatch) Execute() ([]BatchResponse, error) {
 	}
 	resp := hiveBatchResponses{}
 	req := makeDefaultRequest(&resp).withURLValues(reqs).withTimeout(5 * time.Minute)
-	if err := b.h.Organization.client.reliableRequest(http.MethodPost, "hive", req); err != nil {
+	if err := b.h.Organization.client.reliableRequest(context.Background(), http.MethodPost, "hive", req); err != nil {
 		return nil, err
 	}
 

@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -69,7 +70,7 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 		ExpireOn:  reqOpt.TTL,
 		Namespace: reqOpt.Namespace,
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
 		return err
 	}
 	return nil
@@ -86,7 +87,7 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error
 	resp := map[string]Dict{}
 
 	request := makeDefaultRequest(&resp).withQueryData(req)
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -104,7 +105,7 @@ func (org Organization) DRRuleDelete(name string, filters ...DRRuleFilter) error
 	resp := Dict{}
 
 	request := makeDefaultRequest(&resp).withFormData(req)
-	if err := org.client.reliableRequest(http.MethodDelete, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("rules/%s", org.client.options.OID), request); err != nil {
 		return err
 	}
 	return nil

@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -17,7 +18,7 @@ func (d *Device) AddTag(tag string, ttl time.Duration) error {
 		"ttl":    ttl / time.Second,
 		"is_did": true,
 	})
-	if err := d.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/tags", d.DID), req); err != nil {
+	if err := d.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/tags", d.DID), req); err != nil {
 		return err
 	}
 	return nil

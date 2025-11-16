@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -101,7 +102,7 @@ func (s *Sensor) Update() *Sensor {
 	si := sensorInfo{
 		Info: s,
 	}
-	if err := s.Organization.client.reliableRequest(http.MethodGet, s.SID, makeDefaultRequest(&si)); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodGet, s.SID, makeDefaultRequest(&si)); err != nil {
 		s.LastError = err
 		return s
 	}
@@ -116,7 +117,7 @@ func (s *Sensor) Update() *Sensor {
 
 func (s *Sensor) IsolateFromNetwork() error {
 	resp := Dict{}
-	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(&resp)); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(&resp)); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -125,7 +126,7 @@ func (s *Sensor) IsolateFromNetwork() error {
 
 func (s *Sensor) RejoinNetwork() error {
 	resp := Dict{}
-	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(&resp)); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(&resp)); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -134,7 +135,7 @@ func (s *Sensor) RejoinNetwork() error {
 
 func (s *Sensor) GetTags() ([]TagInfo, error) {
 	ti := sensorTagsList{}
-	if err := s.Organization.client.reliableRequest(http.MethodGet, fmt.Sprintf("%s/tags", s.SID), makeDefaultRequest(&ti)); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("%s/tags", s.SID), makeDefaultRequest(&ti)); err != nil {
 		s.LastError = err
 		return nil, err
 	}
@@ -155,7 +156,7 @@ func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 		"tags": tag,
 		"ttl":  ttl / time.Second,
 	})
-	if err := s.Organization.client.reliableRequest(http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -167,7 +168,7 @@ func (s *Sensor) RemoveTag(tag string) error {
 	req := makeDefaultRequest(&resp).withFormData(Dict{
 		"tags": tag,
 	})
-	if err := s.Organization.client.reliableRequest(http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -200,7 +201,7 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 	if idempotentKey != "" {
 		req = req.withIdempotentKey(idempotentKey)
 	}
-	if err := s.Organization.client.reliableRequest(http.MethodPost, s.SID, req); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, s.SID, req); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -210,7 +211,7 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 func (s *Sensor) Delete() error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp)
-	if err := s.Organization.client.reliableRequest(http.MethodDelete, s.SID, req); err != nil {
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, s.SID, req); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -272,7 +273,7 @@ func (org *Organization) ListSensors(options ...ListSensorsOptions) (map[string]
 				"limit":         effectiveOptions.Limit,
 			})
 		}
-		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
+		if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 			return nil, err
 		}
 
@@ -320,7 +321,7 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 				"is_compressed": "true",
 			})
 		}
-		if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
+		if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 			return nil, err
 		}
 
@@ -349,7 +350,7 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 	return m, nil
 }
 
-func (org *Organization) ListSensorsFromSelectorIteratively(selector string, continuationToken string) (map[string]*Sensor, string, error) {
+func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context, selector string, continuationToken string) (map[string]*Sensor, string, error) {
 	m := map[string]*Sensor{}
 	lastToken := continuationToken
 
@@ -367,7 +368,7 @@ func (org *Organization) ListSensorsFromSelectorIteratively(selector string, con
 			"is_compressed": "true",
 		})
 	}
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 		return nil, "", err
 	}
 
@@ -396,7 +397,7 @@ func (org *Organization) GetAllTags() ([]string, error) {
 	tags := struct {
 		Tags []string `json:"tags"`
 	}{}
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("tags/%s", org.client.options.OID), makeDefaultRequest(&tags)); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("tags/%s", org.client.options.OID), makeDefaultRequest(&tags)); err != nil {
 		return nil, err
 	}
 	return tags.Tags, nil
@@ -407,7 +408,7 @@ func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 	q := makeDefaultRequest(&list).withFormData(Dict{
 		"sids": sids,
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("online/%s", org.client.options.OID), q); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("online/%s", org.client.options.OID), q); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -415,7 +416,7 @@ func (org *Organization) ActiveSensors(sids []string) (map[string]bool, error) {
 
 func (org *Organization) GetSensorsWithTag(tag string) (map[string][]string, error) {
 	data := map[string][]string{}
-	if err := org.client.reliableRequest(http.MethodGet, fmt.Sprintf("tags/%s/%s", org.client.options.OID, url.QueryEscape(tag)), makeDefaultRequest(&data)); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("tags/%s/%s", org.client.options.OID, url.QueryEscape(tag)), makeDefaultRequest(&data)); err != nil {
 		return nil, err
 	}
 	return data, nil

@@ -227,7 +227,7 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 	resp := artifactExportResp{}
 	var request restRequest
 	request = makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return nil, err
 	}
 	if resp.Payload != "" {
@@ -284,7 +284,7 @@ func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID
 		"dest_bucket": bucketName,
 		"svc_creds":   writeCreds,
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return nil, err
 	}
 
@@ -330,7 +330,7 @@ func (org Organization) ExportArtifactToGCS(ctx context.Context, artifactID stri
 		"dest_bucket": bucketName,
 		"svc_creds":   writeCreds,
 	})
-	if err := org.client.reliableRequest(http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
+	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("insight/%s/artifacts/originals/%s", org.GetOID(), artifactID), request); err != nil {
 		return "", err
 	}
 	if resp.Payload != "" {

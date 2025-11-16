@@ -232,7 +232,7 @@ func getHTTPClient() *http.Client {
 	}
 }
 
-func (c *Client) reliableRequest(verb string, path string, request restRequest) (err error) {
+func (c *Client) reliableRequest(ctx context.Context, verb string, path string, request restRequest) (err error) {
 	// If no JWT is ready and we have an API key, prime it (similar to Python SDK behavior).
 	// This prevents sending empty JWT on first request which causes billing server to complain.
 	if c.options.JWT == "" && c.options.APIKey != "" {
@@ -244,7 +244,7 @@ func (c *Client) reliableRequest(verb string, path string, request restRequest) 
 	request.nRetries++
 	for request.nRetries > 0 {
 		var statusCode int
-		statusCode, err = c.request(verb, path, request)
+		statusCode, err = c.request(ctx, verb, path, request)
 		if err == nil && statusCode == http.StatusOK {
 			break
 		}
@@ -289,7 +289,7 @@ func (c *Client) serviceRequest(responseData interface{}, serviceName string, se
 		"request_data": encodedData,
 		"is_async":     isAsync,
 	}).withTimeout(10 * time.Minute)
-	return c.reliableRequest(http.MethodPost, fmt.Sprintf("service/%s/%s", c.options.OID, serviceName), req)
+	return c.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("service/%s/%s", c.options.OID, serviceName), req)
 }
 
 func (c *Client) extensionRequest(responseData interface{}, extensionName string, action string, serviceData Dict, isImpersonate bool) error {
@@ -307,7 +307,7 @@ func (c *Client) extensionRequest(responseData interface{}, extensionName string
 	}
 
 	req := makeDefaultRequest(responseData).withFormData(reqData).withTimeout(10 * time.Minute)
-	return c.reliableRequest(http.MethodPost, fmt.Sprintf("extension/request/%s", extensionName), req)
+	return c.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("extension/request/%s", extensionName), req)
 }
 
 func getStringKV(d interface{}) (*url.Values, error) {
@@ -358,7 +358,7 @@ func getStringKV(d interface{}) (*url.Values, error) {
 	return m, nil
 }
 
-func (c *Client) request(verb string, path string, request restRequest) (int, error) {
+func (c *Client) request(ctx context.Context, verb string, path string, request restRequest) (int, error) {
 	headers := map[string]string{}
 	var body io.Reader
 	rawQuery := ""
@@ -387,7 +387,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		rawQuery = qData.Encode()
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), request.timeout)
+	reqCtx, _ := context.WithTimeout(ctx, request.timeout)
 
 	// Build the URL - if urlRoot is a full URL (starts with http), use it as base, otherwise concatenate
 	var fullURL string
@@ -397,7 +397,7 @@ func (c *Client) request(verb string, path string, request restRequest) (int, er
 		fullURL = fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path)
 	}
 
-	r, err := http.NewRequestWithContext(ctx, verb, fullURL, body)
+	r, err := http.NewRequestWithContext(reqCtx, verb, fullURL, body)
 	if err != nil {
 		return 0, err
 	}
@@ -489,7 +489,7 @@ type GenericJSON = map[string]interface{}
 
 func (c *Client) WhoAmI() (WhoAmIJsonResponse, error) {
 	who := WhoAmIJsonResponse{}
-	if err := c.reliableRequest(http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
+	if err := c.reliableRequest(context.Background(), http.MethodGet, "who", makeDefaultRequest(&who)); err != nil {
 		return WhoAmIJsonResponse{}, err
 	}
 	return who, nil
