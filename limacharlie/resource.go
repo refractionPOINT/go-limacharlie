@@ -21,7 +21,7 @@ var ResourceCategories = struct {
 	Service:   "service",
 }
 
-func (org Organization) resources(verb string, request restRequest) error {
+func (org *Organization) resources(verb string, request restRequest) error {
 	return org.client.reliableRequest(context.Background(), verb, fmt.Sprintf("orgs/%s/resources", org.client.options.OID), request)
 }
 
@@ -70,7 +70,7 @@ func (r *ResourcesByCategory) RemoveFromCategory(category ResourceCategory, name
 }
 
 // Resources list available resources
-func (org Organization) Resources() (ResourcesByCategory, error) {
+func (org *Organization) Resources() (ResourcesByCategory, error) {
 	resp := resourceGetResponse{}
 	req := makeDefaultRequest(&resp).withTimeout(10 * time.Second)
 	if err := org.resources(http.MethodGet, req); err != nil {
@@ -98,7 +98,7 @@ func (org Organization) Resources() (ResourcesByCategory, error) {
 // ResourceSubscribe subscribe to a resource.
 // The backend call is async meaning that you will get a response right away but it might take a
 // few seconds before a call to list resources shows up with the updated list.
-func (org Organization) ResourceSubscribe(name ResourceName, category ResourceCategory) error {
+func (org *Organization) ResourceSubscribe(name ResourceName, category ResourceCategory) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withTimeout(120 * time.Second).withFormData(Dict{
 		"res_cat":  category,
@@ -110,7 +110,7 @@ func (org Organization) ResourceSubscribe(name ResourceName, category ResourceCa
 // ResourceUnsubscribe unsubscribe from a resource.
 // The backend call is async meaning that you will get a response right away but it might take a
 // few seconds before a call to list resources shows up with the updated list.
-func (org Organization) ResourceUnsubscribe(name ResourceName, category ResourceCategory) error {
+func (org *Organization) ResourceUnsubscribe(name ResourceName, category ResourceCategory) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withTimeout(120 * time.Second).withFormData(Dict{
 		"res_cat":  category,

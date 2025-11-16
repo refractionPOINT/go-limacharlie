@@ -49,13 +49,13 @@ var maxUploadFilePartSize = int64(1024 * 1024)
 
 const concurrentUploads = 10
 
-func (org Organization) artifact(responseData interface{}, action string, req Dict) error {
+func (org *Organization) artifact(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
 	return org.client.serviceRequest(responseData, "logging", reqData, false)
 }
 
-func (org Organization) ArtifactsRules() (ArtifactRulesByName, error) {
+func (org *Organization) ArtifactsRules() (ArtifactRulesByName, error) {
 	resp := ArtifactRulesByName{}
 	if err := org.artifact(&resp, "list_rules", Dict{}); err != nil {
 		return ArtifactRulesByName{}, err
@@ -63,7 +63,7 @@ func (org Organization) ArtifactsRules() (ArtifactRulesByName, error) {
 	return resp, nil
 }
 
-func (org Organization) ArtifactRuleAdd(ruleName ArtifactRuleName, rule ArtifactRule) error {
+func (org *Organization) ArtifactRuleAdd(ruleName ArtifactRuleName, rule ArtifactRule) error {
 	resp := Dict{}
 	if err := org.artifact(&resp, "add_rule", Dict{
 		"name":            ruleName,
@@ -79,7 +79,7 @@ func (org Organization) ArtifactRuleAdd(ruleName ArtifactRuleName, rule Artifact
 	return nil
 }
 
-func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
+func (org *Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	resp := Dict{}
 	if err := org.artifact(&resp, "remove_rule", Dict{"name": ruleName}); err != nil {
 		return err
@@ -87,11 +87,11 @@ func (org Organization) ArtifactRuleDelete(ruleName ArtifactRuleName) error {
 	return nil
 }
 
-func (org Organization) CreateArtifactFromBytes(name string, fileData []byte, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
+func (org *Organization) CreateArtifactFromBytes(name string, fileData []byte, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
 	return org.UploadArtifact(bytes.NewBuffer(fileData), int64(len(fileData)), fileType, name, artifactId, "", nDaysRetention, ingestionKey)
 }
 
-func (org Organization) CreateArtifactFromFile(name string, fileName string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
+func (org *Organization) CreateArtifactFromFile(name string, fileName string, fileType string, artifactId string, nDaysRetention int, ingestionKey string) error {
 	fileInfo, err := os.Stat(fileName)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (org Organization) CreateArtifactFromFile(name string, fileName string, fil
 	return org.UploadArtifact(file, fileInfo.Size(), fileType, name, artifactId, fileName, nDaysRetention, ingestionKey)
 }
 
-func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestionKey string) error {
+func (org *Organization) UploadArtifact(data io.Reader, size int64, hint string, source string, artifactId string, originalPath string, nDaysRetention int, ingestionKey string) error {
 	// Assemble headers
 	headers := map[string]string{}
 	headers["lc-source"] = source
@@ -223,7 +223,7 @@ func (org Organization) UploadArtifact(data io.Reader, size int64, hint string, 
 	return eg.Wait()
 }
 
-func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
+func (org *Organization) ExportArtifact(artifactID string, deadline time.Time) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
 	var request restRequest
 	request = makeDefaultRequest(&resp)
@@ -278,7 +278,7 @@ func (org Organization) ExportArtifact(artifactID string, deadline time.Time) (i
 	return httpResp.Body, nil
 }
 
-func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (io.ReadCloser, error) {
+func (org *Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (io.ReadCloser, error) {
 	resp := artifactExportResp{}
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"dest_bucket": bucketName,
@@ -324,7 +324,7 @@ func (org Organization) ExportArtifactThroughGCS(ctx context.Context, artifactID
 	return r, nil
 }
 
-func (org Organization) ExportArtifactToGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (string, error) {
+func (org *Organization) ExportArtifactToGCS(ctx context.Context, artifactID string, deadline time.Time, bucketName string, writeCreds string, readClient *storage.Client) (string, error) {
 	resp := artifactExportResp{}
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"dest_bucket": bucketName,

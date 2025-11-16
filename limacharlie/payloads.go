@@ -29,7 +29,7 @@ type payloadPutPointer struct {
 }
 
 // List all the Payloads in an LC organization.
-func (org Organization) Payloads() (map[PayloadName]Payload, error) {
+func (org *Organization) Payloads() (map[PayloadName]Payload, error) {
 	resp := payloadsList{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("payload/%s", org.client.options.OID), request); err != nil {
@@ -39,7 +39,7 @@ func (org Organization) Payloads() (map[PayloadName]Payload, error) {
 }
 
 // Download the content of a Payload in an LC organization.
-func (org Organization) Payload(name PayloadName) ([]byte, error) {
+func (org *Organization) Payload(name PayloadName) ([]byte, error) {
 	resp := payloadGetPointer{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
@@ -58,7 +58,7 @@ func (org Organization) Payload(name PayloadName) ([]byte, error) {
 }
 
 // Delete a Payload from within an LC organization.
-func (org Organization) DeletePayload(name PayloadName) error {
+func (org *Organization) DeletePayload(name PayloadName) error {
 	resp := Dict{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
@@ -68,11 +68,11 @@ func (org Organization) DeletePayload(name PayloadName) error {
 }
 
 // Create a Payload in an LC organization.
-func (org Organization) CreatePayloadFromBytes(name PayloadName, data []byte) error {
+func (org *Organization) CreatePayloadFromBytes(name PayloadName, data []byte) error {
 	return org.CreatePayloadFromReader(name, bytes.NewBuffer(data))
 }
 
-func (org Organization) CreatePayloadFromReader(name PayloadName, data io.Reader) error {
+func (org *Organization) CreatePayloadFromReader(name PayloadName, data io.Reader) error {
 	resp := payloadPutPointer{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {

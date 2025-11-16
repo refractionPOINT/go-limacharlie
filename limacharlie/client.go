@@ -186,7 +186,8 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 		authData.Set("perms", strings.Join(c.options.Permissions, ","))
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	r, err := http.NewRequestWithContext(ctx, http.MethodPost, getJWTURL, strings.NewReader(authData.Encode()))
 	if err != nil {
@@ -387,7 +388,8 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 		rawQuery = qData.Encode()
 	}
 
-	reqCtx, _ := context.WithTimeout(ctx, request.timeout)
+	reqCtx, cancel := context.WithTimeout(ctx, request.timeout)
+	defer cancel()
 
 	// Build the URL - if urlRoot is a full URL (starts with http), use it as base, otherwise concatenate
 	var fullURL string

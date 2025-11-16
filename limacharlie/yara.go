@@ -65,13 +65,13 @@ func (s YaraSource) EqualsContent(s2 YaraSource) bool {
 	return s.Source == s2.Source && s.Content == s2.Content
 }
 
-func (org Organization) yara(responseData interface{}, action string, req Dict) error {
+func (org *Organization) yara(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
 	return org.client.serviceRequest(responseData, "yara", reqData, false)
 }
 
-func (org Organization) YaraListRules() (YaraRules, error) {
+func (org *Organization) YaraListRules() (YaraRules, error) {
 	resp := YaraRules{}
 	if err := org.yara(&resp, "list_rules", Dict{}); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (org Organization) YaraListRules() (YaraRules, error) {
 	return resp, nil
 }
 
-func (org Organization) YaraRuleAdd(ruleName string, rule YaraRule) error {
+func (org *Organization) YaraRuleAdd(ruleName string, rule YaraRule) error {
 	tags := rule.Filters.Tags
 	if tags == nil {
 		tags = []string{}
@@ -100,7 +100,7 @@ func (org Organization) YaraRuleAdd(ruleName string, rule YaraRule) error {
 	return err
 }
 
-func (org Organization) YaraRuleDelete(ruleName string) error {
+func (org *Organization) YaraRuleDelete(ruleName string) error {
 	req := Dict{
 		"name": ruleName,
 	}
@@ -109,7 +109,7 @@ func (org Organization) YaraRuleDelete(ruleName string) error {
 	return err
 }
 
-func (org Organization) YaraListSources() (YaraSources, error) {
+func (org *Organization) YaraListSources() (YaraSources, error) {
 	resp := YaraSources{}
 	if err := org.yara(&resp, "list_sources", Dict{}); err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (org Organization) YaraListSources() (YaraSources, error) {
 	return resp, nil
 }
 
-func (org Organization) YaraSourceAdd(sourceName string, source YaraSource) error {
+func (org *Organization) YaraSourceAdd(sourceName string, source YaraSource) error {
 	resp := Dict{}
 	err := org.yara(&resp, "add_source", Dict{
 		"name":    sourceName,
@@ -141,7 +141,7 @@ func (org Organization) YaraSourceAdd(sourceName string, source YaraSource) erro
 	return err
 }
 
-func (org Organization) YaraSourceDelete(ruleName string) error {
+func (org *Organization) YaraSourceDelete(ruleName string) error {
 	resp := Dict{}
 	err := org.yara(&resp, "remove_source", Dict{
 		"name": ruleName,
@@ -149,7 +149,7 @@ func (org Organization) YaraSourceDelete(ruleName string) error {
 	return err
 }
 
-func (org Organization) YaraGetSource(sourceName string) (string, error) {
+func (org *Organization) YaraGetSource(sourceName string) (string, error) {
 	resp := Dict{}
 	if err := org.yara(&resp, "get_source", Dict{
 		"source": sourceName,

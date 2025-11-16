@@ -183,7 +183,7 @@ type HostnameSearchResponse struct {
 
 // SearchIOCSummary searches for an IOC and returns summary statistics
 // This matches the web app's fetchIndicatorSummaryResult function
-func (org Organization) SearchIOCSummary(params IOCSearchParams) (*IOCSummaryResponse, error) {
+func (org *Organization) SearchIOCSummary(params IOCSearchParams) (*IOCSummaryResponse, error) {
 	hasWildcards := strings.Contains(params.SearchTerm, "%")
 
 	queryParams := Dict{
@@ -207,7 +207,7 @@ func (org Organization) SearchIOCSummary(params IOCSearchParams) (*IOCSummaryRes
 
 // SearchIOCLocations searches for locations where an IOC was found
 // This matches the web app's fetchIndicatorLocationsResult function
-func (org Organization) SearchIOCLocations(params IOCSearchParams) (*IOCLocationsResponse, error) {
+func (org *Organization) SearchIOCLocations(params IOCSearchParams) (*IOCLocationsResponse, error) {
 	hasWildcards := strings.Contains(params.SearchTerm, "%")
 
 	queryParams := Dict{
@@ -240,7 +240,7 @@ func (org Organization) SearchIOCLocations(params IOCSearchParams) (*IOCLocation
 
 // SearchHostname searches for sensors by hostname
 // This matches the web app's fetchHostnameSearchResults function
-func (org Organization) SearchHostname(hostname string) ([]HostnameSearchResult, error) {
+func (org *Organization) SearchHostname(hostname string) ([]HostnameSearchResult, error) {
 	queryParams := Dict{
 		"hostname": hostname,
 	}
@@ -289,7 +289,7 @@ type InsightObjectsResponse struct {
 }
 
 // Deprecated: Use SearchIOCSummary instead
-func (org Organization) InsightObjects(insightReq InsightObjectsRequest) (InsightObjectsResponse, error) {
+func (org *Organization) InsightObjects(insightReq InsightObjectsRequest) (InsightObjectsResponse, error) {
 	var resp InsightObjectsResponse
 	if err := org.insightObjects(insightReq, false, &resp); err != nil {
 		return InsightObjectsResponse{}, err
@@ -308,7 +308,7 @@ type InsightObjectsPerObjectResponse struct {
 }
 
 // Deprecated: Use SearchIOCSummary instead
-func (org Organization) InsightObjectsPerObject(insightReq InsightObjectsRequest) (InsightObjectsPerObjectResponse, error) {
+func (org *Organization) InsightObjectsPerObject(insightReq InsightObjectsRequest) (InsightObjectsPerObjectResponse, error) {
 	var resp InsightObjectsPerObjectResponse
 	if err := org.insightObjects(insightReq, true, &resp); err != nil {
 		return InsightObjectsPerObjectResponse{}, err
@@ -330,7 +330,7 @@ type InsightObjectBatchResponse struct {
 }
 
 // Deprecated: Use SearchIOCSummary for individual searches
-func (org Organization) InsightObjectsBatch(insightReq InsightObjectsBatchRequest) (InsightObjectBatchResponse, error) {
+func (org *Organization) InsightObjectsBatch(insightReq InsightObjectsBatchRequest) (InsightObjectBatchResponse, error) {
 	req := Dict{
 		"objects":        insightReq.Objects,
 		"case_sensitive": insightReq.IsCaseSensitive,
@@ -344,7 +344,7 @@ func (org Organization) InsightObjectsBatch(insightReq InsightObjectsBatchReques
 }
 
 // Deprecated: Internal method for legacy API
-func (org Organization) insightObjects(insightReq InsightObjectsRequest, perObject bool, resp interface{}) error {
+func (org *Organization) insightObjects(insightReq InsightObjectsRequest, perObject bool, resp interface{}) error {
 	req := Dict{
 		"name":           insightReq.IndicatorName,
 		"info":           insightReq.ObjectTypeInfo,

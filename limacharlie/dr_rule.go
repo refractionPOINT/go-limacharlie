@@ -40,7 +40,7 @@ type CoreDRRule struct {
 }
 
 // DRRuleAdd add a D&R Rule to an LC organization
-func (org Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...NewDRRuleOptions) error {
+func (org *Organization) DRRuleAdd(name string, detection interface{}, response interface{}, opt ...NewDRRuleOptions) error {
 	resp := Dict{}
 	reqOpt := NewDRRuleOptions{
 		IsEnabled: true,
@@ -77,7 +77,7 @@ func (org Organization) DRRuleAdd(name string, detection interface{}, response i
 }
 
 // DRRules get all D&R rules for an LC organization
-func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error) {
+func (org *Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error) {
 	req := map[string]string{}
 
 	for _, f := range filters {
@@ -94,7 +94,7 @@ func (org Organization) DRRules(filters ...DRRuleFilter) (map[string]Dict, error
 }
 
 // DRRuleDelete delete a D&R rule from an LC organization
-func (org Organization) DRRuleDelete(name string, filters ...DRRuleFilter) error {
+func (org *Organization) DRRuleDelete(name string, filters ...DRRuleFilter) error {
 	req := map[string]string{
 		"name": name,
 	}

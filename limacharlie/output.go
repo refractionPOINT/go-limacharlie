@@ -288,7 +288,7 @@ type outputsByOrgID = map[string]OutputsByName
 type genericOutputsByOrgID = map[string]GenericJSON
 
 // OutputsGeneric fetches all outputs and returns it in outputs
-func (org Organization) OutputsGeneric(outputs interface{}) error {
+func (org *Organization) OutputsGeneric(outputs interface{}) error {
 	request := makeDefaultRequest(&outputs).withTimeout(10 * time.Second)
 	if err := org.outputs(http.MethodGet, request); err != nil {
 		return err
@@ -304,7 +304,7 @@ type outputResponse struct {
 }
 
 // Outputs returns all outputs by name
-func (org Organization) Outputs() (OutputsByName, error) {
+func (org *Organization) Outputs() (OutputsByName, error) {
 	outputsByOrg := map[string]map[OutputName]outputResponse{}
 	if err := org.OutputsGeneric(&outputsByOrg); err != nil {
 		return nil, err
@@ -327,7 +327,7 @@ func (org Organization) Outputs() (OutputsByName, error) {
 }
 
 // OutputAdd add an output to the LC organization
-func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
+func (org *Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
 	resp := outputResponse{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(output)
 	if err := org.outputs(http.MethodPost, request); err != nil {
@@ -340,7 +340,7 @@ func (org Organization) OutputAdd(output OutputConfig) (OutputConfig, error) {
 }
 
 // OutputDel deletes an output from the LC organization
-func (org Organization) OutputDel(name string) (GenericJSON, error) {
+func (org *Organization) OutputDel(name string) (GenericJSON, error) {
 	resp := GenericJSON{}
 	request := makeDefaultRequest(&resp).withTimeout(10 * time.Second).withFormData(map[string]string{"name": name})
 	if err := org.outputs(http.MethodDelete, request); err != nil {
@@ -349,6 +349,6 @@ func (org Organization) OutputDel(name string) (GenericJSON, error) {
 	return resp, nil
 }
 
-func (org Organization) outputs(verb string, request restRequest) error {
+func (org *Organization) outputs(verb string, request restRequest) error {
 	return org.client.reliableRequest(context.Background(), verb, fmt.Sprintf("outputs/%s", org.client.options.OID), request)
 }

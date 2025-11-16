@@ -21,7 +21,7 @@ func (org *Organization) GetIngestionKeys() (Dict, error) {
 	return keys, nil
 }
 
-func (org Organization) SetIngestionKeys(name string) (Dict, error) {
+func (org *Organization) SetIngestionKeys(name string) (Dict, error) {
 	resp := Dict{}
 	req := Dict{
 		"name": name,
@@ -33,7 +33,7 @@ func (org Organization) SetIngestionKeys(name string) (Dict, error) {
 	return resp, nil
 }
 
-func (org Organization) DelIngestionKeys(name string) (Dict, error) {
+func (org *Organization) DelIngestionKeys(name string) (Dict, error) {
 	resp := Dict{}
 	req := Dict{}
 	escapedName := url.QueryEscape(name)
