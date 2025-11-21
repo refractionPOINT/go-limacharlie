@@ -344,3 +344,39 @@ func TestSensor_Request(t *testing.T) {
 		t.Errorf("unexpected response type: %T", resp)
 	}
 }
+
+func TestListSensorsOnlineOnly(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// List all sensors
+	allSensors, err := org.ListSensors()
+	if err != nil {
+		t.Errorf("ListSensors: %v", err)
+	}
+
+	// List only online sensors
+	onlineSensors, err := org.ListSensors(ListSensorsOptions{
+		OnlineOnly: true,
+	})
+	if err != nil {
+		t.Errorf("ListSensors with OnlineOnly: %v", err)
+	}
+
+	// The number of online sensors should be less than or equal to all sensors
+	if len(onlineSensors) > len(allSensors) {
+		t.Errorf("online sensors (%d) should not exceed all sensors (%d)", len(onlineSensors), len(allSensors))
+	}
+
+	// Verify that all returned sensors are actually online
+	for sid := range onlineSensors {
+		isOnline, err := org.ActiveSensors([]string{sid})
+		if err != nil {
+			t.Errorf("failed to check online status for %s: %v", sid, err)
+			continue
+		}
+		if !isOnline[sid] {
+			t.Errorf("sensor %s reported as online but is actually offline", sid)
+		}
+	}
+}
