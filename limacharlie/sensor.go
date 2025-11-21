@@ -245,8 +245,9 @@ func (org *Organization) GetSensors(SIDs []string) map[string]*Sensor {
 }
 
 type ListSensorsOptions struct {
-	Selector string
-	Limit    int
+	Selector   string
+	Limit      int
+	OnlineOnly bool
 }
 
 func (org *Organization) ListSensors(options ...ListSensorsOptions) (map[string]*Sensor, error) {
@@ -265,12 +266,14 @@ func (org *Organization) ListSensors(options ...ListSensorsOptions) (map[string]
 				"is_compressed":      "true",
 				"selector":           effectiveOptions.Selector,
 				"limit":              effectiveOptions.Limit,
+				"is_online_only":     effectiveOptions.OnlineOnly,
 			})
 		} else {
 			q = q.withQueryData(Dict{
-				"is_compressed": "true",
-				"selector":      effectiveOptions.Selector,
-				"limit":         effectiveOptions.Limit,
+				"is_compressed":  "true",
+				"selector":       effectiveOptions.Selector,
+				"limit":          effectiveOptions.Limit,
+				"is_online_only": effectiveOptions.OnlineOnly,
 			})
 		}
 		if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
