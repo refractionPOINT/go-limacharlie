@@ -1,6 +1,6 @@
 module github.com/refractionPOINT/go-limacharlie/limacharlie
 
-go 1.24
+go 1.24.0
 
 toolchain go1.24.2
 
@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.18.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -52,11 +52,11 @@ require (
 	go.opentelemetry.io/otel/sdk v1.37.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/net v0.42.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.245.0 // indirect
 	google.golang.org/genproto v0.0.0-20250804133106-a7a43d27e69b // indirect
