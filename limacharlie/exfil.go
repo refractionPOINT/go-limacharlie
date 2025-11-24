@@ -48,13 +48,13 @@ func (r ExfilRuleEvent) EqualsContent(other ExfilRuleEvent) bool {
 	return string(bytes) == string(otherBytes)
 }
 
-func (org Organization) exfil(responseData interface{}, action string, req Dict) error {
+func (org *Organization) exfil(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
 	return org.client.serviceRequest(responseData, "exfil", reqData, false)
 }
 
-func (org Organization) ExfilRules() (ExfilRulesType, error) {
+func (org *Organization) ExfilRules() (ExfilRulesType, error) {
 	rules := ExfilRulesType{}
 	if err := org.exfil(&rules, "list_rules", Dict{}); err != nil {
 		return ExfilRulesType{}, err
@@ -62,7 +62,7 @@ func (org Organization) ExfilRules() (ExfilRulesType, error) {
 	return rules, nil
 }
 
-func (org Organization) ExfilRuleEventAdd(name ExfilRuleName, event ExfilRuleEvent) error {
+func (org *Organization) ExfilRuleEventAdd(name ExfilRuleName, event ExfilRuleEvent) error {
 	tags := event.Filters.Tags
 	if tags == nil {
 		tags = []string{}
@@ -81,7 +81,7 @@ func (org Organization) ExfilRuleEventAdd(name ExfilRuleName, event ExfilRuleEve
 	return org.exfil(&resp, "add_event_rule", data)
 }
 
-func (org Organization) ExfilRuleEventDelete(name ExfilRuleName) error {
+func (org *Organization) ExfilRuleEventDelete(name ExfilRuleName) error {
 	resp := Dict{}
 	return org.exfil(&resp, "remove_event_rule", Dict{"name": name})
 }
@@ -128,7 +128,7 @@ func (r ExfilRuleWatch) EqualsContent(other ExfilRuleWatch) bool {
 	return string(bytes) == string(otherBytes)
 }
 
-func (org Organization) ExfilRuleWatchAdd(name ExfilRuleName, watch ExfilRuleWatch) error {
+func (org *Organization) ExfilRuleWatchAdd(name ExfilRuleName, watch ExfilRuleWatch) error {
 	tags := watch.Filters.Tags
 	if tags == nil {
 		tags = []string{}
@@ -149,7 +149,7 @@ func (org Organization) ExfilRuleWatchAdd(name ExfilRuleName, watch ExfilRuleWat
 	})
 }
 
-func (org Organization) ExfilRuleWatchDelete(name ExfilRuleName) error {
+func (org *Organization) ExfilRuleWatchDelete(name ExfilRuleName) error {
 	resp := Dict{}
 	return org.exfil(&resp, "remove_watch", Dict{"name": name})
 }

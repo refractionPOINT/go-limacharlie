@@ -16,7 +16,7 @@ type OrgValueName = string
 type OrgValue = string
 
 // Get an Org Value from a specific org.
-func (org Organization) OrgValueGet(name string) (*OrgValueInfo, error) {
+func (org *Organization) OrgValueGet(name string) (*OrgValueInfo, error) {
 	resp := OrgValueInfo{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("configs/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
@@ -26,7 +26,7 @@ func (org Organization) OrgValueGet(name string) (*OrgValueInfo, error) {
 }
 
 // Set an Org Value for a specific org.
-func (org Organization) OrgValueSet(name string, value string) error {
+func (org *Organization) OrgValueSet(name string, value string) error {
 	resp := Dict{}
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"value": value,

@@ -20,7 +20,7 @@ type FPRule struct {
 }
 
 // FPRules get all false positive rules from a LC organization.
-func (org Organization) FPRules() (map[FPRuleName]FPRule, error) {
+func (org *Organization) FPRules() (map[FPRuleName]FPRule, error) {
 	resp := map[FPRuleName]FPRule{}
 	request := makeDefaultRequest(&resp)
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("fp/%s", org.client.options.OID), request); err != nil {
@@ -36,7 +36,7 @@ type fpAddRuleRequest struct {
 }
 
 // FPRuleAdd add a false positive rule to a LC organization
-func (org Organization) FPRuleAdd(name FPRuleName, detection interface{}, opts ...FPRuleOptions) error {
+func (org *Organization) FPRuleAdd(name FPRuleName, detection interface{}, opts ...FPRuleOptions) error {
 	reqOpt := FPRuleOptions{
 		IsReplace: false,
 	}
@@ -62,7 +62,7 @@ func (org Organization) FPRuleAdd(name FPRuleName, detection interface{}, opts .
 }
 
 // FPRuleDelete delete a false positive rule from a LC organization
-func (org Organization) FPRuleDelete(name FPRuleName) error {
+func (org *Organization) FPRuleDelete(name FPRuleName) error {
 	resp := Dict{}
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"name": name,

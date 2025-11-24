@@ -31,13 +31,13 @@ func (ir IntegrityRule) WithPlatforms(platforms []string) IntegrityRule {
 type IntegrityRuleName = string
 type IntegrityRulesByName = map[IntegrityRuleName]IntegrityRule
 
-func (org Organization) integrity(responseData interface{}, action string, req Dict) error {
+func (org *Organization) integrity(responseData interface{}, action string, req Dict) error {
 	reqData := req
 	reqData["action"] = action
 	return org.client.serviceRequest(responseData, "integrity", reqData, false)
 }
 
-func (org Organization) IntegrityRules() (IntegrityRulesByName, error) {
+func (org *Organization) IntegrityRules() (IntegrityRulesByName, error) {
 	resp := IntegrityRulesByName{}
 	if err := org.integrity(&resp, "list_rules", Dict{}); err != nil {
 		return IntegrityRulesByName{}, err
@@ -45,7 +45,7 @@ func (org Organization) IntegrityRules() (IntegrityRulesByName, error) {
 	return resp, nil
 }
 
-func (org Organization) IntegrityRuleAdd(ruleName IntegrityRuleName, rule IntegrityRule) error {
+func (org *Organization) IntegrityRuleAdd(ruleName IntegrityRuleName, rule IntegrityRule) error {
 	patterns := rule.Patterns
 	if patterns == nil {
 		patterns = []string{}
@@ -70,7 +70,7 @@ func (org Organization) IntegrityRuleAdd(ruleName IntegrityRuleName, rule Integr
 	return err
 }
 
-func (org Organization) IntegrityRuleDelete(ruleName string) error {
+func (org *Organization) IntegrityRuleDelete(ruleName string) error {
 	req := Dict{
 		"name": ruleName,
 	}
