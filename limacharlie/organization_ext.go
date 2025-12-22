@@ -56,29 +56,27 @@ type APIKeyCreate struct {
 }
 
 // MITREReport contains the MITRE ATT&CK coverage report for an organization
+// This format is compatible with the MITRE ATT&CK Navigator
 type MITREReport struct {
-	OID         string                         `json:"oid,omitempty"`
-	Techniques  []MITRETechniqueCoverage       `json:"techniques,omitempty"`
-	Tactics     map[string]MITRETacticCoverage `json:"tactics,omitempty"`
-	Coverage    float64                        `json:"coverage_percentage,omitempty"`
-	GeneratedAt int64                          `json:"generated_at,omitempty"`
+	Name        string                   `json:"name,omitempty"`
+	Versions    MITREVersion             `json:"versions,omitempty"`
+	Sorting     int                      `json:"sorting,omitempty"`
+	Description string                   `json:"description,omitempty"`
+	Domain      string                   `json:"domain,omitempty"`
+	Techniques  []MITRETechniqueCoverage `json:"techniques,omitempty"`
 }
 
 // MITRETechniqueCoverage contains coverage information for a MITRE technique
 type MITRETechniqueCoverage struct {
-	TechniqueID    string   `json:"technique_id,omitempty"`
-	Name           string   `json:"name,omitempty"`
-	Covered        bool     `json:"covered,omitempty"`
-	DetectionRules []string `json:"detection_rules,omitempty"`
-	Tactic         string   `json:"tactic,omitempty"`
+	TechniqueID string `json:"techniqueID,omitempty"`
+	Enabled     bool   `json:"enabled,omitempty"`
+	Color       string `json:"color,omitempty"`
 }
 
-// MITRETacticCoverage contains coverage information for a MITRE tactic
-type MITRETacticCoverage struct {
-	TacticName        string  `json:"tactic_name,omitempty"`
-	TechniquesTotal   int     `json:"techniques_total,omitempty"`
-	TechniquesCovered int     `json:"techniques_covered,omitempty"`
-	Coverage          float64 `json:"coverage_percentage,omitempty"`
+// MITREVersion contains version information for the MITRE layer format
+type MITREVersion struct {
+	Layer     string `json:"layer,omitempty"`
+	Navigator string `json:"navigator,omitempty"`
 }
 
 // SensorTimeData contains timestamp information for when a sensor has data
