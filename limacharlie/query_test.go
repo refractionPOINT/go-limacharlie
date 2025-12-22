@@ -79,7 +79,7 @@ func TestQuery_WithFilter(t *testing.T) {
 
 	// Query with a filter condition
 	resp, err := org.Query(QueryRequest{
-		Query:      "-1h | * | * | event/PROCESS_ID is not 0",
+		Query:      "-1h | * | * | event/PROCESS_ID exists and event/PROCESS_ID is not 0",
 		Stream:     "event",
 		LimitEvent: 50,
 	})
