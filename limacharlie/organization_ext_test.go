@@ -190,16 +190,19 @@ func TestGetMITREReport(t *testing.T) {
 	a.NoError(err, "GetMITREReport should succeed")
 	a.NotNil(report, "MITRE report should not be nil")
 
-	t.Logf("MITRE report: OID=%s, Coverage=%.2f%%, Techniques=%d, Tactics=%d",
-		report.OID, report.Coverage, len(report.Techniques), len(report.Tactics))
+	t.Logf("MITRE report: Name=%s, Domain=%s, Techniques=%d",
+		report.Name, report.Domain, len(report.Techniques))
+
+	// Log version info if available
+	t.Logf("Versions: Layer=%s, Navigator=%s", report.Versions.Layer, report.Versions.Navigator)
 
 	// Log some technique coverage details if available
 	for i, tech := range report.Techniques {
 		if i >= 3 {
 			break
 		}
-		t.Logf("Technique %s (%s): Covered=%v, Rules=%d",
-			tech.TechniqueID, tech.Name, tech.Covered, len(tech.DetectionRules))
+		t.Logf("Technique %s: Enabled=%v, Color=%s",
+			tech.TechniqueID, tech.Enabled, tech.Color)
 	}
 }
 
