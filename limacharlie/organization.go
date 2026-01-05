@@ -49,8 +49,39 @@ type OnlineCount struct {
 }
 
 type SiteConnectivityInfo struct {
-	URLs  map[string]string `json:"url"`
-	Certs map[string]string `json:"certs"`
+	URLs     SiteURLs          `json:"url"`
+	Certs    map[string]string `json:"certs"`
+	SiteName string            `json:"site_name"`
+}
+
+// SiteURLs contains the URLs for various LimaCharlie services
+type SiteURLs struct {
+	Lc               string          `json:"lc"`
+	LcWss            string          `json:"lc_wss"`
+	EDR              string          `json:"edr"`
+	Logs             string          `json:"logs"`
+	Artifacts        string          `json:"artifacts"`
+	Replay           string          `json:"replay"`
+	Live             string          `json:"live"`
+	Hooks            string          `json:"hooks"`
+	Search           string          `json:"search"`
+	RegionCode       string          `json:"region_code"`
+	PrivateEndpoints map[string]bool `json:"private_endpoints,omitempty"`
+}
+
+// ToMap converts SiteURLs to a map for backward compatibility
+func (s SiteURLs) ToMap() map[string]string {
+	return map[string]string{
+		"lc":        s.Lc,
+		"lc_wss":    s.LcWss,
+		"edr":       s.EDR,
+		"logs":      s.Logs,
+		"artifacts": s.Artifacts,
+		"replay":    s.Replay,
+		"live":      s.Live,
+		"hooks":     s.Hooks,
+		"search":    s.Search,
+	}
 }
 
 // NewOrganization initialize a link to an organization
@@ -177,7 +208,7 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 func (o *Organization) GetURLs() (map[string]string, error) {
 	o.mCachedUrls.RLock()
 	if o.cachedURLs != nil {
-		urls := o.cachedURLs.URLs
+		urls := o.cachedURLs.URLs.ToMap()
 		o.mCachedUrls.RUnlock()
 		return urls, nil
 	}
@@ -186,7 +217,7 @@ func (o *Organization) GetURLs() (map[string]string, error) {
 	o.mCachedUrls.Lock()
 	defer o.mCachedUrls.Unlock()
 	if o.cachedURLs != nil {
-		return o.cachedURLs.URLs, nil
+		return o.cachedURLs.URLs.ToMap(), nil
 	}
 
 	resp := SiteConnectivityInfo{}
@@ -195,7 +226,7 @@ func (o *Organization) GetURLs() (map[string]string, error) {
 		return nil, err
 	}
 	o.cachedURLs = &resp
-	return resp.URLs, nil
+	return resp.URLs.ToMap(), nil
 }
 
 func (o *Organization) GetSiteConnectivityInfo() (*SiteConnectivityInfo, error) {
