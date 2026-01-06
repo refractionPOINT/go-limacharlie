@@ -64,6 +64,7 @@ var KnownHives = []string{
 	"model",
 	"playbook",
 	"ai_agent",
+	"external_adapter",
 }
 
 func SyncAll() SyncOptions {
@@ -93,6 +94,7 @@ func SyncAll() SyncOptions {
 			"model":            true,
 			"playbook":         true,
 			"ai_agent":         true,
+			"external_adapter": true,
 		},
 	}
 }
