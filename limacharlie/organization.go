@@ -324,17 +324,16 @@ func (o *Organization) DeleteOrganization(confirmationToken string) (bool, error
 	return resp.Success, nil
 }
 func (o *Organization) SetQuota(quota int64) (bool, error) {
-	resp := map[string]bool{}
+	resp := struct {
+		Success bool `json:"success"`
+	}{}
 	request := makeDefaultRequest(&resp).withQueryData(Dict{
 		"quota": quota,
 	})
 	if err := o.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("orgs/%s/quota", o.client.options.OID), request); err != nil {
 		return false, err
 	}
-	if val, ok := resp["success"]; ok {
-		return val, nil
-	}
-	return false, nil
+	return resp.Success, nil
 }
 
 func (o *Organization) ServiceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) error {
@@ -347,17 +346,16 @@ func (o *Organization) ExtensionRequest(responseData interface{}, extensionName 
 
 // AddToGroup Adds this organization to a given group
 func (o *Organization) AddToGroup(gid string) (bool, error) {
-	resp := map[string]bool{}
+	resp := struct {
+		Success bool `json:"success"`
+	}{}
 	request := makeDefaultRequest(&resp).withQueryData(Dict{
 		"oid": o.client.options.OID,
 	})
 	if err := o.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("groups/%s/orgs", gid), request); err != nil {
 		return false, err
 	}
-	if val, ok := resp["success"]; ok {
-		return val, nil
-	}
-	return false, nil
+	return resp.Success, nil
 }
 
 func (org *Organization) Close() {
