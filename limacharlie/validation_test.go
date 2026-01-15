@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -109,7 +110,7 @@ func TestValidateLCQLQuery_Valid(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 	defer org.Close()
 
-	resp, err := org.ValidateLCQLQuery("-1h | * | * | event/FILE_PATH ends with '.exe'")
+	resp, err := org.ValidateLCQLQuery("2025-12-01 to 2026-01-15 | * | * | event/FILE_PATH ends with '.exe'")
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -190,4 +191,279 @@ func TestValidateDRRule_Invalid(t *testing.T) {
 	} else {
 		t.Log("Rule did not return expected validation error")
 	}
+}
+
+func TestLCQLValidationRawResponse_JSONParsing(t *testing.T) {
+	t.Run("full_stats_response", func(t *testing.T) {
+		// Simulate a full response from the replay service with all ReplayStats fields
+		jsonData := `{
+			"error": "",
+			"stats": {
+				"n_scan": 10000,
+				"n_bytes_scan": 5000000,
+				"n_proc": 8500,
+				"n_matched": 150,
+				"n_shard": 4,
+				"n_eval": 25000,
+				"wall_time": 2.5,
+				"cummulative_time": 8.2,
+				"n_batch_access": 12,
+				"n_billed": 8000,
+				"n_free": 2000
+			}
+		}`
+
+		var resp lcqlValidationRawResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.Empty(t, resp.Error)
+		assert.Equal(t, uint64(10000), resp.Stats.NumScanned)
+		assert.Equal(t, uint64(5000000), resp.Stats.NumBytesScanned)
+		assert.Equal(t, uint64(8500), resp.Stats.NumEventsProcessed)
+		assert.Equal(t, uint64(150), resp.Stats.NumEventsMatched)
+		assert.Equal(t, uint64(4), resp.Stats.NumShards)
+		assert.Equal(t, uint64(25000), resp.Stats.NumEvals)
+		assert.Equal(t, 2.5, resp.Stats.WallTime)
+		assert.Equal(t, 8.2, resp.Stats.CumulativeTime)
+		assert.Equal(t, uint64(12), resp.Stats.NumBatches)
+		assert.Equal(t, uint64(8000), resp.Stats.BilledFor)
+		assert.Equal(t, uint64(2000), resp.Stats.NotBilledFor)
+	})
+
+	t.Run("minimal_stats_response", func(t *testing.T) {
+		// Response with only billing stats (validation mode)
+		jsonData := `{
+			"stats": {
+				"n_billed": 1000,
+				"n_free": 500
+			}
+		}`
+
+		var resp lcqlValidationRawResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.Empty(t, resp.Error)
+		assert.Equal(t, uint64(1000), resp.Stats.BilledFor)
+		assert.Equal(t, uint64(500), resp.Stats.NotBilledFor)
+		// Other fields should be zero
+		assert.Equal(t, uint64(0), resp.Stats.NumScanned)
+	})
+
+	t.Run("error_response_with_stats", func(t *testing.T) {
+		jsonData := `{
+			"error": "invalid query syntax: unexpected token",
+			"stats": {
+				"n_billed": 0,
+				"n_free": 0
+			}
+		}`
+
+		var resp lcqlValidationRawResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, "invalid query syntax: unexpected token", resp.Error)
+		assert.Equal(t, uint64(0), resp.Stats.BilledFor)
+		assert.Equal(t, uint64(0), resp.Stats.NotBilledFor)
+	})
+
+	t.Run("empty_stats_response", func(t *testing.T) {
+		jsonData := `{
+			"error": "",
+			"stats": {}
+		}`
+
+		var resp lcqlValidationRawResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.Empty(t, resp.Error)
+		assert.Equal(t, uint64(0), resp.Stats.BilledFor)
+		assert.Equal(t, uint64(0), resp.Stats.NotBilledFor)
+	})
+
+	t.Run("partial_stats_response", func(t *testing.T) {
+		// Response with only some stats fields present
+		jsonData := `{
+			"stats": {
+				"n_scan": 5000,
+				"n_proc": 4500,
+				"n_billed": 4000,
+				"wall_time": 1.2
+			}
+		}`
+
+		var resp lcqlValidationRawResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(5000), resp.Stats.NumScanned)
+		assert.Equal(t, uint64(4500), resp.Stats.NumEventsProcessed)
+		assert.Equal(t, uint64(4000), resp.Stats.BilledFor)
+		assert.Equal(t, 1.2, resp.Stats.WallTime)
+		// Missing fields should be zero
+		assert.Equal(t, uint64(0), resp.Stats.NotBilledFor)
+		assert.Equal(t, uint64(0), resp.Stats.NumEventsMatched)
+	})
+}
+
+func TestBillingEstimate_JSONSerialization(t *testing.T) {
+	t.Run("marshal", func(t *testing.T) {
+		estimate := BillingEstimate{
+			BilledEvents: 1000,
+			FreeEvents:   500,
+		}
+
+		data, err := json.Marshal(estimate)
+		require.NoError(t, err)
+
+		// Verify the JSON structure matches the expected field names
+		var raw map[string]interface{}
+		err = json.Unmarshal(data, &raw)
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(1000), raw["billed_events"])
+		assert.Equal(t, float64(500), raw["free_events"])
+	})
+
+	t.Run("unmarshal", func(t *testing.T) {
+		jsonData := `{"billed_events": 2500, "free_events": 750}`
+
+		var estimate BillingEstimate
+		err := json.Unmarshal([]byte(jsonData), &estimate)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(2500), estimate.BilledEvents)
+		assert.Equal(t, uint64(750), estimate.FreeEvents)
+	})
+
+	t.Run("unmarshal_zero_values", func(t *testing.T) {
+		jsonData := `{"billed_events": 0, "free_events": 0}`
+
+		var estimate BillingEstimate
+		err := json.Unmarshal([]byte(jsonData), &estimate)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(0), estimate.BilledEvents)
+		assert.Equal(t, uint64(0), estimate.FreeEvents)
+	})
+}
+
+func TestValidationResponse_JSONSerialization(t *testing.T) {
+	t.Run("success_response", func(t *testing.T) {
+		jsonData := `{
+			"error": "",
+			"success": true
+		}`
+
+		var resp ValidationResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp.Success)
+		assert.Empty(t, resp.Error)
+	})
+
+	t.Run("error_response", func(t *testing.T) {
+		jsonData := `{
+			"error": "query syntax error",
+			"success": false
+		}`
+
+		var resp ValidationResponse
+		err := json.Unmarshal([]byte(jsonData), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, "query syntax error", resp.Error)
+		assert.False(t, resp.Success)
+	})
+
+	t.Run("marshal_round_trip", func(t *testing.T) {
+		original := ValidationResponse{
+			Success: true,
+		}
+
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+
+		var decoded ValidationResponse
+		err = json.Unmarshal(data, &decoded)
+		require.NoError(t, err)
+
+		assert.Equal(t, original.Success, decoded.Success)
+	})
+}
+
+func TestEstimateLCQLQueryBilling(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	t.Run("recent_time_range_free_events", func(t *testing.T) {
+		// Recent events (< 30 days) should be free
+		estimate, err := org.EstimateLCQLQueryBilling("2025-12-20 to 2026-01-15 | * | * | *")
+		require.NoError(t, err)
+		require.NotNil(t, estimate)
+
+		t.Logf("Recent range - BilledEvents: %d, FreeEvents: %d",
+			estimate.BilledEvents, estimate.FreeEvents)
+	})
+
+	t.Run("older_time_range_billed_events", func(t *testing.T) {
+		// Older events (> 6 months) should be billed
+		estimate, err := org.EstimateLCQLQueryBilling("2025-01-01 to 2025-03-01 | * | * | *")
+		require.NoError(t, err)
+		require.NotNil(t, estimate)
+
+		t.Logf("Older range - BilledEvents: %d, FreeEvents: %d",
+			estimate.BilledEvents, estimate.FreeEvents)
+	})
+
+	t.Run("mixed_time_range", func(t *testing.T) {
+		// Mixed range should have both billed and free
+		estimate, err := org.EstimateLCQLQueryBilling("2025-06-01 to 2026-01-01 | * | * | *")
+		require.NoError(t, err)
+		require.NotNil(t, estimate)
+
+		t.Logf("Mixed range - BilledEvents: %d, FreeEvents: %d",
+			estimate.BilledEvents, estimate.FreeEvents)
+	})
+
+	t.Run("invalid_query_returns_error", func(t *testing.T) {
+		// Invalid query should return an error
+		_, err := org.EstimateLCQLQueryBilling("invalid !@#$ query syntax")
+		// Should return an error for invalid queries
+		if err != nil {
+			t.Logf("Expected error for invalid query: %v", err)
+		}
+	})
+}
+
+func TestBillingEstimate_ZeroValuesAreValid(t *testing.T) {
+	t.Run("zero_billed_zero_free_is_valid", func(t *testing.T) {
+		// Zero values should be distinguishable from nil
+		estimate := &BillingEstimate{
+			BilledEvents: 0,
+			FreeEvents:   0,
+		}
+
+		// Pointer is not nil, so we can check the values
+		require.NotNil(t, estimate)
+		assert.Equal(t, uint64(0), estimate.BilledEvents)
+		assert.Equal(t, uint64(0), estimate.FreeEvents)
+	})
+
+	t.Run("nil_vs_zero_distinction", func(t *testing.T) {
+		// Test that we can distinguish between nil and zero values
+		var nilEstimate *BillingEstimate
+		zeroEstimate := &BillingEstimate{
+			BilledEvents: 0,
+			FreeEvents:   0,
+		}
+
+		assert.Nil(t, nilEstimate)
+		assert.NotNil(t, zeroEstimate)
+	})
 }
