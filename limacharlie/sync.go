@@ -91,7 +91,6 @@ func SyncAll() SyncOptions {
 			"secret":           true,
 			"lookup":           true,
 			"query":            true,
-			"model":            true,
 			"playbook":         true,
 			"ai_agent":         true,
 			"external_adapter": true,
