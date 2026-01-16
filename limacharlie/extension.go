@@ -51,3 +51,20 @@ func (org *Organization) ReKeyExtension(name ExtensionName) error {
 	}
 	return nil
 }
+
+// ExtensionSchema represents the schema definition for an extension's configuration
+type ExtensionSchema = Dict
+
+// GetExtensionSchema retrieves the configuration schema for a specific extension.
+func (org *Organization) GetExtensionSchema(name ExtensionName) (ExtensionSchema, error) {
+	resp := ExtensionSchema{}
+	values := url.Values{}
+	values.Set("oid", org.client.options.OID)
+
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet,
+		fmt.Sprintf("extension/schema/%s", url.PathEscape(name)),
+		makeDefaultRequest(&resp).withQueryData(values)); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
