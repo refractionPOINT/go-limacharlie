@@ -30,6 +30,8 @@ type BillingEstimate struct {
 	BilledEvents uint64 `json:"billed_events"`
 	// FreeEvents is the estimated number of events that would be free (not billed)
 	FreeEvents uint64 `json:"free_events"`
+	// EstimatedPrice is the calculated cost estimate based on BilledEvents
+	EstimatedPrice EstimatedPrice `json:"estimated_price,omitempty"`
 }
 
 // lcqlValidationRawResponse is the raw response structure from the replay endpoint.
@@ -324,10 +326,11 @@ func (org *Organization) EstimateLCQLQueryBillingWithContext(ctx context.Context
 		return nil, fmt.Errorf("billing estimate failed: %s", rawResponse.Error)
 	}
 
-	// Return the billing estimate from stats
+	// Return the billing estimate from stats, including the calculated price
 	return &BillingEstimate{
-		BilledEvents: rawResponse.Stats.BilledFor,
-		FreeEvents:   rawResponse.Stats.NotBilledFor,
+		BilledEvents:   rawResponse.Stats.BilledFor,
+		FreeEvents:     rawResponse.Stats.NotBilledFor,
+		EstimatedPrice: rawResponse.Stats.EstimatedPrice,
 	}, nil
 }
 

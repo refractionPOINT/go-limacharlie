@@ -209,7 +209,11 @@ func TestLCQLValidationRawResponse_JSONParsing(t *testing.T) {
 				"cummulative_time": 8.2,
 				"n_batch_access": 12,
 				"n_billed": 8000,
-				"n_free": 2000
+				"n_free": 2000,
+				"estimated_price": {
+					"value": 0.08,
+					"currency": "USD cents"
+				}
 			}
 		}`
 
@@ -229,6 +233,8 @@ func TestLCQLValidationRawResponse_JSONParsing(t *testing.T) {
 		assert.Equal(t, uint64(12), resp.Stats.NumBatches)
 		assert.Equal(t, uint64(8000), resp.Stats.BilledFor)
 		assert.Equal(t, uint64(2000), resp.Stats.NotBilledFor)
+		assert.Equal(t, 0.08, resp.Stats.EstimatedPrice.Price)
+		assert.Equal(t, "USD cents", resp.Stats.EstimatedPrice.Currency)
 	})
 
 	t.Run("minimal_stats_response", func(t *testing.T) {
@@ -314,6 +320,10 @@ func TestBillingEstimate_JSONSerialization(t *testing.T) {
 		estimate := BillingEstimate{
 			BilledEvents: 1000,
 			FreeEvents:   500,
+			EstimatedPrice: EstimatedPrice{
+				Price:    0.01,
+				Currency: "USD cents",
+			},
 		}
 
 		data, err := json.Marshal(estimate)
@@ -326,10 +336,22 @@ func TestBillingEstimate_JSONSerialization(t *testing.T) {
 
 		assert.Equal(t, float64(1000), raw["billed_events"])
 		assert.Equal(t, float64(500), raw["free_events"])
+		// Check estimated_price nested object
+		priceObj, ok := raw["estimated_price"].(map[string]interface{})
+		require.True(t, ok, "estimated_price should be an object")
+		assert.Equal(t, 0.01, priceObj["value"])
+		assert.Equal(t, "USD cents", priceObj["currency"])
 	})
 
 	t.Run("unmarshal", func(t *testing.T) {
-		jsonData := `{"billed_events": 2500, "free_events": 750}`
+		jsonData := `{
+			"billed_events": 2500,
+			"free_events": 750,
+			"estimated_price": {
+				"value": 0.025,
+				"currency": "USD cents"
+			}
+		}`
 
 		var estimate BillingEstimate
 		err := json.Unmarshal([]byte(jsonData), &estimate)
@@ -337,10 +359,19 @@ func TestBillingEstimate_JSONSerialization(t *testing.T) {
 
 		assert.Equal(t, uint64(2500), estimate.BilledEvents)
 		assert.Equal(t, uint64(750), estimate.FreeEvents)
+		assert.Equal(t, 0.025, estimate.EstimatedPrice.Price)
+		assert.Equal(t, "USD cents", estimate.EstimatedPrice.Currency)
 	})
 
 	t.Run("unmarshal_zero_values", func(t *testing.T) {
-		jsonData := `{"billed_events": 0, "free_events": 0}`
+		jsonData := `{
+			"billed_events": 0,
+			"free_events": 0,
+			"estimated_price": {
+				"value": 0,
+				"currency": "USD cents"
+			}
+		}`
 
 		var estimate BillingEstimate
 		err := json.Unmarshal([]byte(jsonData), &estimate)
@@ -348,6 +379,23 @@ func TestBillingEstimate_JSONSerialization(t *testing.T) {
 
 		assert.Equal(t, uint64(0), estimate.BilledEvents)
 		assert.Equal(t, uint64(0), estimate.FreeEvents)
+		assert.Equal(t, 0.0, estimate.EstimatedPrice.Price)
+		assert.Equal(t, "USD cents", estimate.EstimatedPrice.Currency)
+	})
+
+	t.Run("unmarshal_without_estimated_price", func(t *testing.T) {
+		// Test backward compatibility - response may not include estimated_price
+		jsonData := `{"billed_events": 1000, "free_events": 500}`
+
+		var estimate BillingEstimate
+		err := json.Unmarshal([]byte(jsonData), &estimate)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(1000), estimate.BilledEvents)
+		assert.Equal(t, uint64(500), estimate.FreeEvents)
+		// EstimatedPrice should be zero value
+		assert.Equal(t, 0.0, estimate.EstimatedPrice.Price)
+		assert.Equal(t, "", estimate.EstimatedPrice.Currency)
 	})
 }
 
@@ -407,8 +455,9 @@ func TestEstimateLCQLQueryBilling(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, estimate)
 
-		t.Logf("Recent range - BilledEvents: %d, FreeEvents: %d",
-			estimate.BilledEvents, estimate.FreeEvents)
+		t.Logf("Recent range - BilledEvents: %d, FreeEvents: %d, EstimatedPrice: %.4f %s",
+			estimate.BilledEvents, estimate.FreeEvents,
+			estimate.EstimatedPrice.Price, estimate.EstimatedPrice.Currency)
 	})
 
 	t.Run("older_time_range_billed_events", func(t *testing.T) {
@@ -417,8 +466,9 @@ func TestEstimateLCQLQueryBilling(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, estimate)
 
-		t.Logf("Older range - BilledEvents: %d, FreeEvents: %d",
-			estimate.BilledEvents, estimate.FreeEvents)
+		t.Logf("Older range - BilledEvents: %d, FreeEvents: %d, EstimatedPrice: %.4f %s",
+			estimate.BilledEvents, estimate.FreeEvents,
+			estimate.EstimatedPrice.Price, estimate.EstimatedPrice.Currency)
 	})
 
 	t.Run("mixed_time_range", func(t *testing.T) {
@@ -427,8 +477,9 @@ func TestEstimateLCQLQueryBilling(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, estimate)
 
-		t.Logf("Mixed range - BilledEvents: %d, FreeEvents: %d",
-			estimate.BilledEvents, estimate.FreeEvents)
+		t.Logf("Mixed range - BilledEvents: %d, FreeEvents: %d, EstimatedPrice: %.4f %s",
+			estimate.BilledEvents, estimate.FreeEvents,
+			estimate.EstimatedPrice.Price, estimate.EstimatedPrice.Currency)
 	})
 
 	t.Run("invalid_query_returns_error", func(t *testing.T) {
