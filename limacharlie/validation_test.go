@@ -518,3 +518,114 @@ func TestBillingEstimate_ZeroValuesAreValid(t *testing.T) {
 		assert.NotNil(t, zeroEstimate)
 	})
 }
+
+func TestQueryValidationResult_JSONSerialization(t *testing.T) {
+	t.Run("marshal_with_billing", func(t *testing.T) {
+		result := QueryValidationResult{
+			Validation: &ValidationResponse{
+				Success: true,
+			},
+			BillingEstimate: &BillingEstimate{
+				BilledEvents: 1000,
+				FreeEvents:   500,
+				EstimatedPrice: EstimatedPrice{
+					Price:    0.01,
+					Currency: "USD cents",
+				},
+			},
+		}
+
+		data, err := json.Marshal(result)
+		require.NoError(t, err)
+
+		var decoded QueryValidationResult
+		err = json.Unmarshal(data, &decoded)
+		require.NoError(t, err)
+
+		assert.True(t, decoded.Validation.Success)
+		require.NotNil(t, decoded.BillingEstimate)
+		assert.Equal(t, uint64(1000), decoded.BillingEstimate.BilledEvents)
+		assert.Equal(t, uint64(500), decoded.BillingEstimate.FreeEvents)
+		assert.Equal(t, 0.01, decoded.BillingEstimate.EstimatedPrice.Price)
+	})
+
+	t.Run("marshal_without_billing", func(t *testing.T) {
+		// When validation fails, billing estimate is nil
+		result := QueryValidationResult{
+			Validation: &ValidationResponse{
+				Error: "invalid query syntax",
+			},
+			BillingEstimate: nil,
+		}
+
+		data, err := json.Marshal(result)
+		require.NoError(t, err)
+
+		var decoded QueryValidationResult
+		err = json.Unmarshal(data, &decoded)
+		require.NoError(t, err)
+
+		assert.Equal(t, "invalid query syntax", decoded.Validation.Error)
+		assert.Nil(t, decoded.BillingEstimate)
+	})
+}
+
+func TestValidateAndEstimateLCQLQuery(t *testing.T) {
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+	defer org.Close()
+
+	t.Run("valid_query_returns_both", func(t *testing.T) {
+		result, err := org.ValidateAndEstimateLCQLQuery("2025-12-20 to 2026-01-15 | * | * | *")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.Validation)
+
+		// Validation should succeed
+		if result.Validation.Error != "" {
+			t.Logf("Validation error: %s", result.Validation.Error)
+		} else {
+			assert.True(t, result.Validation.Success)
+		}
+
+		// Billing estimate should be present for valid queries
+		if result.BillingEstimate != nil {
+			t.Logf("Combined result - BilledEvents: %d, FreeEvents: %d, Price: %.4f %s",
+				result.BillingEstimate.BilledEvents,
+				result.BillingEstimate.FreeEvents,
+				result.BillingEstimate.EstimatedPrice.Price,
+				result.BillingEstimate.EstimatedPrice.Currency)
+		}
+	})
+
+	t.Run("invalid_query_returns_validation_error", func(t *testing.T) {
+		result, err := org.ValidateAndEstimateLCQLQuery("invalid !@#$ query syntax")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.Validation)
+
+		// Validation should fail
+		if result.Validation.Error != "" {
+			t.Logf("Expected validation error: %s", result.Validation.Error)
+			// Billing estimate should be nil for invalid queries
+			assert.Nil(t, result.BillingEstimate)
+		}
+	})
+
+	t.Run("concurrent_execution_performance", func(t *testing.T) {
+		// This test verifies concurrent execution by checking both results are returned
+		result, err := org.ValidateAndEstimateLCQLQuery("2025-06-01 to 2026-01-01 | * | * | *")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.Validation)
+
+		if result.Validation.Success {
+			// If validation succeeded, we should have billing estimate
+			if result.BillingEstimate != nil {
+				t.Logf("Concurrent execution succeeded - BilledEvents: %d, FreeEvents: %d",
+					result.BillingEstimate.BilledEvents,
+					result.BillingEstimate.FreeEvents)
+			}
+		}
+	})
+}

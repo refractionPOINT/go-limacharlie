@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -32,6 +33,15 @@ type BillingEstimate struct {
 	FreeEvents uint64 `json:"free_events"`
 	// EstimatedPrice is the calculated cost estimate based on BilledEvents
 	EstimatedPrice EstimatedPrice `json:"estimated_price,omitempty"`
+}
+
+// QueryValidationResult contains both validation result and billing estimate for a query.
+// This is returned by ValidateAndEstimateLCQLQuery which runs both operations concurrently.
+type QueryValidationResult struct {
+	// Validation contains the syntax validation result
+	Validation *ValidationResponse `json:"validation"`
+	// BillingEstimate contains the billing estimate (may be nil if validation failed or billing request failed)
+	BillingEstimate *BillingEstimate `json:"billing_estimate,omitempty"`
 }
 
 // lcqlValidationRawResponse is the raw response structure from the replay endpoint.
@@ -332,6 +342,129 @@ func (org *Organization) EstimateLCQLQueryBillingWithContext(ctx context.Context
 		FreeEvents:     rawResponse.Stats.NotBilledFor,
 		EstimatedPrice: rawResponse.Stats.EstimatedPrice,
 	}, nil
+}
+
+// ValidateAndEstimateLCQLQuery validates an LCQL query and returns billing estimate concurrently.
+// This method runs both validation and billing estimation in parallel for better performance.
+// If validation fails, the billing request is cancelled early.
+//
+// Parameters:
+//   - query: The LCQL query string to validate and estimate.
+//
+// Returns:
+//   - *QueryValidationResult: Contains both validation result and billing estimate.
+//   - error: An error if the request fails (network error, etc.).
+//
+// Example:
+//
+//	result, err := org.ValidateAndEstimateLCQLQuery("2025-01-01 to 2025-06-01 | * | * | *")
+//	if err != nil {
+//	    return err
+//	}
+//	if !result.Validation.Success {
+//	    fmt.Printf("Query validation failed: %s\n", result.Validation.Error)
+//	} else if result.BillingEstimate != nil {
+//	    fmt.Printf("Estimated billed events: %d, price: %.4f %s\n",
+//	        result.BillingEstimate.BilledEvents,
+//	        result.BillingEstimate.EstimatedPrice.Price,
+//	        result.BillingEstimate.EstimatedPrice.Currency)
+//	}
+func (org *Organization) ValidateAndEstimateLCQLQuery(query string) (*QueryValidationResult, error) {
+	return org.ValidateAndEstimateLCQLQueryWithContext(context.Background(), query)
+}
+
+// ValidateAndEstimateLCQLQueryWithContext validates and estimates billing with a context for cancellation.
+// See ValidateAndEstimateLCQLQuery for full documentation.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - query: The LCQL query string to validate and estimate.
+//
+// Returns:
+//   - *QueryValidationResult: Contains both validation result and billing estimate.
+//   - error: An error if the request fails.
+func (org *Organization) ValidateAndEstimateLCQLQueryWithContext(ctx context.Context, query string) (*QueryValidationResult, error) {
+	var (
+		validationResp  *ValidationResponse
+		billingEstimate *BillingEstimate
+		validationErr   error
+		billingErr      error
+		wg              sync.WaitGroup
+	)
+
+	// Create a cancellable context for the billing request
+	// If validation fails, we cancel the billing request early
+	billingCtx, billingCancel := context.WithCancel(ctx)
+	defer billingCancel()
+
+	// Run validation request
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		resp, err := org.ValidateLCQLQueryWithContext(ctx, query)
+		if err != nil {
+			validationErr = err
+			// Cancel billing request if validation fails
+			billingCancel()
+			return
+		}
+
+		validationResp = resp
+
+		// If validation returned an error, cancel billing
+		if resp.Error != "" {
+			billingCancel()
+		}
+	}()
+
+	// Run billing estimate request
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		estimate, err := org.EstimateLCQLQueryBillingWithContext(billingCtx, query)
+
+		// Check if context was cancelled (expected if validation failed)
+		if billingCtx.Err() == context.Canceled {
+			return
+		}
+
+		if err != nil {
+			billingErr = err
+			return
+		}
+
+		billingEstimate = estimate
+	}()
+
+	// Wait for both requests to complete
+	wg.Wait()
+
+	// Check validation results first
+	if validationErr != nil {
+		return nil, fmt.Errorf("validation request failed: %w", validationErr)
+	}
+
+	// Build the result
+	result := &QueryValidationResult{
+		Validation: validationResp,
+	}
+
+	// If validation failed (has error message), return without billing estimate
+	if validationResp.Error != "" {
+		return result, nil
+	}
+
+	// Add billing estimate if available (may be nil if billing request failed)
+	// We don't fail the whole operation if only billing failed
+	if billingErr != nil && billingCtx.Err() != context.Canceled {
+		// Billing failed but validation succeeded - return validation result without billing
+		return result, nil
+	}
+
+	result.BillingEstimate = billingEstimate
+	return result, nil
 }
 
 // ValidateDRRule validates a Detection & Response rule without executing it.
