@@ -88,6 +88,16 @@ type ReplayStats struct {
 	BilledFor uint64 `json:"n_billed"`
 	// NotBilledFor is the number of events not billed (free tier)
 	NotBilledFor uint64 `json:"n_free"`
+	// EstimatedPrice contains the calculated billing estimate based on BilledFor events
+	EstimatedPrice EstimatedPrice `json:"estimated_price,omitempty"`
+}
+
+// EstimatedPrice represents the calculated billing estimate for a query.
+type EstimatedPrice struct {
+	// Price is the estimated cost in the specified currency
+	Price float64 `json:"value"`
+	// Currency is the unit for the price (e.g., "USD cents")
+	Currency string `json:"currency"`
 }
 
 // ReplayResult contains a single action result from a replay.
