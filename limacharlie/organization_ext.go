@@ -8,18 +8,10 @@ import (
 	"strings"
 )
 
-// UsageStats contains usage statistics for an organization
-type UsageStats struct {
-	OID                 string                 `json:"oid,omitempty"`
-	DataRetention       int64                  `json:"data_retention_days,omitempty"`
-	TotalSensors        int64                  `json:"total_sensors,omitempty"`
-	OnlineSensors       int64                  `json:"online_sensors,omitempty"`
-	EventsIngested      int64                  `json:"events_ingested,omitempty"`
-	DetectionsGenerated int64                  `json:"detections_generated,omitempty"`
-	StorageUsedGB       float64                `json:"storage_used_gb,omitempty"`
-	Period              string                 `json:"period,omitempty"`
-	Extra               map[string]interface{} `json:"extra,omitempty"`
-}
+// UsageStats is deprecated - GetUsageStats now returns Dict directly
+// This struct never matched the actual API response format
+// Kept for backwards compatibility with any code that may reference it
+type UsageStats = Dict
 
 // OrgError represents an error log entry for an organization
 type OrgError struct {
@@ -88,8 +80,9 @@ type SensorTimeData struct {
 }
 
 // GetUsageStats retrieves usage statistics for the organization
-func (org *Organization) GetUsageStats() (*UsageStats, error) {
-	var stats UsageStats
+// Returns raw API response as Dict to handle dynamic response formats
+func (org *Organization) GetUsageStats() (Dict, error) {
+	var stats Dict
 	url := fmt.Sprintf("usage/%s", org.GetOID())
 
 	request := makeDefaultRequest(&stats)
@@ -98,7 +91,7 @@ func (org *Organization) GetUsageStats() (*UsageStats, error) {
 		return nil, err
 	}
 
-	return &stats, nil
+	return stats, nil
 }
 
 // GetOrgErrors retrieves error logs for the organization
