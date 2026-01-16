@@ -15,8 +15,12 @@ func TestGetUsageStats(t *testing.T) {
 	a.NoError(err, "GetUsageStats should succeed")
 	a.NotNil(stats, "Usage stats should not be nil")
 
-	t.Logf("Usage stats: OID=%s, TotalSensors=%d, OnlineSensors=%d",
-		stats.OID, stats.TotalSensors, stats.OnlineSensors)
+	// API returns {"from_cache": bool, "usage": {"date": {...}, ...}}
+	usage, hasUsage := stats["usage"]
+	a.True(hasUsage, "Stats should contain 'usage' field")
+	a.NotNil(usage, "Usage data should not be nil")
+
+	t.Logf("Usage stats retrieved: %d top-level keys", len(stats))
 }
 
 // TestBillingOrgStatus tests retrieving billing status
