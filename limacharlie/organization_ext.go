@@ -34,12 +34,14 @@ type UserOrgInfo struct {
 
 // APIKeyInfo contains information about an API key
 type APIKeyInfo struct {
-	KeyHash     string   `json:"key_hash,omitempty"`
-	Description string   `json:"name,omitempty"` // API returns "name" from Firebase
-	Permissions []string `json:"priv,omitempty"` // API returns "priv"
-	CreatedAt   int64    `json:"created_at,omitempty"`
-	CreatedBy   string   `json:"created_by,omitempty"`
-	OID         string   `json:"oid,omitempty"`
+	KeyHash        string   `json:"key_hash,omitempty"`
+	Description    string   `json:"name,omitempty"` // API returns "name" from Firebase
+	Permissions    []string `json:"priv,omitempty"` // API returns "priv"
+	CreatedAt      int64    `json:"created_at,omitempty"`
+	CreatedBy      string   `json:"created_by,omitempty"`
+	OID            string   `json:"oid,omitempty"`
+	AllowedIPRange string   `json:"allowed_ip_range,omitempty"`
+	LastUsed       int64    `json:"last_used,omitempty"`
 }
 
 // APIKeyCreate contains the response when creating a new API key
@@ -195,15 +197,26 @@ func (org *Organization) GetAPIKeys() ([]APIKeyInfo, error) {
 // name: description/name for the API key
 // permissions: optional list of permissions for the key
 func (org *Organization) CreateAPIKey(name string, permissions []string) (*APIKeyCreate, error) {
+	return org.CreateAPIKeyWithOptions(name, permissions, "")
+}
+
+// CreateAPIKeyWithOptions creates a new API key for the organization with additional options
+// name: description/name for the API key
+// permissions: optional list of permissions for the key
+// allowedIPRange: optional CIDR notation IP range to restrict key usage (e.g., "192.168.1.0/24")
+func (org *Organization) CreateAPIKeyWithOptions(name string, permissions []string, allowedIPRange string) (*APIKeyCreate, error) {
 	var response APIKeyCreate
 	url := fmt.Sprintf("orgs/%s/keys", org.GetOID())
 
 	data := map[string]interface{}{
 		"key_name": name,
 	}
-	if permissions != nil && len(permissions) > 0 {
+	if len(permissions) > 0 {
 		// API expects comma-separated string
 		data["perms"] = strings.Join(permissions, ",")
+	}
+	if allowedIPRange != "" {
+		data["allowed_ip_range"] = allowedIPRange
 	}
 
 	request := makeDefaultRequest(&response).withFormData(data)
