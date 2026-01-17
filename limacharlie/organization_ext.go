@@ -26,6 +26,7 @@ type OrgError struct {
 type UserOrgInfo struct {
 	OID         string   `json:"oid,omitempty"`
 	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
 	IsOwner     bool     `json:"is_owner,omitempty"`
 	Region      string   `json:"region,omitempty"`
