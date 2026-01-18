@@ -24,12 +24,30 @@ type OrgError struct {
 
 // UserOrgInfo contains information about an organization accessible to a user
 type UserOrgInfo struct {
-	OID         string   `json:"oid,omitempty"`
-	Name        string   `json:"name,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
-	IsOwner     bool     `json:"is_owner,omitempty"`
-	Region      string   `json:"region,omitempty"`
+	Code          string     `json:"code,omitempty"`
+	OID           string     `json:"oid,omitempty"`
+	Name          string     `json:"name,omitempty"`
+	Description   string     `json:"description,omitempty"`
+	Status        string     `json:"status,omitempty"`
+	SensorOnline  *int       `json:"sensor_online,omitempty"`
+	SensorQuota   *int       `json:"sensor_quota,omitempty"`
+	SensorVersion *string    `json:"sensor_version,omitempty"`
+	Permissions   []string   `json:"permissions,omitempty"`
+	Errors        []OrgError `json:"errors,omitempty"`
+	SiteName      *string    `json:"site_name,omitempty"`
+	// Legacy fields kept for backward compatibility
+	IsOwner bool   `json:"is_owner,omitempty"`
+	Region  string `json:"region,omitempty"`
+}
+
+// ListUserOrgsOptions contains options for listing user organizations
+type ListUserOrgsOptions struct {
+	Offset    int
+	Limit     int
+	Filter    string
+	SortBy    string
+	SortOrder string
+	Fields    []string // list of fields to return (code, oid, name, description, status, sensor_online, sensor_quota, sensor_version, permissions, errors, site_name)
 }
 
 // APIKeyInfo contains information about an API key
@@ -126,15 +144,10 @@ func (org *Organization) DismissOrgError(component string) error {
 	return nil
 }
 
-// ListUserOrgs retrieves the list of organizations accessible to the current user
-// offset: starting index for pagination
-// limit: maximum number of results to return
-// filter: optional filter string
-// sortBy: optional field to sort by
-// sortOrder: optional sort order ("asc" or "desc")
-// withNames: whether to include organization names
-// Returns nil, nil if the endpoint requires user-based authentication
-func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOrder *string, withNames bool) ([]UserOrgInfo, error) {
+// ListUserOrgsWithOptions retrieves the list of organizations accessible to the current user
+// with configurable options including field selection for performance optimization.
+// Returns the list of organizations, the total count, and any error.
+func (org *Organization) ListUserOrgsWithOptions(opts ...ListUserOrgsOptions) ([]UserOrgInfo, int, error) {
 	var response struct {
 		Organizations []UserOrgInfo `json:"orgs"`
 		Total         int           `json:"total,omitempty"`
@@ -143,31 +156,68 @@ func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOr
 	urlPath := "user/orgs"
 	values := url.Values{}
 
-	if offset != nil {
-		values.Set("offset", fmt.Sprintf("%d", *offset))
+	// Apply options if provided
+	if len(opts) > 0 {
+		opt := opts[0]
+		if opt.Offset > 0 {
+			values.Set("offset", fmt.Sprintf("%d", opt.Offset))
+		}
+		if opt.Limit > 0 {
+			values.Set("limit", fmt.Sprintf("%d", opt.Limit))
+		}
+		if opt.Filter != "" {
+			values.Set("filter", opt.Filter)
+		}
+		if opt.SortBy != "" {
+			values.Set("sort_by", opt.SortBy)
+		}
+		if opt.SortOrder != "" {
+			values.Set("sort_order", opt.SortOrder)
+		}
+		if len(opt.Fields) > 0 {
+			values.Set("fields", strings.Join(opt.Fields, ","))
+		}
 	}
-	if limit != nil {
-		values.Set("limit", fmt.Sprintf("%d", *limit))
-	}
-	if filter != nil && *filter != "" {
-		values.Set("filter", *filter)
-	}
-	if sortBy != nil && *sortBy != "" {
-		values.Set("sort_by", *sortBy)
-	}
-	if sortOrder != nil && *sortOrder != "" {
-		values.Set("sort_order", *sortOrder)
-	}
-	// Note: with_names is NOT sent to API - it's used client-side in Python SDK
-	// The API always returns full org info, we just don't need to filter it
 
 	request := makeDefaultRequest(&response).withQueryData(values)
 
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return response.Organizations, nil
+	return response.Organizations, response.Total, nil
+}
+
+// ListUserOrgs retrieves the list of organizations accessible to the current user.
+// Deprecated: Use ListUserOrgsWithOptions instead for better control over pagination and field selection.
+// offset: starting index for pagination
+// limit: maximum number of results to return
+// filter: optional filter string
+// sortBy: optional field to sort by
+// sortOrder: optional sort order ("asc" or "desc")
+// withNames: whether to include organization names (unused, kept for compatibility)
+// Returns nil, nil if the endpoint requires user-based authentication
+func (org *Organization) ListUserOrgs(offset, limit *int, filter, sortBy, sortOrder *string, withNames bool) ([]UserOrgInfo, error) {
+	opts := ListUserOrgsOptions{}
+
+	if offset != nil {
+		opts.Offset = *offset
+	}
+	if limit != nil {
+		opts.Limit = *limit
+	}
+	if filter != nil {
+		opts.Filter = *filter
+	}
+	if sortBy != nil {
+		opts.SortBy = *sortBy
+	}
+	if sortOrder != nil {
+		opts.SortOrder = *sortOrder
+	}
+
+	orgs, _, err := org.ListUserOrgsWithOptions(opts)
+	return orgs, err
 }
 
 // GetAPIKeys retrieves the list of API keys for the organization

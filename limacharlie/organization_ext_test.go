@@ -101,6 +101,104 @@ func TestListUserOrgsWithPagination(t *testing.T) {
 	t.Logf("Retrieved %d organizations with limit=%d", len(orgs), limit)
 }
 
+// TestListUserOrgsWithOptions tests the new options-based function
+func TestListUserOrgsWithOptions(t *testing.T) {
+	t.Skip("ListUserOrgsWithOptions requires user-level authentication which is not available in test environment")
+
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// Test with no options (should return all orgs with all fields)
+	orgs, total, err := org.ListUserOrgsWithOptions()
+	a.NoError(err)
+	a.NotNil(orgs)
+	a.GreaterOrEqual(total, len(orgs))
+
+	t.Logf("User has access to %d organizations (total: %d)", len(orgs), total)
+
+	if len(orgs) > 0 {
+		t.Logf("First org: OID=%s, Name=%s, Status=%s", orgs[0].OID, orgs[0].Name, orgs[0].Status)
+	}
+}
+
+// TestListUserOrgsWithOptionsFields tests field selection
+func TestListUserOrgsWithOptionsFields(t *testing.T) {
+	t.Skip("ListUserOrgsWithOptions requires user-level authentication which is not available in test environment")
+
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	// Test with specific fields only (performance optimization)
+	opts := ListUserOrgsOptions{
+		Fields: []string{"oid", "name"},
+	}
+	orgs, total, err := org.ListUserOrgsWithOptions(opts)
+	a.NoError(err)
+	a.NotNil(orgs)
+	a.GreaterOrEqual(total, 0)
+
+	t.Logf("Retrieved %d organizations with fields=oid,name (total: %d)", len(orgs), total)
+
+	// When only specific fields are requested, other fields should be empty/default
+	if len(orgs) > 0 {
+		t.Logf("First org: OID=%s, Name=%s", orgs[0].OID, orgs[0].Name)
+	}
+}
+
+// TestListUserOrgsWithOptionsPagination tests pagination with the new function
+func TestListUserOrgsWithOptionsPagination(t *testing.T) {
+	t.Skip("ListUserOrgsWithOptions requires user-level authentication which is not available in test environment")
+
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	opts := ListUserOrgsOptions{
+		Offset: 0,
+		Limit:  5,
+	}
+	orgs, total, err := org.ListUserOrgsWithOptions(opts)
+	a.NoError(err)
+	a.NotNil(orgs)
+	a.LessOrEqual(len(orgs), 5)
+	a.GreaterOrEqual(total, 0)
+
+	t.Logf("Retrieved %d organizations with limit=5 (total: %d)", len(orgs), total)
+}
+
+// TestListUserOrgsWithOptionsAllParams tests all parameters combined
+func TestListUserOrgsWithOptionsAllParams(t *testing.T) {
+	t.Skip("ListUserOrgsWithOptions requires user-level authentication which is not available in test environment")
+
+	a := assert.New(t)
+	org := getTestOrgFromEnv(a)
+
+	opts := ListUserOrgsOptions{
+		Offset:    0,
+		Limit:     10,
+		SortBy:    "name",
+		SortOrder: "asc",
+		Fields:    []string{"oid", "name", "status", "sensor_online"},
+	}
+	orgs, total, err := org.ListUserOrgsWithOptions(opts)
+	a.NoError(err)
+	a.NotNil(orgs)
+	a.LessOrEqual(len(orgs), 10)
+
+	t.Logf("Retrieved %d organizations with all options (total: %d)", len(orgs), total)
+
+	for i, o := range orgs {
+		if i >= 3 {
+			break
+		}
+		var sensorOnline int
+		if o.SensorOnline != nil {
+			sensorOnline = *o.SensorOnline
+		}
+		t.Logf("Org %d: OID=%s, Name=%s, Status=%s, SensorOnline=%d",
+			i+1, o.OID, o.Name, o.Status, sensorOnline)
+	}
+}
+
 // TestAPIKeyLifecycle tests the full API key lifecycle
 func TestAPIKeyLifecycle(t *testing.T) {
 	a := assert.New(t)
