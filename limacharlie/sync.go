@@ -1640,6 +1640,12 @@ func (org *Organization) syncInstallationKeys(ikeys orgSyncInstallationKeys, opt
 	}
 
 	for keyName, key := range ikeys {
+		// The config key name is the canonical description used for
+		// matching against existing org keys.  Normalize it so that
+		// keys created via sync always have a description that matches
+		// what the next push will look up.
+		key.Description = keyName
+
 		orgKey, found := orgKeyMap[keyName]
 		if found {
 			if key.EqualsContent(orgKey) {
