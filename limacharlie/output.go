@@ -35,6 +35,7 @@ var OutputTypes = struct {
 	DataDog          OutputModuleType
 	OpenSearch       OutputModuleType
 	Websocket        OutputModuleType
+	LiveStream       OutputModuleType
 }{
 	S3:               "s3",
 	GCS:              "gcs",
@@ -57,6 +58,7 @@ var OutputTypes = struct {
 	DataDog:          "datadog",
 	OpenSearch:       "opensearch",
 	Websocket:        "websocket",
+	LiveStream:       "live_stream",
 }
 
 // OutputDataType is the type of data
