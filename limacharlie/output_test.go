@@ -12,6 +12,8 @@ import (
 func TestOutputList(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	deleteAllOutputs(org)
+
 	outputs, err := org.Outputs()
 	a.NoError(err)
 	if len(outputs) != 0 {
@@ -22,6 +24,9 @@ func TestOutputList(t *testing.T) {
 func TestOutputAddDelete(t *testing.T) {
 	a := assert.New(t)
 	org := getTestOrgFromEnv(a)
+	deleteAllOutputs(org)
+	defer deleteAllOutputs(org)
+
 	outputs, err := org.Outputs()
 	a.NoError(err)
 	if len(outputs) != 0 {
