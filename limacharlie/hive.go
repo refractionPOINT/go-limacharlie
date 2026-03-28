@@ -60,11 +60,17 @@ type SysMtd struct {
 	LastError   string `json:"last_error" yaml:"last_error"`
 	LastErrorTs int64  `json:"last_error_ts" yaml:"last_error_ts"`
 }
+type UIAction struct {
+	Label    string `json:"label" yaml:"label"`
+	Location string `json:"location" yaml:"location"`
+}
+
 type UsrMtd struct {
-	Enabled bool     `json:"enabled" yaml:"enabled"`
-	Expiry  int64    `json:"expiry" yaml:"expiry"`
-	Tags    []string `json:"tags" yaml:"tags"`
-	Comment string   `json:"comment" yaml:"comment"`
+	Enabled   bool       `json:"enabled" yaml:"enabled"`
+	Expiry    int64      `json:"expiry" yaml:"expiry"`
+	Tags      []string   `json:"tags" yaml:"tags"`
+	Comment   string     `json:"comment" yaml:"comment"`
+	UIActions []UIAction `json:"ui_actions,omitempty" yaml:"ui_actions,omitempty"`
 }
 
 type HiveName = string
