@@ -65,6 +65,7 @@ type SiteURLs struct {
 	Live             string          `json:"live"`
 	Hooks            string          `json:"hooks"`
 	Search           string          `json:"search"`
+	Cases            string          `json:"cases"`
 	RegionCode       string          `json:"region_code"`
 	PrivateEndpoints map[string]bool `json:"private_endpoints,omitempty"`
 }
@@ -81,6 +82,7 @@ func (s SiteURLs) ToMap() map[string]string {
 		"live":      s.Live,
 		"hooks":     s.Hooks,
 		"search":    s.Search,
+		"cases":     s.Cases,
 	}
 }
 
