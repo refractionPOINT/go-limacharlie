@@ -18,7 +18,7 @@ func TestDRRuleAddDelete(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	testRuleName := "testrule" + "-" + randSeq(6)
-	testRuleExp := int64(1773563700000)
+	testRuleExp := int64(3600) // 1 hour TTL in seconds
 	testRuleDetect := map[string]interface{}{
 		"op":    "is",
 		"event": "NEW_PROCESS",
