@@ -128,6 +128,11 @@ type MockServer struct {
 	// Tags across the org
 	AllTags []string
 
+	// Custom handler overrides: path -> handler.
+	// If set, the custom handler is called instead of the default for matching paths.
+	// Checked via prefix match, so "/v1/rules/" would override all rule routes.
+	CustomHandlers map[string]http.HandlerFunc
+
 	// Call log
 	calls []MockCall
 }
@@ -181,12 +186,26 @@ func NewMockServer(oid string) *MockServer {
 		BillingPlans:         []BillingPlan{},
 		GroupStore:           map[string]*GroupInfo{},
 		AllTags:              []string{},
+		CustomHandlers:       map[string]http.HandlerFunc{},
 		calls:                []MockCall{},
 	}
 
 	mux := http.NewServeMux()
 	ms.registerRoutes(mux)
-	ms.Server = httptest.NewServer(mux)
+	// Wrap mux with custom handler dispatch
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ms.mu.RLock()
+		for prefix, h := range ms.CustomHandlers {
+			if strings.HasPrefix(r.URL.Path, prefix) {
+				ms.mu.RUnlock()
+				h(w, r)
+				return
+			}
+		}
+		ms.mu.RUnlock()
+		mux.ServeHTTP(w, r)
+	})
+	ms.Server = httptest.NewServer(handler)
 
 	// Update URLs to point to mock server for services that the SDK
 	// hits directly (like replay). Strip the scheme for consistency
@@ -361,12 +380,6 @@ func readBody(r *http.Request) string {
 	b, _ := io.ReadAll(r.Body)
 	r.Body = io.NopCloser(bytes.NewReader(b))
 	return string(b)
-}
-
-func parseForm(r *http.Request) url.Values {
-	body := readBody(r)
-	vals, _ := url.ParseQuery(body)
-	return vals
 }
 
 // --- Route handlers ---
@@ -1588,4 +1601,3 @@ func compressPayload(data interface{}) (string, error) {
 	}
 	return buf.String(), nil
 }
-

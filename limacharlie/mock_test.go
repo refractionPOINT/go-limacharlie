@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -1490,4 +1491,236 @@ func TestMockMultipleMockServers(t *testing.T) {
 	rules2, err := org2.DRRules()
 	require.NoError(t, err)
 	assert.Empty(t, rules2)
+}
+
+// --- Device ---
+
+func TestMockDevice_AddTag(t *testing.T) {
+	ms, org := setupMock(t)
+
+	did := uuid.New().String()
+	sid := uuid.New().String()
+	ms.SensorStore[sid] = &Sensor{
+		OID: testOID,
+		SID: sid,
+		DID: did,
+	}
+
+	d := &Device{
+		DID:          did,
+		Organization: org,
+	}
+	err := d.AddTag("device-tag", 24*time.Hour)
+	require.NoError(t, err)
+
+	// Verify the call was made
+	found := false
+	for _, call := range ms.Calls() {
+		if call.Method == "POST" && strings.Contains(call.Path, did+"/tags") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found)
+}
+
+// --- Hive advanced ---
+
+func TestMockHive_ListMtd(t *testing.T) {
+	_, org := setupMock(t)
+
+	hc := NewHiveClient(org)
+	enabled := true
+	expiry := int64(0)
+
+	_, err := hc.Add(HiveArgs{
+		HiveName:     "test-hive",
+		PartitionKey: testOID,
+		Key:          "rec-1",
+		Data:         Dict{"secret": "data"},
+		Enabled:      &enabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+
+	records, err := hc.ListMtd(HiveArgs{HiveName: "test-hive", PartitionKey: testOID})
+	require.NoError(t, err)
+	assert.Len(t, records, 1)
+	// ListMtd strips data
+	assert.Nil(t, records["rec-1"].Data)
+	assert.True(t, records["rec-1"].UsrMtd.Enabled)
+}
+
+func TestMockHive_Update(t *testing.T) {
+	_, org := setupMock(t)
+
+	hc := NewHiveClient(org)
+	enabled := true
+	expiry := int64(0)
+
+	// Add initial record
+	_, err := hc.Add(HiveArgs{
+		HiveName:     "test-hive",
+		PartitionKey: testOID,
+		Key:          "update-me",
+		Data:         Dict{"version": "v1"},
+		Enabled:      &enabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+
+	// Update data
+	resp, err := hc.Update(HiveArgs{
+		HiveName:     "test-hive",
+		PartitionKey: testOID,
+		Key:          "update-me",
+		Data:         Dict{"version": "v2"},
+		Enabled:      &enabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.Guid)
+
+	// Verify updated
+	hd, err := hc.Get(HiveArgs{HiveName: "test-hive", PartitionKey: testOID, Key: "update-me"})
+	require.NoError(t, err)
+	assert.Equal(t, "v2", hd.Data["version"])
+}
+
+func TestMockHive_UpdateTx(t *testing.T) {
+	_, org := setupMock(t)
+
+	hc := NewHiveClient(org)
+	enabled := true
+	expiry := int64(0)
+
+	// Add initial record
+	_, err := hc.Add(HiveArgs{
+		HiveName:     "test-hive",
+		PartitionKey: testOID,
+		Key:          "tx-rec",
+		Data:         Dict{"counter": float64(1)},
+		Enabled:      &enabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+
+	// Transactional update
+	resp, err := hc.UpdateTx(HiveArgs{
+		HiveName:     "test-hive",
+		PartitionKey: testOID,
+		Key:          "tx-rec",
+	}, func(record *HiveData) (*HiveData, error) {
+		counter, _ := record.Data["counter"].(float64)
+		record.Data["counter"] = counter + 1
+		return record, nil
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+
+	// Verify
+	hd, err := hc.Get(HiveArgs{HiveName: "test-hive", PartitionKey: testOID, Key: "tx-rec"})
+	require.NoError(t, err)
+	assert.Equal(t, float64(2), hd.Data["counter"])
+}
+
+// --- ListSensorsFromSelector ---
+
+func TestMockListSensorsFromSelector(t *testing.T) {
+	ms, org := setupMock(t)
+
+	sid := uuid.New().String()
+	ms.SensorStore[sid] = &Sensor{
+		OID:      testOID,
+		SID:      sid,
+		Hostname: "selected-host",
+		Platform: Platforms.Linux,
+	}
+
+	sensors, err := org.ListSensorsFromSelector("plat == linux")
+	require.NoError(t, err)
+	// Mock returns all sensors regardless of selector (selector filtering is server-side)
+	assert.Len(t, sensors, 1)
+	assert.Equal(t, "selected-host", sensors[sid].Hostname)
+}
+
+// --- Custom handler ---
+
+func TestMockCustomHandler(t *testing.T) {
+	ms := NewMockServer(testOID)
+	defer ms.Close()
+
+	// Override the D&R rules endpoint with custom behavior
+	ms.CustomHandlers[fmt.Sprintf("/v1/rules/%s", testOID)] = func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"custom-rule": {"detect": "custom"}}`))
+	}
+
+	org, err := ms.NewOrganization()
+	require.NoError(t, err)
+
+	rules, err := org.DRRules()
+	require.NoError(t, err)
+	assert.Contains(t, rules, "custom-rule")
+}
+
+// --- Sensors with DID ---
+
+func TestMockSensors_WithDevice(t *testing.T) {
+	ms, org := setupMock(t)
+
+	sid := uuid.New().String()
+	did := uuid.New().String()
+	ms.SensorStore[sid] = &Sensor{
+		OID:      testOID,
+		SID:      sid,
+		DID:      did,
+		Hostname: "device-host",
+	}
+
+	s := org.GetSensor(sid)
+	assert.Equal(t, "device-host", s.Hostname)
+	assert.NotNil(t, s.Device)
+	assert.Equal(t, did, s.Device.DID)
+}
+
+// --- RefreshJWT through mock ---
+
+func TestMockRefreshJWT(t *testing.T) {
+	ms := NewMockServer(testOID)
+	defer ms.Close()
+
+	c, err := ms.NewClient()
+	require.NoError(t, err)
+
+	jwt, err := c.RefreshJWT(0)
+	require.NoError(t, err)
+	assert.Equal(t, "mock-jwt-token-refreshed", jwt)
+	assert.Equal(t, "mock-jwt-token-refreshed", c.GetCurrentJWT())
+}
+
+// --- URL caching ---
+
+func TestMockGetURLs_Caching(t *testing.T) {
+	ms, org := setupMock(t)
+
+	ms.ResetCalls()
+
+	urls1, err := org.GetURLs()
+	require.NoError(t, err)
+
+	urls2, err := org.GetURLs()
+	require.NoError(t, err)
+
+	assert.Equal(t, urls1, urls2)
+
+	// Second call should be cached (no additional HTTP call)
+	calls := ms.Calls()
+	urlCalls := 0
+	for _, c := range calls {
+		if strings.Contains(c.Path, "/url") {
+			urlCalls++
+		}
+	}
+	assert.Equal(t, 1, urlCalls, "expected only 1 URL fetch, rest should be cached")
 }
