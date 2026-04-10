@@ -36,7 +36,7 @@ var OutputTypes = struct {
 	OpenSearch       OutputModuleType
 	Websocket        OutputModuleType
 	Telegram         OutputModuleType
-	Teams            OutputModuleType
+	MsTeams          OutputModuleType
 	LiveStream       OutputModuleType
 }{
 	S3:               "s3",
@@ -61,7 +61,7 @@ var OutputTypes = struct {
 	OpenSearch:       "opensearch",
 	Websocket:        "websocket",
 	Telegram:         "telegram",
-	Teams:            "teams",
+	MsTeams:          "ms_teams",
 	LiveStream:       "live_stream",
 }
 
