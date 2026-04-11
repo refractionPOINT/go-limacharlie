@@ -35,6 +35,8 @@ var OutputTypes = struct {
 	DataDog          OutputModuleType
 	OpenSearch       OutputModuleType
 	Websocket        OutputModuleType
+	Telegram         OutputModuleType
+	MsTeams          OutputModuleType
 	LiveStream       OutputModuleType
 }{
 	S3:               "s3",
@@ -58,6 +60,8 @@ var OutputTypes = struct {
 	DataDog:          "datadog",
 	OpenSearch:       "opensearch",
 	Websocket:        "websocket",
+	Telegram:         "telegram",
+	MsTeams:          "ms_teams",
 	LiveStream:       "live_stream",
 }
 
@@ -165,6 +169,10 @@ type OutputConfig struct {
 	BlobContainer     string `json:"blob_container,omitempty" yaml:"blob_container,omitempty"`
 	AccountName       string `json:"account_name,omitempty" yaml:"account_name,omitempty"`
 	ConnectionString  string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
+	BotToken          string `json:"bot_token,omitempty" yaml:"bot_token,omitempty"`
+	ChatID            string `json:"chat_id,omitempty" yaml:"chat_id,omitempty"`
+	ParseMode         string `json:"parse_mode,omitempty" yaml:"parse_mode,omitempty"`
+	WebhookURL        string `json:"webhook_url,omitempty" yaml:"webhook_url,omitempty"`
 }
 
 func (o OutputConfig) Equals(other OutputConfig) bool {
