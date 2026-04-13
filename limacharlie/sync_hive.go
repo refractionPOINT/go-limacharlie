@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -131,7 +132,19 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 						PartitionKey: orgInfo.OID},
 						ncd)
 					if err != nil {
-						return orgOps, err
+						// If the record appears in the listing but can't be
+						// fetched (e.g. partial state from a previous failed
+						// push), fall back to an add so the sync is idempotent.
+						if strings.Contains(err.Error(), "RECORD_NOT_FOUND") {
+							err = org.addHiveConfigData(HiveArgs{
+								Key:          hiveKey,
+								HiveName:     hiveName,
+								PartitionKey: orgInfo.OID,
+							}, ncd)
+						}
+						if err != nil {
+							return orgOps, err
+						}
 					}
 					op.IsAdded = true
 					orgOps = append(orgOps, op)
