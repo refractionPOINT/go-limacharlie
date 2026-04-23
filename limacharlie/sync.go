@@ -996,6 +996,7 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 	}
 	// We will sync manually a few hives specifically here to avoid cases
 	// where a new resource uses a record and it's not there yet.
+	earlySyncedHives := map[string]bool{}
 	for _, hive := range []string{"secret", "yara", "lookup", "model"} {
 		if isEnabled, ok := options.SyncHives[hive]; ok && isEnabled && len(conf.Hives[hive]) > 0 {
 			justOne := orgSyncHives{
@@ -1006,6 +1007,7 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 			if err != nil {
 				return ops, fmt.Errorf("sync_hives %q: %+v ", hive, err)
 			}
+			earlySyncedHives[hive] = true
 		}
 	}
 	if options.SyncExtensions {
@@ -1065,7 +1067,15 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 		}
 	}
 	if len(options.SyncHives) != 0 {
-		newOps, err := org.syncHive(conf.Hives, options)
+		// Exclude hives already synced in the early pass above
+		// to avoid duplicate processing.
+		remainingHives := make(orgSyncHives, len(conf.Hives))
+		for k, v := range conf.Hives {
+			if !earlySyncedHives[k] {
+				remainingHives[k] = v
+			}
+		}
+		newOps, err := org.syncHive(remainingHives, options)
 		ops = append(ops, newOps...)
 		if err != nil {
 			return ops, fmt.Errorf("sync_hives: %+v ", err)
