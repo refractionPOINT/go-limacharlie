@@ -6,10 +6,6 @@ import (
 	"net/http"
 )
 
-const (
-	billingRootURL = "https://billing.limacharlie.io"
-)
-
 // BillingOrgStatus contains the billing status information for an organization
 type BillingOrgStatus struct {
 	IsPastDue bool `json:"is_past_due,omitempty"`
@@ -40,6 +36,7 @@ type BillingInvoiceURL struct {
 type BillingPlan struct {
 	ID          string                 `json:"id,omitempty"`
 	Name        string                 `json:"name,omitempty"`
+	Region      string                 `json:"region,omitempty"`
 	Description string                 `json:"description,omitempty"`
 	Price       float64                `json:"price,omitempty"`
 	Currency    string                 `json:"currency,omitempty"`
@@ -56,9 +53,9 @@ type BillingUserAuthRequirements struct {
 // GetBillingOrgStatus retrieves the billing status for the organization
 func (org *Organization) GetBillingOrgStatus() (*BillingOrgStatus, error) {
 	var status BillingOrgStatus
-	url := fmt.Sprintf("orgs/%s/status", org.GetOID())
+	url := fmt.Sprintf("orgs/%s/billing/status", org.GetOID())
 
-	request := makeDefaultRequest(&status).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&status)
 
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
@@ -70,9 +67,9 @@ func (org *Organization) GetBillingOrgStatus() (*BillingOrgStatus, error) {
 // GetBillingOrgDetails retrieves detailed billing information for the organization
 func (org *Organization) GetBillingOrgDetails() (*BillingOrgDetails, error) {
 	var details BillingOrgDetails
-	url := fmt.Sprintf("orgs/%s/details", org.GetOID())
+	url := fmt.Sprintf("orgs/%s/billing/details", org.GetOID())
 
-	request := makeDefaultRequest(&details).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&details)
 
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
@@ -101,12 +98,12 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (m
 	}
 
 	response := make(map[string]interface{})
-	urlPath := fmt.Sprintf("orgs/%s/invoice_url/%d/%02d", org.GetOID(), year, month)
+	urlPath := fmt.Sprintf("orgs/%s/billing/invoice/%d/%02d", org.GetOID(), year, month)
 	if format != "" {
 		urlPath = fmt.Sprintf("%s?format=%s", urlPath, format)
 	}
 
-	request := makeDefaultRequest(&response).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&response)
 
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
@@ -115,15 +112,45 @@ func (org *Organization) GetBillingInvoiceURL(year, month int, format string) (m
 	return response, nil
 }
 
+// SkuDefinition contains metadata and pricing information for a metered SKU
+type SkuDefinition struct {
+	SkuID       string                 `json:"sku_id"`
+	PlanID      string                 `json:"plan_id"`
+	Category    string                 `json:"category"`
+	Label       string                 `json:"label"`
+	Description string                 `json:"description"`
+	UnitType    string                 `json:"unit_type"`
+	UnitLabel   string                 `json:"unit_label"`
+	MetaProduct string                 `json:"meta_product"`
+	Pricing     map[string]interface{} `json:"pricing,omitempty"`
+	Error       string                 `json:"error,omitempty"`
+}
+
+// GetBillingSkuDefinitions retrieves metered SKU definitions with metadata and pricing
+func (org *Organization) GetBillingSkuDefinitions() ([]SkuDefinition, error) {
+	var response struct {
+		Skus []SkuDefinition `json:"skus"`
+	}
+	url := fmt.Sprintf("orgs/%s/billing/sku", org.GetOID())
+
+	request := makeDefaultRequest(&response)
+
+	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
+		return nil, err
+	}
+
+	return response.Skus, nil
+}
+
 // GetBillingAvailablePlans retrieves the list of available billing plans for the user
 func (org *Organization) GetBillingAvailablePlans() ([]BillingPlan, error) {
 	// Server wraps response in {"plans": [...]}
 	var response struct {
 		Plans []BillingPlan `json:"plans"`
 	}
-	url := "user/self/plans"
+	url := "plans"
 
-	request := makeDefaultRequest(&response).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&response)
 
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
@@ -137,7 +164,7 @@ func (org *Organization) GetBillingUserAuthRequirements() (*BillingUserAuthRequi
 	var authReq BillingUserAuthRequirements
 	url := "user/self/auth"
 
-	request := makeDefaultRequest(&authReq).withURLRoot(billingRootURL + "/")
+	request := makeDefaultRequest(&authReq)
 
 	if err := org.client.reliableRequest(context.Background(), http.MethodGet, url, request); err != nil {
 		return nil, err
