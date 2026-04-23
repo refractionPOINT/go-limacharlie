@@ -35,7 +35,6 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string // overrides rootURL when non-empty
 	jwtURL     string // overrides getJWTURL when non-empty
-	billingURL string // overrides billingRootURL when non-empty
 }
 
 // ClientOptions holds all options for Client
@@ -90,11 +89,6 @@ func (r restRequest) withQueryData(queryData interface{}) restRequest {
 
 func (r restRequest) withURLValues(urlValues url.Values) restRequest {
 	r.urlValues = urlValues
-	return r
-}
-
-func (r restRequest) withURLRoot(root string) restRequest {
-	r.urlRoot = root
 	return r
 }
 
@@ -403,12 +397,7 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 	// Build the URL - if urlRoot is a full URL (starts with http), use it as base, otherwise concatenate
 	var fullURL string
 	if strings.HasPrefix(request.urlRoot, "http://") || strings.HasPrefix(request.urlRoot, "https://") {
-		effectiveRoot := request.urlRoot
-		// If a billing URL override is set, replace the billing root URL
-		if c.billingURL != "" && strings.HasPrefix(request.urlRoot, billingRootURL) {
-			effectiveRoot = c.billingURL + strings.TrimPrefix(request.urlRoot, billingRootURL)
-		}
-		fullURL = fmt.Sprintf("%s%s", effectiveRoot, path)
+		fullURL = fmt.Sprintf("%s%s", request.urlRoot, path)
 	} else {
 		base := c.baseURL
 		if base == "" {

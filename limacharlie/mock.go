@@ -262,7 +262,6 @@ func (ms *MockServer) NewClient() (*Client, error) {
 		httpClient: ms.Server.Client(),
 		baseURL:    ms.Server.URL,
 		jwtURL:     ms.Server.URL + "/jwt",
-		billingURL: ms.Server.URL,
 	}, nil
 }
 

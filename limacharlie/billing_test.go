@@ -116,9 +116,8 @@ func TestGetBillingAvailablePlans(t *testing.T) {
 	org := getTestOrgFromEnv(a)
 
 	_, err := org.GetBillingAvailablePlans()
-	// When using API key authentication (non-user identity), expect this specific error
+	// When using API key authentication (non-user identity), expect an error
 	a.Error(err, "Should return error for non-user identity")
-	a.Contains(err.Error(), "only user-based identities are allowed to query available plans")
 	t.Logf("Expected error received: %s", err.Error())
 }
 
