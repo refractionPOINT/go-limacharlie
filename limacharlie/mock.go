@@ -343,12 +343,12 @@ func (ms *MockServer) registerRoutes(mux *http.ServeMux) {
 	// Hostnames
 	mux.HandleFunc(fmt.Sprintf("/v1/hostnames/%s", ms.OID), ms.handleHostnames)
 
-	// Billing (no /v1/ prefix - billing service uses its own root URL)
-	mux.HandleFunc(fmt.Sprintf("/orgs/%s/status", ms.OID), ms.handleBillingStatus)
-	mux.HandleFunc(fmt.Sprintf("/orgs/%s/details", ms.OID), ms.handleBillingDetails)
-	mux.HandleFunc(fmt.Sprintf("/orgs/%s/invoice_url/", ms.OID), ms.handleBillingInvoice)
-	mux.HandleFunc("/user/self/plans", ms.handleBillingPlans)
-	mux.HandleFunc("/user/self/auth", ms.handleBillingAuth)
+	// Billing
+	mux.HandleFunc(fmt.Sprintf("/v1/orgs/%s/billing/status", ms.OID), ms.handleBillingStatus)
+	mux.HandleFunc(fmt.Sprintf("/v1/orgs/%s/billing/details", ms.OID), ms.handleBillingDetails)
+	mux.HandleFunc(fmt.Sprintf("/v1/orgs/%s/billing/invoice/", ms.OID), ms.handleBillingInvoice)
+	mux.HandleFunc("/v1/plans", ms.handleBillingPlans)
+	mux.HandleFunc("/v1/user/self/auth", ms.handleBillingAuth)
 
 	// Groups
 	mux.HandleFunc("/v1/groups/concurrent", ms.handleGroupsConcurrent)
