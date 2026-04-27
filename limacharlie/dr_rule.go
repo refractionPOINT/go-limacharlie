@@ -48,7 +48,7 @@ func (org *Organization) DRRuleAdd(name string, detection interface{}, response 
 	for _, o := range opt {
 		reqOpt = o
 		if reqOpt.TTL != 0 {
-			reqOpt.TTL = time.Now().Unix() + reqOpt.TTL
+			reqOpt.TTL = time.Now().UnixMilli() + reqOpt.TTL*1000
 		}
 	}
 

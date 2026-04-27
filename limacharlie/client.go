@@ -33,6 +33,8 @@ type Client struct {
 	options    ClientOptions
 	logger     LCLogger
 	httpClient *http.Client
+	baseURL    string // overrides rootURL when non-empty
+	jwtURL     string // overrides getJWTURL when non-empty
 }
 
 // ClientOptions holds all options for Client
@@ -90,11 +92,6 @@ func (r restRequest) withURLValues(urlValues url.Values) restRequest {
 	return r
 }
 
-func (r restRequest) withURLRoot(root string) restRequest {
-	r.urlRoot = root
-	return r
-}
-
 func (r restRequest) withIdempotentKey(idempotentKey string) restRequest {
 	r.idempotentKey = idempotentKey
 	return r
@@ -108,7 +105,7 @@ func isEmpty(s string) bool {
 // Will return a valid client as soon as one loader returns valid requirements
 func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...ClientOptionLoader) (*Client, error) {
 	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
-		return &Client{options: inOpt, logger: logger, httpClient: getHTTPClient()}, nil
+		return &Client{options: inOpt, logger: logger, httpClient: getHTTPClient(), baseURL: rootURL, jwtURL: getJWTURL}, nil
 	}
 
 	loaderCount := len(optsLoaders)
@@ -138,6 +135,8 @@ func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...Cl
 		options:    opt,
 		logger:     logger,
 		httpClient: getHTTPClient(),
+		baseURL:    rootURL,
+		jwtURL:     getJWTURL,
 	}, nil
 }
 
@@ -189,7 +188,11 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, getJWTURL, strings.NewReader(authData.Encode()))
+	jwtEndpoint := c.jwtURL
+	if jwtEndpoint == "" {
+		jwtEndpoint = getJWTURL
+	}
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, jwtEndpoint, strings.NewReader(authData.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -396,7 +399,11 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 	if strings.HasPrefix(request.urlRoot, "http://") || strings.HasPrefix(request.urlRoot, "https://") {
 		fullURL = fmt.Sprintf("%s%s", request.urlRoot, path)
 	} else {
-		fullURL = fmt.Sprintf("%s%s%s", rootURL, request.urlRoot, path)
+		base := c.baseURL
+		if base == "" {
+			base = rootURL
+		}
+		fullURL = fmt.Sprintf("%s%s%s", base, request.urlRoot, path)
 	}
 
 	r, err := http.NewRequestWithContext(reqCtx, verb, fullURL, body)
