@@ -1,3 +1,3 @@
 module github.com/refractionPOINT/go-limacharlie
 
-go 1.21
+go 1.25.9
