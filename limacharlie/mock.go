@@ -214,6 +214,10 @@ func NewMockServer(oid string) *MockServer {
 	ms.URLs.Replay = mockHost
 	ms.URLs.Artifacts = mockHost
 	ms.URLs.Hooks = mockHost
+	// Search calls need a scheme because the mock listens on http, while
+	// production Search URLs arrive hostname-only and default to https.
+	// search.go honors an already-qualified URL here.
+	ms.URLs.Search = "http://" + mockHost
 
 	return ms
 }
