@@ -61,7 +61,6 @@ var KnownHives = []string{
 	"secret",
 	"lookup",
 	"query",
-	"model",
 	"playbook",
 	"ai_agent",
 	"ai_skill",
@@ -1000,7 +999,7 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 	}
 	// We will sync manually a few hives specifically here to avoid cases
 	// where a new resource uses a record and it's not there yet.
-	for _, hive := range []string{"secret", "yara", "lookup", "model"} {
+	for _, hive := range []string{"secret", "yara", "lookup"} {
 		if isEnabled, ok := options.SyncHives[hive]; ok && isEnabled && len(conf.Hives[hive]) > 0 {
 			justOne := orgSyncHives{
 				hive: conf.Hives[hive],
