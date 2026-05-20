@@ -772,6 +772,86 @@ func TestMockHive_CRUD(t *testing.T) {
 	assert.Empty(t, records)
 }
 
+// TestMockHive_AddEmptyDataCreates regression-tests that HiveClient.Add
+// creates a new record when the caller passes empty Data. Previously, Add
+// would route the request to the metadata-only endpoint (set_record_mtd),
+// which fails with RECORD_NOT_FOUND when the record does not yet exist —
+// making it impossible to create a hive entry that only carries usr_mtd
+// (e.g. an IaC rule with `enabled: false` and no `data:` block).
+func TestMockHive_AddEmptyDataCreates(t *testing.T) {
+	_, org := setupMock(t)
+
+	hc := NewHiveClient(org)
+	disabled := false
+	expiry := int64(0)
+
+	resp, err := hc.Add(HiveArgs{
+		HiveName:     "dr-general",
+		PartitionKey: testOID,
+		Key:          "rule-with-no-data",
+		Enabled:      &disabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "rule-with-no-data", resp.Name)
+
+	hd, err := hc.Get(HiveArgs{HiveName: "dr-general", PartitionKey: testOID, Key: "rule-with-no-data"})
+	require.NoError(t, err)
+	assert.False(t, hd.UsrMtd.Enabled)
+}
+
+// TestMockHive_SetRecordMtdRequiresExisting verifies the mock now models the
+// set_record_mtd RPC semantic: a POST to /{key}/mtd returns RECORD_NOT_FOUND
+// when no record exists. Without this, the regression above would never be
+// observable in unit tests.
+func TestMockHive_SetRecordMtdRequiresExisting(t *testing.T) {
+	ms, org := setupMock(t)
+
+	hc := NewHiveClient(org)
+
+	// Update against a missing record routes to /mtd (empty Data) and must
+	// surface RECORD_NOT_FOUND from the mock.
+	_, err := hc.Update(HiveArgs{
+		HiveName:     "dr-general",
+		PartitionKey: testOID,
+		Key:          "missing-record",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "RECORD_NOT_FOUND")
+
+	// Seed the record, then a metadata-only update must succeed and must
+	// preserve the existing data.
+	enabled := true
+	expiry := int64(0)
+	_, err = hc.Add(HiveArgs{
+		HiveName:     "dr-general",
+		PartitionKey: testOID,
+		Key:          "existing-record",
+		Data:         Dict{"detect": "x", "respond": "y"},
+		Enabled:      &enabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+
+	disabled := false
+	_, err = hc.Update(HiveArgs{
+		HiveName:     "dr-general",
+		PartitionKey: testOID,
+		Key:          "existing-record",
+		Enabled:      &disabled,
+		Expiry:       &expiry,
+	})
+	require.NoError(t, err)
+
+	hd, err := hc.Get(HiveArgs{HiveName: "dr-general", PartitionKey: testOID, Key: "existing-record"})
+	require.NoError(t, err)
+	assert.False(t, hd.UsrMtd.Enabled)
+	assert.Equal(t, "x", hd.Data["detect"])
+	assert.Equal(t, "y", hd.Data["respond"])
+
+	_ = ms
+}
+
 func TestMockHive_MultipleRecords(t *testing.T) {
 	_, org := setupMock(t)
 
