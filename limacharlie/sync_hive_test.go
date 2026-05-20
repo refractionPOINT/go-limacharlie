@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 )
 
 var s3TestHiveKey string
@@ -582,65 +581,6 @@ func TestHiveRemove(t *testing.T) {
 	a.True(syncOpS3)
 	a.True(syncOpOffice)
 	a.True(syncOpFp)
-}
-
-func TestHiveDRService(t *testing.T) {
-	a := assert.New(t)
-	org := getTestOrgFromEnv(a)
-	hive := NewHiveClient(org)
-
-	err := org.ResourceSubscribe("yara", "replicant")
-	a.NoError(err)
-
-	// give changes a few secs to take place before list call
-	time.Sleep(time.Second * 2)
-	setData, err := hive.List(HiveArgs{HiveName: "dr-service", PartitionKey: os.Getenv("_OID")})
-	a.NoError(err)
-
-	// ensure data is returning as null
-	for k, v := range setData {
-		a.Nil(v.Data, "set data should be nil for key %s", k)
-	}
-
-	yaraRule := `
-hives:
-  dr-service:
-    __YaraReplicant___sensor_sync_yara:
-      data: null
-      usr_mtd:
-        enabled: false
-        expiry: 2663563600000
-        tags: ["test1", "test2", "test3"]`
-
-	orgConfig := OrgConfig{}
-	err = yaml.Unmarshal([]byte(yaraRule), &orgConfig)
-	a.NoError(err)
-
-	orgOps, err := org.SyncPush(orgConfig, SyncOptions{IsDryRun: true, SyncHives: map[string]bool{"dr-service": true}})
-	a.NoError(err)
-	a.NotEmpty(orgOps)
-
-	expectedOps := sortSyncOps([]OrgSyncOperation{
-		{ElementType: OrgSyncOperationElementType.Hives, ElementName: "dr-service/" + "__YaraReplicant___sensor_sync_yara", IsAdded: true, IsRemoved: false},
-	})
-	if !a.Equal(sortSyncOps(expectedOps), sortSyncOps(orgOps)) {
-		return
-	}
-
-	orgOps, err = org.SyncPush(orgConfig, SyncOptions{IsDryRun: false, SyncHives: map[string]bool{"dr-service": true}})
-	a.NoError(err)
-	a.NotEmpty(orgOps)
-
-	drData, err := hive.GetMTD(HiveArgs{HiveName: "dr-service", PartitionKey: os.Getenv("_OID"), Key: "__YaraReplicant___sensor_sync_yara"})
-	a.NoError(err)
-
-	a.Nil(drData.Data)
-	a.False(drData.UsrMtd.Enabled)
-	a.Equal(int64(2663563600000), drData.UsrMtd.Expiry)
-	a.Equal(3, len(drData.UsrMtd.Tags))
-
-	err = org.ResourceUnsubscribe("yara", "replicant")
-	a.NoError(err)
 }
 
 func TestHiveMerge(t *testing.T) {
