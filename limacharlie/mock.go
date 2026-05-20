@@ -1140,6 +1140,29 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 			json.Unmarshal([]byte(dataStr), &data)
 		}
 
+		// target=mtd corresponds to the set_record_mtd RPC, which only mutates
+		// the metadata of an existing record and returns RECORD_NOT_FOUND
+		// otherwise. target=data is set_record, an upsert.
+		if target == "mtd" {
+			records := ms.HiveStore[storeKey]
+			existing, ok := records[key]
+			if records == nil || !ok {
+				ms.writeError(w, 404, "RECORD_NOT_FOUND")
+				return
+			}
+			existing.UsrMtd = usrMtd
+			existing.SysMtd.Etag = uuid.New().String()
+			existing.SysMtd.LastAuthor = "mock"
+			existing.SysMtd.LastMod = time.Now().Unix()
+			ms.HiveStore[storeKey][key] = existing
+			ms.writeJSON(w, HiveResp{
+				Guid: existing.SysMtd.GUID,
+				Hive: HiveInfo{Name: hiveName, Partition: partition},
+				Name: key,
+			})
+			return
+		}
+
 		if ms.HiveStore[storeKey] == nil {
 			ms.HiveStore[storeKey] = map[string]HiveData{}
 		}
