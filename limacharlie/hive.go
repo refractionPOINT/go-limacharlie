@@ -230,10 +230,10 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 		return nil, errors.New("key required")
 	}
 
-	target := "mtd" // if no data set default to target type mtd
-	if len(args.Data) != 0 || args.ARL != "" {
-		target = "data"
-	}
+	// Always create via the data endpoint. set_record_mtd only mutates an
+	// existing record's metadata and returns RECORD_NOT_FOUND otherwise, so
+	// it cannot be used to create a record — even when Data is empty.
+	target := "data"
 
 	var userMtd UsrMtd // set UsrMtd Data
 	if args.Expiry != nil {
