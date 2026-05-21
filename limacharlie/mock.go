@@ -1143,11 +1143,20 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 		// target=mtd corresponds to the set_record_mtd RPC, which only mutates
 		// the metadata of an existing record and returns RECORD_NOT_FOUND
 		// otherwise. target=data is set_record, an upsert.
+		//
+		// Both branches honor etag CAS the same way prod does: if the request
+		// carries an etag (mtd: via the dedicated "etag" form field; data:
+		// via sys_mtd.etag) and it doesn't match the stored record, return
+		// ETAG_MISMATCH so tests can exercise concurrent-write rejection.
 		if target == "mtd" {
 			records := ms.HiveStore[storeKey]
 			existing, ok := records[key]
 			if records == nil || !ok {
 				ms.writeError(w, 404, "RECORD_NOT_FOUND")
+				return
+			}
+			if reqEtag := form.Get("etag"); reqEtag != "" && reqEtag != existing.SysMtd.Etag {
+				ms.writeError(w, 409, "ETAG_MISMATCH")
 				return
 			}
 			existing.UsrMtd = usrMtd
@@ -1163,6 +1172,13 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// target=data (set_record): upsert path. If the record already exists
+		// and the request carries an etag, enforce it before overwriting.
+		if existing, ok := ms.HiveStore[storeKey][key]; ok && sysMtd.Etag != "" && sysMtd.Etag != existing.SysMtd.Etag {
+			ms.writeError(w, 409, "ETAG_MISMATCH")
+			return
+		}
+
 		if ms.HiveStore[storeKey] == nil {
 			ms.HiveStore[storeKey] = map[string]HiveData{}
 		}
@@ -1170,14 +1186,23 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 		guid := uuid.New().String()
 		etag := uuid.New().String()
 
+		// Preserve created-by/created-at on overwrite of an existing record.
+		createdBy := "mock"
+		createdAt := time.Now().Unix()
+		if existing, ok := ms.HiveStore[storeKey][key]; ok {
+			createdBy = existing.SysMtd.CreatedBy
+			createdAt = existing.SysMtd.CreatedAt
+			guid = existing.SysMtd.GUID
+		}
+
 		ms.HiveStore[storeKey][key] = HiveData{
 			Data:   data,
 			UsrMtd: usrMtd,
 			SysMtd: SysMtd{
 				Etag:       etag,
 				GUID:       guid,
-				CreatedBy:  "mock",
-				CreatedAt:  time.Now().Unix(),
+				CreatedBy:  createdBy,
+				CreatedAt:  createdAt,
 				LastAuthor: "mock",
 				LastMod:    time.Now().Unix(),
 			},
