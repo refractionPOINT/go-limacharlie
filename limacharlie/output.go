@@ -131,6 +131,8 @@ type OutputConfig struct {
 	SecondsPerFile    int    `json:"sec_per_file,omitempty,string" yaml:"sec_per_file,omitempty"`
 	SampleRate        int    `json:"sample_rate,omitempty,string" yaml:"sample_rate,omitempty"`
 	DestinationEmail  string `json:"dest_email,omitempty" yaml:"dest_email,omitempty"`
+	CCEmail           string `json:"cc_email,omitempty" yaml:"cc_email,omitempty"`
+	BCCEmail          string `json:"bcc_email,omitempty" yaml:"bcc_email,omitempty"`
 	FromEmail         string `json:"from_email,omitempty" yaml:"from_email,omitempty"`
 	Readable          bool   `json:"is_readable,omitempty,string" yaml:"is_readable,omitempty"`
 	Subject           string `json:"subject,omitempty" yaml:"subject,omitempty"`
