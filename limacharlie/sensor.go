@@ -353,24 +353,36 @@ func (org *Organization) ListSensorsFromSelector(selector string) (map[string]*S
 	return m, nil
 }
 
-func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context, selector string, continuationToken string) (map[string]*Sensor, string, error) {
+// ListSensorsIterativeOptions configures behavior of ListSensorsFromSelectorIteratively.
+type ListSensorsIterativeOptions struct {
+	// Limit caps the number of sensor records returned per call. Leaving it
+	// zero defers to the backend default. Set a smaller value to bound the
+	// per-call latency when paginating through large organizations.
+	Limit int
+}
+
+func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context, selector string, continuationToken string, options ...ListSensorsIterativeOptions) (map[string]*Sensor, string, error) {
 	m := map[string]*Sensor{}
 	lastToken := continuationToken
 
+	effectiveOptions := ListSensorsIterativeOptions{}
+	if len(options) != 0 {
+		effectiveOptions = options[0]
+	}
+
 	page := rawSensorListPage{}
 	q := makeDefaultRequest(&page)
-	if lastToken != "" {
-		q = q.withQueryData(Dict{
-			"continuation_token": lastToken,
-			"selector":           selector,
-			"is_compressed":      "true",
-		})
-	} else {
-		q = q.withQueryData(Dict{
-			"selector":      selector,
-			"is_compressed": "true",
-		})
+	queryData := Dict{
+		"selector":      selector,
+		"is_compressed": "true",
 	}
+	if lastToken != "" {
+		queryData["continuation_token"] = lastToken
+	}
+	if effectiveOptions.Limit > 0 {
+		queryData["limit"] = effectiveOptions.Limit
+	}
+	q = q.withQueryData(queryData)
 	if err := org.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
 		return nil, "", err
 	}
