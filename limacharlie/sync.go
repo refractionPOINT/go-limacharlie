@@ -66,6 +66,8 @@ var KnownHives = []string{
 	"ai_skill",
 	"ai_memory",
 	"external_adapter",
+	"org_notes",
+	"sop",
 }
 
 func SyncAll() SyncOptions {
@@ -97,6 +99,8 @@ func SyncAll() SyncOptions {
 			"ai_skill":         true,
 			"ai_memory":        true,
 			"external_adapter": true,
+			"org_notes":        true,
+			"sop":              true,
 		},
 	}
 }
