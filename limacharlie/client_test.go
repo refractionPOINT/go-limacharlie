@@ -55,3 +55,27 @@ func (s *ClientTestSuite) TestFileLoader() {
 		})
 	}
 }
+
+func (s *ClientTestSuite) TestDefaultURLs() {
+	c, err := NewClientFromLoader(ClientOptions{
+		OID: "9416bc29-2bae-47d7-ac8c-63210f3a22e3",
+		JWT: "fake",
+	}, nil)
+	if s.NoError(err) {
+		s.Equal(rootURL, c.baseURL)
+		s.Equal(getJWTURL, c.jwtURL)
+	}
+}
+
+func (s *ClientTestSuite) TestURLOverrides() {
+	c, err := NewClientFromLoader(ClientOptions{
+		OID:    "9416bc29-2bae-47d7-ac8c-63210f3a22e3",
+		JWT:    "fake",
+		URL:    "https://api.example.test",
+		JWTURL: "https://jwt.example.test",
+	}, nil)
+	if s.NoError(err) {
+		s.Equal("https://api.example.test", c.baseURL)
+		s.Equal("https://jwt.example.test", c.jwtURL)
+	}
+}
