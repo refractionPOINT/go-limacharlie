@@ -46,6 +46,10 @@ type ClientOptions struct {
 	Environment   string
 	Permissions   []string
 	JWTExpiryTime time.Duration
+	// URL overrides the default REST API base URL ("https://api.limacharlie.io") when non-empty.
+	URL string
+	// JWTURL overrides the default JWT exchange URL ("https://jwt.limacharlie.io") when non-empty.
+	JWTURL string
 }
 
 type jwtResponse struct {
@@ -105,7 +109,7 @@ func isEmpty(s string) bool {
 // Will return a valid client as soon as one loader returns valid requirements
 func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...ClientOptionLoader) (*Client, error) {
 	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
-		return &Client{options: inOpt, logger: logger, httpClient: getHTTPClient(), baseURL: rootURL, jwtURL: getJWTURL}, nil
+		return &Client{options: inOpt, logger: logger, httpClient: getHTTPClient(), baseURL: resolveBaseURL(inOpt.URL), jwtURL: resolveJWTURL(inOpt.JWTURL)}, nil
 	}
 
 	loaderCount := len(optsLoaders)
@@ -135,9 +139,25 @@ func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...Cl
 		options:    opt,
 		logger:     logger,
 		httpClient: getHTTPClient(),
-		baseURL:    rootURL,
-		jwtURL:     getJWTURL,
+		baseURL:    resolveBaseURL(opt.URL),
+		jwtURL:     resolveJWTURL(opt.JWTURL),
 	}, nil
+}
+
+// resolveBaseURL returns the override when non-empty, otherwise the default rootURL.
+func resolveBaseURL(override string) string {
+	if override != "" {
+		return override
+	}
+	return rootURL
+}
+
+// resolveJWTURL returns the override when non-empty, otherwise the default getJWTURL.
+func resolveJWTURL(override string) string {
+	if override != "" {
+		return override
+	}
+	return getJWTURL
 }
 
 // NewClient loads client options from
