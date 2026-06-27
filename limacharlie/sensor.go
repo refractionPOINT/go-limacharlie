@@ -179,6 +179,30 @@ func (s *Sensor) RemoveTag(tag string) error {
 	return nil
 }
 
+// Seal marks the sensor as sealed, preventing it from being uninstalled.
+// Mirrors the Python SDK Sensor.seal().
+func (s *Sensor) Seal() error {
+	resp := Dict{}
+	req := makeDefaultRequest(&resp)
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/seal", s.SID), req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
+// Unseal removes the seal from the sensor, allowing it to be uninstalled.
+// Mirrors the Python SDK Sensor.unseal().
+func (s *Sensor) Unseal() error {
+	resp := Dict{}
+	req := makeDefaultRequest(&resp)
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("%s/seal", s.SID), req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
 func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 	data := Dict{
 		"tasks": task,
