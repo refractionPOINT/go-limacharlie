@@ -65,6 +65,16 @@ type restRequest struct {
 	response      interface{}
 	urlRoot       string
 	idempotentKey string
+	// rawBody, when non-nil, is sent verbatim as the request body instead of
+	// form-encoding formData/urlValues. Used for services that expect a JSON
+	// body (e.g. the cases and ai-sessions micro-services).
+	rawBody []byte
+	// contentType is the Content-Type header to use with rawBody. Defaults to
+	// "application/json" when rawBody is set and contentType is empty.
+	contentType string
+	// extraHeaders are additional headers set on the request after the default
+	// ones, so they can override defaults (e.g. Authorization for ai-sessions).
+	extraHeaders map[string]string
 }
 
 func makeDefaultRequest(response interface{}) restRequest {
@@ -93,6 +103,29 @@ func (r restRequest) withQueryData(queryData interface{}) restRequest {
 
 func (r restRequest) withURLValues(urlValues url.Values) restRequest {
 	r.urlValues = urlValues
+	return r
+}
+
+// withURLRoot overrides the URL root. When root starts with http:// or
+// https:// it is treated as a full base host (e.g. "https://cases.limacharlie.io")
+// and the request path is appended directly to it, bypassing the default API base.
+func (r restRequest) withURLRoot(root string) restRequest {
+	r.urlRoot = root
+	return r
+}
+
+// withRawBody sends body verbatim with the given Content-Type (defaults to
+// application/json when contentType is empty), instead of form-encoding.
+func (r restRequest) withRawBody(body []byte, contentType string) restRequest {
+	r.rawBody = body
+	r.contentType = contentType
+	return r
+}
+
+// withExtraHeaders sets additional headers applied after the defaults, allowing
+// them to override default headers such as Authorization.
+func (r restRequest) withExtraHeaders(headers map[string]string) restRequest {
+	r.extraHeaders = headers
 	return r
 }
 
@@ -387,20 +420,30 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 	var body io.Reader
 	rawQuery := ""
 
-	var fData *url.Values
 	var err error
-	if request.urlValues != nil {
-		fData = &request.urlValues
-	} else {
-		fData, err = getStringKV(request.formData)
-		if err != nil {
-			return 0, err
+	if request.rawBody != nil {
+		// Send the raw body verbatim (e.g. JSON for the cases/ai services).
+		body = bytes.NewReader(request.rawBody)
+		if request.contentType != "" {
+			headers["Content-Type"] = request.contentType
+		} else {
+			headers["Content-Type"] = "application/json"
 		}
-	}
+	} else {
+		var fData *url.Values
+		if request.urlValues != nil {
+			fData = &request.urlValues
+		} else {
+			fData, err = getStringKV(request.formData)
+			if err != nil {
+				return 0, err
+			}
+		}
 
-	if fData != nil {
-		body = strings.NewReader(fData.Encode())
-		headers["Content-Type"] = "application/x-www-form-urlencoded"
+		if fData != nil {
+			body = strings.NewReader(fData.Encode())
+			headers["Content-Type"] = "application/x-www-form-urlencoded"
+		}
 	}
 
 	qData, err := getStringKV(request.queryData)
@@ -437,6 +480,11 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 		r.Header.Set("x-idempotent-key", request.idempotentKey)
 	}
 	for k, v := range headers {
+		r.Header.Set(k, v)
+	}
+	// extraHeaders are applied last so callers can override defaults such as
+	// Authorization (used by the ai-sessions service).
+	for k, v := range request.extraHeaders {
 		r.Header.Set(k, v)
 	}
 

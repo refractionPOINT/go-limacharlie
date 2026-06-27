@@ -214,6 +214,11 @@ func NewMockServer(oid string) *MockServer {
 	ms.URLs.Replay = mockHost
 	ms.URLs.Artifacts = mockHost
 	ms.URLs.Hooks = mockHost
+	// The cases and ai-sessions micro-services are resolved scheme-aware
+	// (see Organization.getServiceRoot), so point them at the full mock URL
+	// (with the http:// scheme) to keep them reachable over the test server.
+	ms.URLs.Cases = ms.Server.URL
+	ms.URLs.AI = ms.Server.URL
 
 	return ms
 }
