@@ -152,10 +152,14 @@ func (s *Sensor) GetTags() ([]TagInfo, error) {
 
 func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 	resp := Dict{}
-	req := makeDefaultRequest(&resp).withFormData(Dict{
-		"tags": tag,
-		"ttl":  ttl / time.Second,
-	})
+	form := Dict{"tags": tag}
+	// Only send a ttl when one is requested. Mirrors the Python SDK (which
+	// omits ttl when None); the backend then applies its default
+	// (effectively permanent) rather than expiring the tag immediately.
+	if ttl > 0 {
+		form["ttl"] = ttl / time.Second
+	}
+	req := makeDefaultRequest(&resp).withFormData(form)
 	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
 		return err
