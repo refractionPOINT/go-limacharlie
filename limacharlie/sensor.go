@@ -152,10 +152,14 @@ func (s *Sensor) GetTags() ([]TagInfo, error) {
 
 func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 	resp := Dict{}
-	req := makeDefaultRequest(&resp).withFormData(Dict{
-		"tags": tag,
-		"ttl":  ttl / time.Second,
-	})
+	form := Dict{"tags": tag}
+	// Only send a ttl when one is requested. Mirrors the Python SDK (which
+	// omits ttl when None); the backend then applies its default
+	// (effectively permanent) rather than expiring the tag immediately.
+	if ttl > 0 {
+		form["ttl"] = ttl / time.Second
+	}
+	req := makeDefaultRequest(&resp).withFormData(form)
 	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
 		return err
@@ -169,6 +173,30 @@ func (s *Sensor) RemoveTag(tag string) error {
 		"tags": tag,
 	})
 	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
+// Seal marks the sensor as sealed, preventing it from being uninstalled.
+// Mirrors the Python SDK Sensor.seal().
+func (s *Sensor) Seal() error {
+	resp := Dict{}
+	req := makeDefaultRequest(&resp)
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/seal", s.SID), req); err != nil {
+		s.LastError = err
+		return err
+	}
+	return nil
+}
+
+// Unseal removes the seal from the sensor, allowing it to be uninstalled.
+// Mirrors the Python SDK Sensor.unseal().
+func (s *Sensor) Unseal() error {
+	resp := Dict{}
+	req := makeDefaultRequest(&resp)
+	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("%s/seal", s.SID), req); err != nil {
 		s.LastError = err
 		return err
 	}

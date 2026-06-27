@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,6 +67,7 @@ type SiteURLs struct {
 	Hooks            string          `json:"hooks"`
 	Search           string          `json:"search"`
 	Cases            string          `json:"cases"`
+	AI               string          `json:"ai"`
 	RegionCode       string          `json:"region_code"`
 	PrivateEndpoints map[string]bool `json:"private_endpoints,omitempty"`
 }
@@ -83,7 +85,28 @@ func (s SiteURLs) ToMap() map[string]string {
 		"hooks":     s.Hooks,
 		"search":    s.Search,
 		"cases":     s.Cases,
+		"ai":        s.AI,
 	}
+}
+
+// getServiceRoot resolves the base URL for a micro-service (e.g. "cases", "ai")
+// from the organization's URL map. The returned value always includes a scheme:
+// if the configured host already carries one it is returned as-is (this is what
+// the mock server does), otherwise "https://" is prepended. The result is a base
+// host with no trailing slash, suitable for use as a restRequest URL root.
+func (o *Organization) getServiceRoot(name string) (string, error) {
+	urls, err := o.GetURLs()
+	if err != nil {
+		return "", err
+	}
+	host, ok := urls[name]
+	if !ok || host == "" {
+		return "", fmt.Errorf("%s URL not found in organization URLs", name)
+	}
+	if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+		host = "https://" + host
+	}
+	return strings.TrimRight(host, "/"), nil
 }
 
 // NewOrganization initialize a link to an organization
