@@ -231,8 +231,9 @@ func (org *Organization) ReplayDRRuleWithContext(ctx context.Context, req Replay
 		return nil, fmt.Errorf("failed to marshal request body: %v", err)
 	}
 
-	// Build the URL
-	url := fmt.Sprintf("https://%s/", replayURL)
+	// Build the URL (replayQueryURL honors an explicit scheme on the host and
+	// defaults to https for a bare host — see query.go).
+	url := replayQueryURL(replayURL)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))

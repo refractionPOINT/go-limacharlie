@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -103,7 +104,7 @@ func (org *Organization) QueryWithContext(ctx context.Context, req QueryRequest)
 	}
 
 	// Build the URL
-	url := fmt.Sprintf("https://%s/", replayURL)
+	url := replayQueryURL(replayURL)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
@@ -236,7 +237,7 @@ func (qi *QueryIterator) Next() (*QueryResponse, error) {
 	}
 
 	// Build the URL
-	url := fmt.Sprintf("https://%s/", qi.replayURL)
+	url := replayQueryURL(qi.replayURL)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(qi.ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
@@ -294,4 +295,16 @@ func (qi *QueryIterator) Next() (*QueryResponse, error) {
 // HasMore returns true if there are more pages of results to fetch.
 func (qi *QueryIterator) HasMore() bool {
 	return qi.hasMore
+}
+
+// replayQueryURL builds the endpoint URL from a replay/query host. A bare host
+// is resolved to https; a host that already carries an explicit scheme (e.g.
+// "http://...") is used as-is, which lets the SDK target an endpoint served
+// over a non-default scheme (for example a plain-HTTP endpoint in development
+// or testing).
+func replayQueryURL(replayURL string) string {
+	if strings.Contains(replayURL, "://") {
+		return strings.TrimRight(replayURL, "/") + "/"
+	}
+	return "https://" + replayURL + "/"
 }
