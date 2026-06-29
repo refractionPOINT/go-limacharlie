@@ -149,8 +149,8 @@ func (org *Organization) ValidateLCQLQueryWithContext(ctx context.Context, query
 		return nil, fmt.Errorf("failed to marshal request body: %v", err)
 	}
 
-	// Build the URL
-	url := fmt.Sprintf("https://%s/", replayURL)
+	// Build the URL (scheme-aware; see replayQueryURL in query.go).
+	url := replayQueryURL(replayURL)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
@@ -287,8 +287,8 @@ func (org *Organization) EstimateLCQLQueryBillingWithContext(ctx context.Context
 		return nil, fmt.Errorf("failed to marshal request body: %v", err)
 	}
 
-	// Build the URL
-	url := fmt.Sprintf("https://%s/", replayURL)
+	// Build the URL (scheme-aware; see replayQueryURL in query.go).
+	url := replayQueryURL(replayURL)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
@@ -544,8 +544,8 @@ func (org *Organization) ValidateDRRuleWithContext(ctx context.Context, rule Dic
 		return nil, fmt.Errorf("failed to marshal request body: %v", err)
 	}
 
-	// Build the URL
-	url := fmt.Sprintf("https://%s/", replayURL)
+	// Build the URL (scheme-aware; see replayQueryURL in query.go).
+	url := replayQueryURL(replayURL)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
