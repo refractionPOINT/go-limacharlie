@@ -1,6 +1,8 @@
 package limacharlie
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -138,9 +140,35 @@ func (org *Organization) ExportSensors() (Dict, error) {
 // It mirrors python-limacharlie Extensions.get_all (sdk/extensions.py ~L63),
 // issuing a GET against extension/definition.
 func (org *Organization) ListAvailableExtensions() (Dict, error) {
-	resp := Dict{}
-	if err := org.GenericGETRequest("extension/definition", Dict{}, &resp); err != nil {
+	var raw json.RawMessage
+	if err := org.GenericGETRequest("extension/definition", Dict{}, &raw); err != nil {
 		return nil, fmt.Errorf("failed to list available extensions: %w", err)
+	}
+
+	// The endpoint may return either a JSON object (e.g. keyed by extension name,
+	// or wrapping a list under a field) or a bare JSON array of extension
+	// definitions, each carrying a "name". Normalize the array form into a
+	// name-keyed object so callers always receive a Dict.
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var list []Dict
+		if err := json.Unmarshal(trimmed, &list); err != nil {
+			return nil, fmt.Errorf("failed to list available extensions: %w", err)
+		}
+		out := Dict{}
+		for _, ext := range list {
+			if name, _ := ext["name"].(string); name != "" {
+				out[name] = ext
+			}
+		}
+		return out, nil
+	}
+
+	resp := Dict{}
+	if len(trimmed) > 0 {
+		if err := json.Unmarshal(trimmed, &resp); err != nil {
+			return nil, fmt.Errorf("failed to list available extensions: %w", err)
+		}
 	}
 	return resp, nil
 }
