@@ -145,10 +145,10 @@ func (org *Organization) ListAvailableExtensions() (Dict, error) {
 		return nil, fmt.Errorf("failed to list available extensions: %w", err)
 	}
 
-	// The endpoint may return either a JSON object (e.g. keyed by extension name,
-	// or wrapping a list under a field) or a bare JSON array of extension
-	// definitions, each carrying a "name". Normalize the array form into a
-	// name-keyed object so callers always receive a Dict.
+	// The endpoint returns a JSON array of extension definitions, each carrying a
+	// "name". Normalize it into a name-keyed object so callers always receive a
+	// Dict. A JSON object response is handled as a defensive fallback (e.g. a
+	// name-keyed object from a mock or older backend).
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) > 0 && trimmed[0] == '[' {
 		var list []Dict
