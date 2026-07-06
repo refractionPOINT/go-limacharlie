@@ -130,7 +130,13 @@ func (org *Organization) UploadArtifact(data io.Reader, size int64, hint string,
 	if !ok {
 		return errors.New("artifacts URL not found in org URLs")
 	}
-	reqUrl := fmt.Sprintf("https://%s/ingest", uploadUrl)
+	// A bare host is resolved to https; a host that already carries an explicit
+	// scheme (e.g. http://host:port) is used as-is, so callers can point at a
+	// non-default scheme (for example a plain-HTTP endpoint in development).
+	if !strings.Contains(uploadUrl, "://") {
+		uploadUrl = "https://" + uploadUrl
+	}
+	reqUrl := uploadUrl + "/ingest"
 
 	// Build request
 	combined := fmt.Sprintf("%s:%s", org.GetOID(), ingestionKey)
