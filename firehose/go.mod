@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/refractionPOINT/go-limacharlie/limacharlie v0.0.0
 	github.com/rs/zerolog v1.34.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 )
 
 require (
