@@ -52,14 +52,19 @@ type ListUserOrgsOptions struct {
 
 // APIKeyInfo contains information about an API key
 type APIKeyInfo struct {
-	KeyHash        string   `json:"key_hash,omitempty"`
-	Description    string   `json:"name,omitempty"` // API returns "name" from Firebase
-	Permissions    []string `json:"priv,omitempty"` // API returns "priv"
-	CreatedAt      int64    `json:"created_at,omitempty"`
-	CreatedBy      string   `json:"created_by,omitempty"`
-	OID            string   `json:"oid,omitempty"`
-	AllowedIPRange string   `json:"allowed_ip_range,omitempty"`
-	LastUsed       int64    `json:"last_used,omitempty"`
+	KeyHash     string   `json:"key_hash,omitempty"`
+	Description string   `json:"name,omitempty"` // API returns "name" from Firebase
+	Permissions []string `json:"priv,omitempty"` // API returns "priv"
+	// CreatedAt is NOT returned by GET /orgs/{oid}/keys (the backend response
+	// carries no creation timestamp) — it stays zero on listings and is kept only
+	// for compatibility with callers that populate it out-of-band.
+	CreatedAt int64 `json:"created_at,omitempty"`
+	// CreatedBy is the creator's identity (the JWT ident — an email for
+	// interactively-created keys). The API returns it under the key "by".
+	CreatedBy      string `json:"by,omitempty"`
+	OID            string `json:"oid,omitempty"`
+	AllowedIPRange string `json:"allowed_ip_range,omitempty"`
+	LastUsed       int64  `json:"last_used,omitempty"`
 }
 
 // APIKeyCreate contains the response when creating a new API key
