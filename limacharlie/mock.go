@@ -21,8 +21,11 @@ import (
 type MockCall struct {
 	Method string
 	Path   string
-	Body   string
-	Time   time.Time
+	// Query is the raw URL query string (r.URL.RawQuery), so tests can assert
+	// query parameters (e.g. is_online_only, selector) sent on GET requests.
+	Query string
+	Body  string
+	Time  time.Time
 }
 
 // MockServer simulates the LimaCharlie API for testing.
@@ -250,6 +253,7 @@ func (ms *MockServer) recordCall(r *http.Request, body string) {
 	ms.calls = append(ms.calls, MockCall{
 		Method: r.Method,
 		Path:   r.URL.Path,
+		Query:  r.URL.RawQuery,
 		Body:   body,
 		Time:   time.Now(),
 	})

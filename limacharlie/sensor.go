@@ -387,6 +387,11 @@ type ListSensorsIterativeOptions struct {
 	// zero defers to the backend default. Set a smaller value to bound the
 	// per-call latency when paginating through large organizations.
 	Limit int
+	// OnlineOnly restricts the result to sensors that are currently online.
+	// The default (false) returns all sensors matching the selector, online or
+	// not. Mirrors ListSensorsOptions.OnlineOnly (both map to the sensors API
+	// is_online_only query parameter).
+	OnlineOnly bool
 }
 
 func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context, selector string, continuationToken string, options ...ListSensorsIterativeOptions) (map[string]*Sensor, string, error) {
@@ -409,6 +414,15 @@ func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context,
 	}
 	if effectiveOptions.Limit > 0 {
 		queryData["limit"] = effectiveOptions.Limit
+	}
+	// Only send is_online_only when explicitly requested. A caller that passes
+	// no options (or OnlineOnly:false) produces a request byte-identical to
+	// before this option existed - fully backward compatible - rather than
+	// relying on the API treating an explicit false the same as an absent
+	// parameter. Omitted and false are equivalent to the sensors API (both
+	// mean "all sensors").
+	if effectiveOptions.OnlineOnly {
+		queryData["is_online_only"] = true
 	}
 	q = q.withQueryData(queryData)
 	if err := org.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("sensors/%s", org.client.options.OID), q); err != nil {
