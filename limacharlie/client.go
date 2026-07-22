@@ -141,13 +141,20 @@ func isEmpty(s string) bool {
 // NewClientFromLoader initialize a client from options loaders.
 // Will return a valid client as soon as one loader returns valid requirements
 func NewClientFromLoader(inOpt ClientOptions, logger LCLogger, optsLoaders ...ClientOptionLoader) (*Client, error) {
-	if inOpt.validateMinimumRequirements() == nil && inOpt.validate() == nil {
+	errMin := inOpt.validateMinimumRequirements()
+	errVal := inOpt.validate()
+	if errMin == nil && errVal == nil {
 		return &Client{options: inOpt, logger: logger, httpClient: getHTTPClient(), baseURL: resolveBaseURL(inOpt.URL), jwtURL: resolveJWTURL(inOpt.JWTURL)}, nil
 	}
 
 	loaderCount := len(optsLoaders)
 	if loaderCount == 0 {
-		return nil, newLCError(lcErrClientNoOptionsLoader)
+		// No loaders to fall back on, so surface the actual reason the inline
+		// options were rejected instead of a generic "no loader" error.
+		if errMin != nil {
+			return nil, errMin
+		}
+		return nil, errVal
 	}
 
 	var opt ClientOptions

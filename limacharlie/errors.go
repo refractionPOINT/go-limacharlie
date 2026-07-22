@@ -9,7 +9,6 @@ import (
 type lcErrorCode = string
 
 const (
-	lcErrClientNoOptionsLoader     = "CLIENT_NO_OPTION_LOADER"
 	lcErrClientMissingRequirements = "CLIENT_MISSING_REQUIREMENTS"
 )
 
