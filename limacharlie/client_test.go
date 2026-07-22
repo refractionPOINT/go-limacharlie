@@ -16,8 +16,24 @@ func TestClientSuite(t *testing.T) {
 }
 
 func (s *ClientTestSuite) TestNoLoader() {
+	// With no loaders and empty options, the client should surface the actual
+	// validation failure (missing minimum requirements) rather than a generic
+	// "no loader" error.
 	c, err := NewClientFromLoader(ClientOptions{}, nil)
-	s.EqualError(err, newLCError(lcErrClientNoOptionsLoader).Error())
+	s.EqualError(err, newLCError(lcErrClientMissingRequirements).Error())
+	s.Nil(c)
+}
+
+func (s *ClientTestSuite) TestNoLoaderInvalidAPIKey() {
+	// Minimum requirements are met (a valid OID is set) but the APIKey is not a
+	// valid UUID. With no loaders to fall back on, the underlying validation
+	// error must be surfaced instead of being masked.
+	c, err := NewClientFromLoader(ClientOptions{
+		OID:    "9416bc29-2bae-47d7-ac8c-63210f3a22e3",
+		APIKey: "not-a-valid-uuid",
+	}, nil)
+	s.Error(err)
+	s.Contains(err.Error(), "invalid APIKey")
 	s.Nil(c)
 }
 
