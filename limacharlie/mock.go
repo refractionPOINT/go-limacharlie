@@ -219,6 +219,7 @@ func NewMockServer(oid string) *MockServer {
 	// (with the http:// scheme) to keep them reachable over the test server.
 	ms.URLs.Cases = ms.Server.URL
 	ms.URLs.AI = ms.Server.URL
+	ms.URLs.Search = ms.Server.URL
 
 	return ms
 }
