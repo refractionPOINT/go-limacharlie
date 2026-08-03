@@ -287,6 +287,18 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 	return &hiveResp, nil
 }
 
+// Update modifies an existing hive record. The server's set_record and
+// set_record_mtd RPCs wholesale-replace the record's usr_mtd block on every
+// write, so to avoid silently zeroing out fields the caller did not author
+// we merge here: fetch the current usr_mtd, overlay only the fields the
+// caller explicitly set (non-nil pointer args, or non-nil Tags slice), and
+// send the merged result back. The server's existing etag check still gates
+// the write, so a concurrent writer between our fetch and our POST surfaces
+// as ETAG_MISMATCH rather than a silent stomp.
+//
+// Tag handling: args.Tags == nil means "preserve existing tags";
+// args.Tags == []string{} (non-nil empty slice) means "clear all tags". The
+// distinction is preserved at the SDK boundary and on the wire.
 func (h *HiveClient) Update(args HiveArgs) (*HiveResp, error) {
 	if args.Key == "" {
 		return nil, errors.New("key required")
@@ -309,8 +321,12 @@ func (h *HiveClient) Update(args HiveArgs) (*HiveResp, error) {
 		}
 	}
 
-	// set usr mtd data
-	var usrMtd UsrMtd
+	// Merge: start from the fetched usr_mtd and overlay only authored fields.
+	// A nil pointer means the caller did not author the field, so we keep the
+	// existing value. This preserves enabled/expiry/tags/comment that the
+	// caller did not touch, instead of letting them get wiped to Go zero
+	// values when the server replaces usr_mtd wholesale.
+	usrMtd := existing.UsrMtd
 	if args.Expiry != nil {
 		usrMtd.Expiry = *args.Expiry
 	}
