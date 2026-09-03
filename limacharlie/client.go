@@ -305,6 +305,11 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 		}
 	}
 
+	// Tracks whether the JWT was already refreshed for this call. A second
+	// Unauthorized after a fresh token is a genuine refusal by the API, not
+	// an expired token, so there is nothing to gain from refreshing again.
+	jwtRefreshed := false
+
 	request.nRetries++
 	for request.nRetries > 0 {
 		var statusCode int
@@ -317,22 +322,33 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 		if statusCode == http.StatusUnauthorized {
 			// Unauthorized, the JWT may have expired, refresh
 			// it and retry.
-			// If there is no API Key configured, provide the
-			// previous error instead of the refresh.
-			if c.options.APIKey == "" {
+			// If there is no API Key configured, or the token was
+			// already refreshed once, the API is really refusing the
+			// request: report that error to the caller.
+			if c.options.APIKey == "" || jwtRefreshed {
 				return err
 			}
-			if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
+			// Note: the refresh error is deliberately kept in its own
+			// variable. Assigning it to err would overwrite the error of
+			// the request above and, on a successful refresh, silently
+			// turn an Unauthorized into a nil error for the caller.
+			if _, refreshErr := c.RefreshJWT(c.options.JWTExpiryTime); refreshErr != nil {
 				// If we cannot get a new JWT there is no point in
 				// retrying with bad creds.
-				return err
+				return refreshErr
 			}
+			jwtRefreshed = true
 		} else if statusCode == http.StatusTooManyRequests {
 			// Out of quota, wait a bit and retry.
 			time.Sleep(10 * time.Second)
 		} else if statusCode == http.StatusGatewayTimeout {
 			// Looks like the API might be under load.
 			time.Sleep(5 * time.Second)
+		} else if statusCode >= 400 && statusCode < 500 {
+			// Any other client-side error (bad request, forbidden, not
+			// found, ...) is definitive: retrying the exact same request
+			// cannot change the outcome.
+			return err
 		} else if err == nil {
 			// If no errors, any other status code other than those
 			// above will not be retried.
