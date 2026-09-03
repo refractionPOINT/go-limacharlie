@@ -297,18 +297,21 @@ func getHTTPClient() *http.Client {
 }
 
 func (c *Client) reliableRequest(ctx context.Context, verb string, path string, request restRequest) (err error) {
+	// Tracks whether the JWT was already refreshed for this call. A second
+	// Unauthorized after a fresh token is a genuine refusal by the API, not
+	// an expired token, so there is nothing to gain from refreshing again.
+	jwtRefreshed := false
+
 	// If no JWT is ready and we have an API key, prime it (similar to Python SDK behavior).
 	// This prevents sending empty JWT on first request which causes billing server to complain.
 	if c.options.JWT == "" && c.options.APIKey != "" {
 		if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
 			return err
 		}
+		// The token the first attempt is about to use was just minted, so an
+		// Unauthorized answer to it is a refusal, not an expiry.
+		jwtRefreshed = true
 	}
-
-	// Tracks whether the JWT was already refreshed for this call. A second
-	// Unauthorized after a fresh token is a genuine refusal by the API, not
-	// an expired token, so there is nothing to gain from refreshing again.
-	jwtRefreshed := false
 
 	request.nRetries++
 	for request.nRetries > 0 {
@@ -322,10 +325,13 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 		if statusCode == http.StatusUnauthorized {
 			// Unauthorized, the JWT may have expired, refresh
 			// it and retry.
-			// If there is no API Key configured, or the token was
-			// already refreshed once, the API is really refusing the
-			// request: report that error to the caller.
-			if c.options.APIKey == "" || jwtRefreshed {
+			// A refresh cannot change the outcome when there is no API
+			// Key to exchange, when the token was already refreshed for
+			// this call, or when the request carries its own Authorization
+			// header (it overrides the client JWT, so a new JWT would not
+			// even be sent). The API is really refusing the request:
+			// report that error to the caller.
+			if c.options.APIKey == "" || jwtRefreshed || request.extraHeaders["Authorization"] != "" {
 				return err
 			}
 			// Note: the refresh error is deliberately kept in its own
@@ -334,8 +340,10 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 			// turn an Unauthorized into a nil error for the caller.
 			if _, refreshErr := c.RefreshJWT(c.options.JWTExpiryTime); refreshErr != nil {
 				// If we cannot get a new JWT there is no point in
-				// retrying with bad creds.
-				return refreshErr
+				// retrying with bad creds. Both errors are reported: the
+				// message the API returned carries the details callers
+				// match on, and must not be lost.
+				return fmt.Errorf("%v (JWT refresh also failed: %v)", err, refreshErr)
 			}
 			jwtRefreshed = true
 		} else if statusCode == http.StatusTooManyRequests {
