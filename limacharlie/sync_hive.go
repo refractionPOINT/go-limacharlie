@@ -22,7 +22,17 @@ func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHiv
 	m := sync.Mutex{}
 	var wg sync.WaitGroup
 	waitCh := make(chan struct{})
-	errCh := make(chan error)
+	// The receiver below returns as soon as one fetch reports an error, so
+	// errCh must have room for every fetch to report without blocking. On an
+	// unbuffered channel the goroutines that fail afterwards stay blocked on
+	// the send forever, leaking for the lifetime of the process.
+	nHives := 0
+	for hiveName := range syncHiveOpts {
+		if syncHiveOpts[hiveName] {
+			nHives++
+		}
+	}
+	errCh := make(chan error, nHives)
 	hiveSync := orgSyncHives{}
 	go func() {
 		for hiveName := range syncHiveOpts {
