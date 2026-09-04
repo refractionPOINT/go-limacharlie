@@ -1,4 +1,4 @@
-FROM golang:1.26
+FROM golang:1.27.1
 
 ENV LC_CURRENT_ENV "test_env"
 ENV LC_OID "fba6e992-ce4f-4d9e-99dc-b548f00df7f9"
