@@ -45,7 +45,9 @@ identity needs `acl.get` to fetch membership and `acl.set` to write membership o
 add/remove `acl:` tags, in addition to the usual resource permissions. Reading
 restricted content also requires the relevant scope membership; `acl.set` is not
 an implicit read bypass. Do not push `acl_restricted: true` redaction markers as
-replacement record data. Always handle errors returned by `SyncFetch` and `SyncPush`.
+replacement record data. Use the stable UID (not email) for a user member and the
+key name for an API-key member. Always handle errors returned by `SyncFetch` and
+`SyncPush`.
 
 Existing Owner/Administrator assignments may need to be reapplied, or ACL
 permissions granted explicitly, before an existing automation identity can sync ACLs.

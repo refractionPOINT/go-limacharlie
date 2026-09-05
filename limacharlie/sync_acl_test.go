@@ -17,7 +17,7 @@ func TestSyncACLHiveRoundTrip(t *testing.T) {
 			source.HiveStore["acl/"+testOID] = map[string]HiveData{
 				"finance": {
 					Data: Dict{"members": List{
-						Dict{"type": "user", "id": "analyst@example.com"},
+						Dict{"type": "user", "id": "test-user-uid"},
 						Dict{"type": "api_key", "id": "test-key-id"},
 						Dict{"type": "group", "id": "test-group-id"},
 					}},
