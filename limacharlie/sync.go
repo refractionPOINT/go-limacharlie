@@ -51,6 +51,7 @@ type SyncOptions struct {
 }
 
 var KnownHives = []string{
+	"acl",
 	"dr-general",
 	"dr-managed",
 	"dr-service",
@@ -84,6 +85,7 @@ func SyncAll() SyncOptions {
 		SyncInstallationKeys: true,
 		SyncYara:             true,
 		SyncHives: map[string]bool{
+			"acl":              true,
 			"dr-general":       true,
 			"dr-managed":       true,
 			"dr-service":       true,
