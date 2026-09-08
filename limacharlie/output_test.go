@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -129,5 +130,48 @@ type: event
 	}
 	if fmt.Sprintf("%#v", y) != fmt.Sprintf("%#v", expected) {
 		t.Errorf("mismatch: %#v != %#v", y, expected)
+	}
+}
+
+// TestOutputElasticCreateActionYAML round-trips the elastic data stream toggle.
+// Bool fields carry the ",string" JSON option, so a field declared without it
+// marshals to an unquoted value the backend then rejects — and one missing from
+// the struct is dropped silently, which is the failure this pins.
+func TestOutputElasticCreateActionYAML(t *testing.T) {
+	testOutput := OutputConfig{
+		Name:   "test-lc-go-sdk-out",
+		Module: OutputTypes.Elastic,
+		Type:   OutputType.Event,
+
+		Addresses:      "https://elastic.example.com:9200",
+		Index:          "logs-limacharlie-default",
+		IsCreateAction: true,
+	}
+
+	y, err := yaml.Marshal(testOutput)
+	if err != nil {
+		t.Fatalf("failed to marshal output to yaml: %v", err)
+	}
+	if !strings.Contains(string(y), `is_create_action: "true"`) {
+		t.Errorf("is_create_action missing or unquoted in:\n%s", y)
+	}
+
+	roundTripped := OutputConfig{}
+	if err := yaml.Unmarshal(y, &roundTripped); err != nil {
+		t.Fatalf("failed to unmarshal output from yaml: %v", err)
+	}
+	if fmt.Sprintf("%#v", roundTripped) != fmt.Sprintf("%#v", testOutput) {
+		t.Errorf("mismatch: %#v != %#v", roundTripped, testOutput)
+	}
+
+	// Omitted, the toggle must not appear at all: an output that never set it
+	// keeps the "index" action.
+	testOutput.IsCreateAction = false
+	y, err = yaml.Marshal(testOutput)
+	if err != nil {
+		t.Fatalf("failed to marshal output to yaml: %v", err)
+	}
+	if strings.Contains(string(y), "is_create_action") {
+		t.Errorf("is_create_action emitted while unset:\n%s", y)
 	}
 }
