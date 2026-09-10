@@ -143,17 +143,20 @@ func TestOutputElasticCreateActionYAML(t *testing.T) {
 		Module: OutputTypes.Elastic,
 		Type:   OutputType.Event,
 
-		Addresses:      "https://elastic.example.com:9200",
-		Index:          "logs-limacharlie-default",
-		IsCreateAction: true,
+		Addresses:         "https://elastic.example.com:9200",
+		Index:             "logs-limacharlie-default",
+		IsCreateAction:    true,
+		IsCompressRequest: true,
 	}
 
 	y, err := yaml.Marshal(testOutput)
 	if err != nil {
 		t.Fatalf("failed to marshal output to yaml: %v", err)
 	}
-	if !strings.Contains(string(y), `is_create_action: "true"`) {
-		t.Errorf("is_create_action missing or unquoted in:\n%s", y)
+	for _, want := range []string{`is_create_action: "true"`, `is_compress_request: "true"`} {
+		if !strings.Contains(string(y), want) {
+			t.Errorf("%s missing or unquoted in:\n%s", want, y)
+		}
 	}
 
 	roundTripped := OutputConfig{}
@@ -167,11 +170,14 @@ func TestOutputElasticCreateActionYAML(t *testing.T) {
 	// Omitted, the toggle must not appear at all: an output that never set it
 	// keeps the "index" action.
 	testOutput.IsCreateAction = false
+	testOutput.IsCompressRequest = false
 	y, err = yaml.Marshal(testOutput)
 	if err != nil {
 		t.Fatalf("failed to marshal output to yaml: %v", err)
 	}
-	if strings.Contains(string(y), "is_create_action") {
-		t.Errorf("is_create_action emitted while unset:\n%s", y)
+	for _, unwanted := range []string{"is_create_action", "is_compress_request"} {
+		if strings.Contains(string(y), unwanted) {
+			t.Errorf("%s emitted while unset:\n%s", unwanted, y)
+		}
 	}
 }

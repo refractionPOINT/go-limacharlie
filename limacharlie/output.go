@@ -168,6 +168,7 @@ type OutputConfig struct {
 	Addresses         string `json:"addresses,omitempty" yaml:"addresses,omitempty"`
 	APIKey            string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
 	IsCreateAction    bool   `json:"is_create_action,omitempty,string" yaml:"is_create_action,omitempty"`
+	IsCompressRequest bool   `json:"is_compress_request,omitempty,string" yaml:"is_compress_request,omitempty"`
 	Schema            string `json:"schema,omitempty" yaml:"schema,omitempty"`
 	BlobContainer     string `json:"blob_container,omitempty" yaml:"blob_container,omitempty"`
 	AccountName       string `json:"account_name,omitempty" yaml:"account_name,omitempty"`
