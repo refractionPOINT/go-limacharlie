@@ -17,8 +17,9 @@ type Organization struct {
 	logger LCLogger
 	invID  string
 
-	mCachedUrls sync.RWMutex
+	mCachedUrls sync.Mutex
 	cachedURLs  *SiteConnectivityInfo
+	urlsReady   chan struct{}
 	spout       *Spout
 	spoutMutex  sync.Mutex
 }
@@ -231,50 +232,59 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 }
 
 func (o *Organization) GetURLs() (map[string]string, error) {
-	o.mCachedUrls.RLock()
-	if o.cachedURLs != nil {
-		urls := o.cachedURLs.URLs.ToMap()
-		o.mCachedUrls.RUnlock()
-		return urls, nil
-	}
-	o.mCachedUrls.RUnlock()
+	return o.GetURLsWithContext(context.Background())
+}
 
-	o.mCachedUrls.Lock()
-	defer o.mCachedUrls.Unlock()
-	if o.cachedURLs != nil {
-		return o.cachedURLs.URLs.ToMap(), nil
-	}
-
-	resp := SiteConnectivityInfo{}
-
-	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+// GetURLsWithContext returns the organization's service URLs. The context is
+// used when the URLs are not already cached, allowing callers to cancel URL
+// discovery and any retries it performs.
+func (o *Organization) GetURLsWithContext(ctx context.Context) (map[string]string, error) {
+	info, err := o.getSiteConnectivityInfo(ctx)
+	if err != nil {
 		return nil, err
 	}
-	o.cachedURLs = &resp
-	return resp.URLs.ToMap(), nil
+	return info.URLs.ToMap(), nil
 }
 
 func (o *Organization) GetSiteConnectivityInfo() (*SiteConnectivityInfo, error) {
-	o.mCachedUrls.RLock()
-	if o.cachedURLs != nil {
-		urls := o.cachedURLs
-		o.mCachedUrls.RUnlock()
-		return urls, nil
-	}
-	o.mCachedUrls.RUnlock()
+	return o.getSiteConnectivityInfo(context.Background())
+}
 
-	o.mCachedUrls.Lock()
-	defer o.mCachedUrls.Unlock()
-	if o.cachedURLs != nil {
-		return o.cachedURLs, nil
-	}
-	resp := SiteConnectivityInfo{}
+func (o *Organization) getSiteConnectivityInfo(ctx context.Context) (*SiteConnectivityInfo, error) {
+	for {
+		o.mCachedUrls.Lock()
+		if o.cachedURLs != nil {
+			info := o.cachedURLs
+			o.mCachedUrls.Unlock()
+			return info, nil
+		}
+		if o.urlsReady != nil {
+			ready := o.urlsReady
+			o.mCachedUrls.Unlock()
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-ready:
+				continue
+			}
+		}
 
-	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
-		return nil, err
+		ready := make(chan struct{})
+		o.urlsReady = ready
+		o.mCachedUrls.Unlock()
+
+		resp := &SiteConnectivityInfo{}
+		err := o.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(resp))
+
+		o.mCachedUrls.Lock()
+		if err == nil {
+			o.cachedURLs = resp
+		}
+		o.urlsReady = nil
+		close(ready)
+		o.mCachedUrls.Unlock()
+		return resp, err
 	}
-	o.cachedURLs = &resp
-	return &resp, nil
 }
 
 func (o *Organization) GetInfo() (OrganizationInformation, error) {
