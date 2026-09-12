@@ -231,6 +231,13 @@ func (org *Organization) WithInvestigationID(invID string) *Organization {
 }
 
 func (o *Organization) GetURLs() (map[string]string, error) {
+	return o.GetURLsWithContext(context.Background())
+}
+
+// GetURLsWithContext returns the organization's service URLs. The context is
+// used when the URLs are not already cached, allowing callers to cancel URL
+// discovery and any retries it performs.
+func (o *Organization) GetURLsWithContext(ctx context.Context) (map[string]string, error) {
 	o.mCachedUrls.RLock()
 	if o.cachedURLs != nil {
 		urls := o.cachedURLs.URLs.ToMap()
@@ -247,7 +254,7 @@ func (o *Organization) GetURLs() (map[string]string, error) {
 
 	resp := SiteConnectivityInfo{}
 
-	if err := o.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
+	if err := o.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("orgs/%s/url", o.client.options.OID), makeDefaultRequest(&resp)); err != nil {
 		return nil, err
 	}
 	o.cachedURLs = &resp

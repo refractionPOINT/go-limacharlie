@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -84,6 +85,20 @@ func TestMockGetURLs(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, urls["lc"])
 	assert.NotEmpty(t, urls["replay"])
+}
+
+func TestMockGetURLsWithContextCancellation(t *testing.T) {
+	ms, org := setupMock(t)
+	ms.CustomHandlers[fmt.Sprintf("/v1/orgs/%s/url", testOID)] = func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	started := time.Now()
+	_, err := org.GetURLsWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, time.Since(started), time.Second)
 }
 
 func TestMockGetSiteConnectivityInfo(t *testing.T) {
