@@ -101,6 +101,49 @@ func TestMockGetURLsWithContextCancellation(t *testing.T) {
 	assert.Less(t, time.Since(started), time.Second)
 }
 
+func TestMockGetURLsWithContextCancelsDuringRetryBackoff(t *testing.T) {
+	ms, org := setupMock(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	ms.CustomHandlers["/v1/orgs/"] = func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		cancel()
+	}
+
+	started := time.Now()
+	_, err := org.GetURLsWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, time.Since(started), time.Second)
+}
+
+func TestMockGetURLsWithContextCancelsWhileAnotherFetchIsRunning(t *testing.T) {
+	ms, org := setupMock(t)
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	ms.CustomHandlers["/v1/orgs/"] = func(w http.ResponseWriter, _ *http.Request) {
+		close(requestStarted)
+		<-releaseRequest
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"url":{"lc_wss":"example.invalid"}}`))
+	}
+
+	firstResult := make(chan error, 1)
+	go func() {
+		_, err := org.GetURLsWithContext(context.Background())
+		firstResult <- err
+	}()
+	<-requestStarted
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	started := time.Now()
+	_, err := org.GetURLsWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, time.Since(started), time.Second)
+
+	close(releaseRequest)
+	require.NoError(t, <-firstResult)
+}
+
 func TestMockGetSiteConnectivityInfo(t *testing.T) {
 	_, org := setupMock(t)
 
