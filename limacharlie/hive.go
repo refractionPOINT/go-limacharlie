@@ -522,6 +522,12 @@ func (b *HiveBatch) DelRecord(record RecordID) {
 }
 
 func (b *HiveBatch) Execute() ([]BatchResponse, error) {
+	// An empty batch is already successfully applied. Avoid sending a request
+	// without any "request" form values, which the Hive endpoint rejects.
+	if len(b.requests) == 0 {
+		return []BatchResponse{}, nil
+	}
+
 	reqs := url.Values{}
 	for _, req := range b.requests {
 		d, err := json.Marshal(req)
