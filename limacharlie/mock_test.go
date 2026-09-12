@@ -104,10 +104,16 @@ func TestMockGetURLsWithContextCancellation(t *testing.T) {
 func TestMockGetURLsWithContextCancelsDuringRetryBackoff(t *testing.T) {
 	ms, org := setupMock(t)
 	ctx, cancel := context.WithCancel(context.Background())
+	requestHandled := make(chan struct{}, 1)
 	ms.CustomHandlers["/v1/orgs/"] = func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		cancel()
+		requestHandled <- struct{}{}
 	}
+	go func() {
+		<-requestHandled
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
 
 	started := time.Now()
 	_, err := org.GetURLsWithContext(ctx)
