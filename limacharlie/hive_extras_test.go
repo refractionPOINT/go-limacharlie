@@ -43,6 +43,20 @@ func TestGetHiveSchema(t *testing.T) {
 	require.Equal(t, "object", schema["type"])
 }
 
+func TestHiveBatchExecuteEmptyIsNoOp(t *testing.T) {
+	ms := NewMockServer("test-oid")
+	defer ms.Close()
+
+	org, err := ms.NewOrganization()
+	require.NoError(t, err)
+	ms.ResetCalls()
+
+	responses, err := NewHiveClient(org).NewBatchOperations().Execute()
+	require.NoError(t, err)
+	require.Empty(t, responses)
+	require.Empty(t, ms.Calls(), "an empty batch must not make an HTTP request")
+}
+
 func TestValidateHiveRecord(t *testing.T) {
 	ms := NewMockServer("test-oid")
 	defer ms.Close()
