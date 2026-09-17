@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -84,6 +85,69 @@ func TestMockGetURLs(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, urls["lc"])
 	assert.NotEmpty(t, urls["replay"])
+}
+
+func TestMockGetURLsWithContextCancellation(t *testing.T) {
+	ms, org := setupMock(t)
+	ms.CustomHandlers[fmt.Sprintf("/v1/orgs/%s/url", testOID)] = func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	started := time.Now()
+	_, err := org.GetURLsWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, time.Since(started), time.Second)
+}
+
+func TestMockGetURLsWithContextCancelsDuringRetryBackoff(t *testing.T) {
+	ms, org := setupMock(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	requestHandled := make(chan struct{}, 1)
+	ms.CustomHandlers["/v1/orgs/"] = func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		requestHandled <- struct{}{}
+	}
+	go func() {
+		<-requestHandled
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	started := time.Now()
+	_, err := org.GetURLsWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, time.Since(started), time.Second)
+}
+
+func TestMockGetURLsWithContextCancelsWhileAnotherFetchIsRunning(t *testing.T) {
+	ms, org := setupMock(t)
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	ms.CustomHandlers["/v1/orgs/"] = func(w http.ResponseWriter, _ *http.Request) {
+		close(requestStarted)
+		<-releaseRequest
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"url":{"lc_wss":"example.invalid"}}`))
+	}
+
+	firstResult := make(chan error, 1)
+	go func() {
+		_, err := org.GetURLsWithContext(context.Background())
+		firstResult <- err
+	}()
+	<-requestStarted
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	started := time.Now()
+	_, err := org.GetURLsWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, time.Since(started), time.Second)
+
+	close(releaseRequest)
+	require.NoError(t, <-firstResult)
 }
 
 func TestMockGetSiteConnectivityInfo(t *testing.T) {

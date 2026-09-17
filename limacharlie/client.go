@@ -348,10 +348,14 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 			jwtRefreshed = true
 		} else if statusCode == http.StatusTooManyRequests {
 			// Out of quota, wait a bit and retry.
-			time.Sleep(10 * time.Second)
+			if err := waitForRetry(ctx, 10*time.Second); err != nil {
+				return err
+			}
 		} else if statusCode == http.StatusGatewayTimeout {
 			// Looks like the API might be under load.
-			time.Sleep(5 * time.Second)
+			if err := waitForRetry(ctx, 5*time.Second); err != nil {
+				return err
+			}
 		} else if statusCode >= 400 && statusCode < 500 {
 			// Any other client-side error (bad request, forbidden, not
 			// found, ...) is definitive: retrying the exact same request
@@ -364,6 +368,17 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 		}
 	}
 	return err
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *Client) serviceRequest(responseData interface{}, serviceName string, serviceData Dict, isAsync bool) error {
