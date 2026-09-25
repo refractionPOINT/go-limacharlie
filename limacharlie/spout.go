@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -362,6 +363,8 @@ func (s *Spout) connectWebSocket(header LiveStreamRequest) (*websocket.Conn, err
 	// Create WebSocket dialer
 	dialer := websocket.Dialer{
 		HandshakeTimeout: defaultWebSocketTimeout,
+		// Honour HTTPS_PROXY / NO_PROXY like the REST client.
+		Proxy: http.ProxyFromEnvironment,
 	}
 
 	// Connect to WebSocket

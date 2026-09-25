@@ -288,6 +288,9 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 func getHTTPClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
+			// Honour HTTPS_PROXY / HTTP_PROXY / NO_PROXY, as Go's default
+			// transport does, so the SDK works behind a corporate proxy.
+			Proxy: http.ProxyFromEnvironment,
 			Dial: (&net.Dialer{
 				Timeout: 10 * time.Second,
 			}).Dial,
