@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	authTestOID = "fba6e992-ce4f-4d9e-99dc-b548f00df7f9"
+	authTestOID = "00000000-0000-4000-8000-000000000001"
 	// The token minted by the stand-in exchange endpoint.
 	authTestRefreshedJWT = "refreshed-token"
 )

@@ -3,13 +3,21 @@ steps:
   dir: limacharlie
   args: ['go', 'test', '.', '-v']
   env:
-    - '_KEY=${_KEY}'
     - '_OID=${_OID}'
     - 'LC_CURRENT_ENV=test_env'
-    - 'LC_OID=fba6e992-ce4f-4d9e-99dc-b548f00df7f9'
-    - 'LC_UID=af4ddec0-c2e8-4db2-ba3f-f5e9a1aff3fd'
-    - 'LC_API_KEY=843e80c8-e273-4b3e-93bd-41151b4b933a'
+    # Loader-test fixtures only (asserted verbatim by TestEnvironmentLoader); not credentials.
+    - 'LC_OID=00000000-0000-4000-8000-000000000001'
+    - 'LC_UID=00000000-0000-4000-8000-000000000002'
+    - 'LC_API_KEY=00000000-0000-4000-8000-000000000003'
     - 'LC_CREDS_FILE_NO_ENV=tests/test_noenv.yaml'
     - 'LC_CREDS_FILE=tests/test.yaml'
+  # The integration-test API key comes from Secret Manager, never from the trigger or this file.
+  secretEnv: ['_KEY']
+availableSecrets:
+  secretManager:
+  - versionName: projects/${PROJECT_ID}/secrets/GO_LIMACHARLIE_TEST_KEY/versions/latest
+    env: '_KEY'
 options:
- machineType: 'N1_HIGHCPU_8'
+  machineType: 'N1_HIGHCPU_8'
+  # Tolerate substitutions defined on the trigger that this config no longer references.
+  substitutionOption: 'ALLOW_LOOSE'
