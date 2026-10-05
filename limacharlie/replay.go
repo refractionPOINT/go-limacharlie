@@ -19,6 +19,12 @@ type ReplayDRRuleRequest struct {
 	// Rule is an inline D&R rule to replay (optional if RuleName is provided)
 	// Should contain "detect" and optionally "respond" keys
 	Rule Dict `json:"rule,omitempty"`
+	// Lookups optionally mocks lookups for the replay, keyed by lookup name
+	// (the part after "hive://lookup/"). Each value is lookup data: a map of
+	// indicator to metadata, as in the "lookup_data" of a lookup hive record.
+	// An empty Dict is a lookup with no entries. Nothing is stubbed
+	// automatically here; see ValidateDRRuleWithLookups for validation.
+	Lookups map[string]Dict `json:"lookups,omitempty"`
 
 	// Events is a list of inline events to test against (mutually exclusive with SensorEvents)
 	Events []Dict `json:"events,omitempty"`
@@ -216,6 +222,10 @@ func (org *Organization) ReplayDRRuleWithContext(ctx context.Context, req Replay
 		"event_source": eventSource,
 		"trace":        req.Trace,
 		"is_dry_run":   req.DryRun,
+	}
+
+	if len(req.Lookups) > 0 {
+		requestBody["lookups"] = req.Lookups
 	}
 
 	if req.LimitEvent > 0 {
