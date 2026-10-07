@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -436,12 +437,12 @@ func TestPollSearchRequestShape(t *testing.T) {
 		// A token is opaque and the server is free to use characters that
 		// need escaping, so a round trip through the query string has to
 		// survive them intact.
-		const token = "cursor/with+odd chars=&?#"
-		_, err := org.PollSearch("query-1", token)
+		const cursor = "cursor/with+odd chars=&?#"
+		_, err := org.PollSearch("query-1", cursor)
 		require.NoError(t, err)
 
 		call := sr.Calls()[0]
-		require.Equal(t, token, call.query.Get("token"))
+		require.Equal(t, cursor, call.query.Get("token"))
 		require.Equal(t, []string{"token"}, func() []string {
 			keys := make([]string, 0, len(call.query))
 			for k := range call.query {
@@ -754,6 +755,7 @@ func TestExecuteSearchHandlerStopsEarly(t *testing.T) {
 	_, org, sr := newSearchTestOrg(t)
 	sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
 	sr.on(http.MethodGet, "/v1/search/query-1", jsonOK(`{"completed":true,"results":[{"type":"events","nextToken":"more"}]}`))
+	sr.on(http.MethodDelete, "/v1/search/query-1", jsonOK(`{}`))
 
 	pages := 0
 	err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
@@ -764,6 +766,7 @@ func TestExecuteSearchHandlerStopsEarly(t *testing.T) {
 	require.NoError(t, err, "stopping early is not a failure")
 	require.Equal(t, 1, pages)
 	require.Len(t, sr.callsFor(http.MethodGet), 1, "a token that is not followed must not be fetched")
+	require.Len(t, sr.callsFor(http.MethodDelete), 1, "a search left with pages unread must be released")
 }
 
 func TestExecuteSearchHandlerErrorAborts(t *testing.T) {
@@ -771,11 +774,90 @@ func TestExecuteSearchHandlerErrorAborts(t *testing.T) {
 	sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
 	sr.on(http.MethodGet, "/v1/search/query-1", jsonOK(`{"completed":true,"results":[{"type":"events","nextToken":"more"}]}`))
 
+	sr.on(http.MethodDelete, "/v1/search/query-1", jsonOK(`{}`))
+
 	sentinel := errors.New("consumer is gone")
 	err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
 		func(page *SearchPoll) (bool, error) { return true, sentinel })
 	require.ErrorIs(t, err, sentinel, "the handler's error must reach the caller unchanged")
 	require.Len(t, sr.callsFor(http.MethodGet), 1)
+	require.Len(t, sr.callsFor(http.MethodDelete), 1, "an aborted search must be released")
+}
+
+// TestExecuteSearchReleasesOnlyAnUnfinishedSearch pins when the best-effort
+// cancel is sent. Every exit that leaves pages unread sends one, including a
+// handler that never returns because it called t.FailNow; a search that ran
+// to its last page sends none, because the server has already finished it.
+func TestExecuteSearchReleasesOnlyAnUnfinishedSearch(t *testing.T) {
+	lastPage := jsonOK(`{"completed":true,"results":[{"type":"events","rows":[{"mtd":{"id":"e1"}}]}]}`)
+	morePages := jsonOK(`{"completed":true,"results":[{"type":"events","nextToken":"more"}]}`)
+
+	t.Run("not after the last page", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+		sr.on(http.MethodGet, "/v1/search/query-1", lastPage)
+
+		err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
+			func(page *SearchPoll) (bool, error) { return true, nil })
+		require.NoError(t, err)
+		require.Empty(t, sr.callsFor(http.MethodDelete))
+	})
+
+	t.Run("not when the handler fails on the last page", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+		sr.on(http.MethodGet, "/v1/search/query-1", lastPage)
+
+		err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
+			func(page *SearchPoll) (bool, error) { return true, errors.New("consumer is gone") })
+		require.Error(t, err)
+		require.Empty(t, sr.callsFor(http.MethodDelete))
+	})
+
+	t.Run("when a page fails", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+		sr.on(http.MethodGet, "/v1/search/query-1", morePages,
+			jsonStatus(http.StatusInternalServerError, `{"error":"worker lost"}`))
+		sr.on(http.MethodDelete, "/v1/search/query-1", jsonOK(`{}`))
+
+		err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
+			func(page *SearchPoll) (bool, error) { return true, nil })
+		require.Error(t, err)
+		require.Len(t, sr.callsFor(http.MethodDelete), 1)
+	})
+
+	t.Run("when the poll bound is reached", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+		sr.on(http.MethodGet, "/v1/search/query-1", jsonOK(`{"completed":false,"nextPollInMs":1}`))
+		sr.on(http.MethodDelete, "/v1/search/query-1", jsonOK(`{}`))
+
+		err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2},
+			SearchExecuteOptions{PollInterval: time.Millisecond, MaxPollAttempts: 2},
+			func(page *SearchPoll) (bool, error) { return true, nil })
+		require.Error(t, err)
+		require.Len(t, sr.callsFor(http.MethodDelete), 1)
+	})
+
+	t.Run("when the handler exits through Goexit", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+		sr.on(http.MethodGet, "/v1/search/query-1", morePages)
+		sr.on(http.MethodDelete, "/v1/search/query-1", jsonOK(`{}`))
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_ = org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
+				func(page *SearchPoll) (bool, error) {
+					runtime.Goexit()
+					return true, nil
+				})
+		}()
+		<-done
+		require.Len(t, sr.callsFor(http.MethodDelete), 1)
+	})
 }
 
 func TestExecuteSearchRequiresHandler(t *testing.T) {
@@ -850,6 +932,34 @@ func TestExecuteSearchCancelsServerSide(t *testing.T) {
 // ---------------------------------------------------------------------------
 // CancelSearch and ValidateSearch
 // ---------------------------------------------------------------------------
+
+// TestSearchQueryIDIsOnePathSegment covers a caller-supplied query id, such as
+// one read back from storage. It must address that search and nothing else, so
+// a "?" in it cannot start a query string and a "/" cannot add a segment.
+func TestSearchQueryIDIsOnePathSegment(t *testing.T) {
+	const hostile = "q/../validate?token=injected"
+
+	t.Run("poll", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodGet, "/v1/search/"+hostile, jsonOK(`{"completed":true,"results":[]}`))
+
+		_, err := org.PollSearch(hostile, "")
+		require.NoError(t, err)
+		call := sr.Calls()[0]
+		require.Equal(t, "/v1/search/"+hostile, call.path)
+		require.Empty(t, call.query)
+	})
+
+	t.Run("cancel", func(t *testing.T) {
+		_, org, sr := newSearchTestOrg(t)
+		sr.on(http.MethodDelete, "/v1/search/"+hostile, jsonOK(`{}`))
+
+		require.NoError(t, org.CancelSearch(hostile))
+		call := sr.Calls()[0]
+		require.Equal(t, "/v1/search/"+hostile, call.path)
+		require.Empty(t, call.query)
+	})
+}
 
 func TestCancelSearch(t *testing.T) {
 	t.Run("sends a delete for the query", func(t *testing.T) {

@@ -31,7 +31,9 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 - **`CancelSearch` closes a documented gap.** `search_queries.go` already told readers to cancel a search with the search API's delete endpoint, and there was no method to do it with.
 
-- **Opt-in end-to-end tests** in `limacharlie/search_e2e_test.go`, which exercise the mode against a live organization. They skip themselves unless `LC_SEARCH_E2E` is set alongside `_OID` and `_KEY`, so they do not run in CI and are not part of this package's regression suite. They require the server-side search mode support to be deployed and fail until it ships; the skip message says so and names what to set. `LC_SEARCH_E2E_LOOKBACK_HOURS` and `LC_SEARCH_E2E_MAX_PAGES` size a run.
+- **`ExecuteSearch` releases a search it stops reading.** Whenever it returns before the last page (the handler stopped or failed, a page failed, the poll bound was reached, the context was cancelled) it cancels the search server-side on a best-effort basis, so the search stops holding a concurrency slot. A search that ran to its last page is left alone.
+
+- **End-to-end tests** in `limacharlie/search_e2e_test.go`, which exercise the Search calls against a live organization. `cloudbuild.yaml` sets `LC_SEARCH_E2E=1` next to the build's `_OID` and `_KEY`, so they run on every build. Everywhere else they skip unless `LC_SEARCH_E2E` is set, because they start real, billed searches. `LC_SEARCH_E2E_LOOKBACK_HOURS` and `LC_SEARCH_E2E_MAX_PAGES` size a run.
 
 ### Changed
 

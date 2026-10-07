@@ -309,18 +309,17 @@ func TestSearchE2EPaginationIsConsistentAcrossPages(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), searchE2EBudget)
 	defer cancel()
 
-	var queryID string
 	pages, rows := 0, 0
 	firstMode := SearchMode("")
 	reachedEnd := false
 
+	// Stopping at the page cap leaves pages unread, and ExecuteSearch
+	// releases the search itself when that happens.
 	err := org.ExecuteSearch(ctx, SearchRequest{
 		Query:     searchE2EQuery,
 		StartTime: start,
 		EndTime:   end,
-	}, SearchExecuteOptions{
-		OnQueryInitiated: func(id string) { queryID = id },
-	}, func(page *SearchPoll) (bool, error) {
+	}, SearchExecuteOptions{}, func(page *SearchPoll) (bool, error) {
 		pages++
 		mode := requireAppliedSearchMode(t, page)
 		if firstMode == "" {
@@ -336,13 +335,6 @@ func TestSearchE2EPaginationIsConsistentAcrossPages(t *testing.T) {
 		return pages < maxPages, nil
 	})
 	require.NoError(t, err)
-
-	// Stopping at the page cap leaves the search open, so release its slot.
-	if !reachedEnd && queryID != "" {
-		if err := org.CancelSearch(queryID); err != nil {
-			t.Logf("could not cancel search %s: %v", queryID, err)
-		}
-	}
 
 	require.GreaterOrEqual(t, pages, 1)
 	if pages == 1 {
@@ -361,18 +353,16 @@ func searchE2ESettledWindow() (start, end int64) {
 }
 
 // collectSearchE2ERows runs one search to the end, or to maxRows, and returns
-// its event rows in the order the pages delivered them, each serialized so two
-// runs can be compared exactly. reachedEnd reports whether the search finished
-// rather than being stopped at the cap.
+// its first maxRows event rows in the order the pages delivered them, each
+// serialized so two runs can be compared exactly. The cap is applied to rows
+// rather than pages, because the pages are what the mode changes. reachedEnd
+// reports whether the search finished rather than being stopped at the cap.
 func collectSearchE2ERows(t *testing.T, org *Organization, req SearchRequest, maxRows int) (rows []string, reachedEnd bool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), searchE2EBudget)
 	defer cancel()
 
-	var queryID string
-	err := org.ExecuteSearch(ctx, req, SearchExecuteOptions{
-		OnQueryInitiated: func(id string) { queryID = id },
-	}, func(page *SearchPoll) (bool, error) {
+	err := org.ExecuteSearch(ctx, req, SearchExecuteOptions{}, func(page *SearchPoll) (bool, error) {
 		for _, item := range page.Results {
 			if item.Type != "events" {
 				continue
@@ -389,10 +379,8 @@ func collectSearchE2ERows(t *testing.T, org *Organization, req SearchRequest, ma
 		return len(rows) < maxRows, nil
 	})
 	require.NoError(t, err)
-	if !reachedEnd && queryID != "" {
-		if err := org.CancelSearch(queryID); err != nil {
-			t.Logf("could not cancel search %s: %v", queryID, err)
-		}
+	if len(rows) > maxRows {
+		rows = rows[:maxRows]
 	}
 	return rows, reachedEnd
 }
@@ -401,9 +389,8 @@ func collectSearchE2ERows(t *testing.T, org *Organization, req SearchRequest, ma
 // on: it moves where one page ends and the next begins, never which rows come
 // back or in what order.
 //
-// Both runs read the same settled window. Where both reach the end the whole
-// sequences must be equal; where the row cap stops one first, the rows both
-// runs saw must be equal and in the same order.
+// Both runs read the same settled window and are cut to the same row cap, so
+// whether they reached the end or the cap, the two sequences must be equal.
 func TestSearchE2EBothModesReturnTheSameRows(t *testing.T) {
 	org := newSearchE2EOrg(t)
 	start, end := searchE2ESettledWindow()
@@ -416,18 +403,13 @@ func TestSearchE2EBothModesReturnTheSameRows(t *testing.T) {
 		t.Skipf("the settled window holds no events for this organization, so there is nothing to compare")
 	}
 
-	if batchEnd && interactiveEnd {
-		require.Equal(t, len(batch), len(interactive), "the two modes returned a different number of rows for the same window")
-	}
-	common := len(batch)
-	if len(interactive) < common {
-		common = len(interactive)
-	}
-	for i := 0; i < common; i++ {
+	require.Equal(t, len(batch), len(interactive),
+		"the two modes returned a different number of rows for the same window and row cap")
+	for i := range batch {
 		require.Equal(t, batch[i], interactive[i], "row %d differs between batch and interactive", i)
 	}
-	t.Logf("compared %d row(s); batch returned %d (end %v), interactive %d (end %v)",
-		common, len(batch), batchEnd, len(interactive), interactiveEnd)
+	t.Logf("compared %d row(s); batch reached the end: %v, interactive: %v",
+		len(batch), batchEnd, interactiveEnd)
 }
 
 // TestSearchE2EWithoutModeLeavesItToTheOrganization sends no mode key at all,
