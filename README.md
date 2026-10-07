@@ -20,6 +20,7 @@ Testing requires:
 - For quick build verification: `go build ./...` in both limacharlie/ and firehose/ directories
 
 ### Notes
+- Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md). The repository publishes no tags or GitHub Releases, so consumers pin a commit and Go resolves a pseudo-version from it; the `Unreleased` section is what is on `master`
 - The repository contains two Go modules: `limacharlie` (main SDK) and `firehose` (streaming data client)
 - Tests require valid credentials with basic permissions (org.get)
 - The SDK supports multiple authentication methods: API keys, UIDs, and JWTs

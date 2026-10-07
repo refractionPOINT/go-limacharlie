@@ -5,6 +5,7 @@ steps:
   env:
     - '_OID=${_OID}'
     - 'LC_CURRENT_ENV=test_env'
+    - 'LC_SEARCH_E2E=1'
     # Loader-test fixtures only (asserted verbatim by TestEnvironmentLoader); not credentials.
     - 'LC_OID=00000000-0000-4000-8000-000000000001'
     - 'LC_UID=00000000-0000-4000-8000-000000000002'
