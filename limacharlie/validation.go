@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -472,6 +473,14 @@ func (org *Organization) ValidateAndEstimateLCQLQueryWithContext(ctx context.Con
 //
 // The rule parameter should be a Dict containing "detect" and/or "respond" keys.
 //
+// This is a structural validation: the replay service has no access to the
+// organization's lookups, so every lookup the rule references (a "resource"
+// value of the form "hive://lookup/<name>", at any depth of the rule) is sent
+// to the service as an empty mock lookup. The existence of the lookup in the
+// organization is NOT checked, only that the rule compiles. To validate
+// against specific lookup content, use ValidateDRRuleWithLookups. Resources of
+// other kinds (such as "lcr://...") are left untouched.
+//
 // Example:
 //
 //	rule := lc.Dict{
@@ -497,7 +506,41 @@ func (org *Organization) ValidateDRRule(rule Dict) (*ValidationResponse, error) 
 }
 
 // ValidateDRRuleWithContext validates a D&R rule with a context for cancellation.
+// See ValidateDRRule for full documentation, including how lookups referenced
+// by the rule are handled.
 func (org *Organization) ValidateDRRuleWithContext(ctx context.Context, rule Dict) (*ValidationResponse, error) {
+	return org.ValidateDRRuleWithLookups(ctx, rule, nil)
+}
+
+// ValidateDRRuleWithLookups validates a D&R rule like ValidateDRRuleWithContext,
+// but lets the caller supply the content of the lookups the rule references.
+//
+// The lookups map is keyed by lookup name (the part after "hive://lookup/");
+// each value is the lookup data of that lookup, i.e. a map of indicator to
+// metadata, exactly as stored in the "lookup_data" field of a lookup hive
+// record. An empty Dict is a valid lookup with no entries. The map is sent to
+// the replay service as the "lookups" field of the request and is never
+// modified.
+//
+// Every lookup referenced by the rule that is not present in lookups is
+// automatically stubbed with an empty lookup (see ValidateDRRule). A lookup
+// supplied here always wins over the stub.
+//
+// Example:
+//
+//	rule := lc.Dict{
+//	    "detect": lc.Dict{
+//	        "event": "DNS_REQUEST",
+//	        "op": "lookup",
+//	        "path": "event/DOMAIN_NAME",
+//	        "resource": "hive://lookup/bad-domains",
+//	    },
+//	    "respond": lc.List{lc.Dict{"action": "report", "name": "bad-domain"}},
+//	}
+//	result, err := org.ValidateDRRuleWithLookups(ctx, rule, map[string]lc.Dict{
+//	    "bad-domains": {"evil.example.com": lc.Dict{}},
+//	})
+func (org *Organization) ValidateDRRuleWithLookups(ctx context.Context, rule Dict, lookups map[string]Dict) (*ValidationResponse, error) {
 	// Get replay URL from organization
 	urls, err := org.GetURLs()
 	if err != nil {
@@ -536,6 +579,15 @@ func (org *Organization) ValidateDRRuleWithContext(ctx context.Context, rule Dic
 		"limit_event": 0,
 		"limit_eval":  0,
 		"is_dry_run":  false,
+	}
+
+	// The replay service cannot see the organization's lookups, so mock them.
+	mocks, err := mockLookupsForRule(rule, lookups)
+	if err != nil {
+		return nil, err
+	}
+	if len(mocks) != 0 {
+		requestBody["lookups"] = mocks
 	}
 
 	// Marshal the request body
@@ -599,6 +651,73 @@ func (org *Organization) ValidateDRRuleWithContext(ctx context.Context, rule Dic
 	// Success
 	response.Success = true
 	return &response, nil
+}
+
+// lookupResourcePrefix is the resource scheme a D&R "lookup" operator uses to
+// reference a lookup stored in the lookup hive.
+const lookupResourcePrefix = "hive://lookup/"
+
+// mockLookupsForRule returns the "lookups" mock to send to the replay service
+// for rule: every caller-supplied lookup, plus an empty lookup for each
+// "hive://lookup/<name>" resource the rule references that the caller did not
+// supply. The result is nil when there is nothing to send. The caller's map is
+// not modified.
+func mockLookupsForRule(rule Dict, supplied map[string]Dict) (map[string]Dict, error) {
+	// Round-trip through JSON so the walk only has to handle the generic JSON
+	// types, whatever concrete map/slice types (Dict, List, []Dict, ...) the
+	// caller built the rule from. A decoded JSON value cannot be cyclic.
+	raw, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal rule: %v", err)
+	}
+	var generic interface{}
+	if err := json.Unmarshal(raw, &generic); err != nil {
+		return nil, fmt.Errorf("failed to decode rule: %v", err)
+	}
+
+	mocks := make(map[string]Dict, len(supplied))
+	for name, data := range supplied {
+		if data == nil {
+			// A nil Dict would marshal as null instead of an empty lookup.
+			data = Dict{}
+		}
+		mocks[name] = data
+	}
+	for _, name := range referencedLookups(generic) {
+		if _, ok := mocks[name]; !ok {
+			mocks[name] = Dict{}
+		}
+	}
+	if len(mocks) == 0 {
+		return nil, nil
+	}
+	return mocks, nil
+}
+
+// referencedLookups returns the names of all lookups referenced, at any depth,
+// by a "resource" key holding a "hive://lookup/<name>" string in v, which must
+// be a value decoded from JSON.
+func referencedLookups(v interface{}) []string {
+	var names []string
+	switch t := v.(type) {
+	case map[string]interface{}:
+		for k, child := range t {
+			if k == "resource" {
+				if s, ok := child.(string); ok && strings.HasPrefix(s, lookupResourcePrefix) {
+					if name := strings.TrimPrefix(s, lookupResourcePrefix); name != "" {
+						names = append(names, name)
+					}
+					continue
+				}
+			}
+			names = append(names, referencedLookups(child)...)
+		}
+	case []interface{}:
+		for _, child := range t {
+			names = append(names, referencedLookups(child)...)
+		}
+	}
+	return names
 }
 
 // ValidateUSPMapping validates a USP adapter mapping configuration.
