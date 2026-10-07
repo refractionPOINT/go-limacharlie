@@ -41,6 +41,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -64,8 +65,10 @@ const (
 
 	// defaultSearchMaxPollAttempts bounds how many times FetchSearchPage polls
 	// a single page before giving up. It is a guard against an unbounded loop,
-	// not a deadline: prefer a context with a deadline for that.
-	defaultSearchMaxPollAttempts = 300
+	// not a deadline: prefer a context with a deadline for that. At the
+	// server's usual 1s cadence it allows about an hour per page, well past
+	// the time a batch page over a broad window can legitimately take.
+	defaultSearchMaxPollAttempts = 3600
 
 	// cancelSearchTimeout is the budget for the best-effort cancel issued when
 	// a caller's context is cancelled mid-search.
@@ -373,8 +376,9 @@ type SearchValidation struct {
 // is usable and applies the defaults described on each field.
 type SearchExecuteOptions struct {
 	// MaxPollAttempts bounds how many times a single page is polled before the
-	// call gives up. Defaults to 300. It exists so a stuck page cannot loop
-	// forever; a real time budget belongs on the context.
+	// call gives up. Defaults to 3600, about an hour per page at the server's
+	// usual 1s cadence. It exists so a stuck page cannot loop forever; a real
+	// time budget belongs on the context.
 	MaxPollAttempts int
 	// PollInterval is the floor under the server's suggested poll delay. The
 	// server's suggestion governs whenever it is larger. Defaults to 500ms.
@@ -415,8 +419,11 @@ type SearchPageHandler func(page *SearchPoll) (keepGoing bool, err error)
 // for the whole search.
 //
 // A submission that fails may still have started a search, because the failure
-// can happen after the server accepted it. Organization.ListOpenQueries shows
-// what an organization actually has open.
+// can happen after the server accepted it. The SDK's shared request layer
+// retries a 5xx, a 504 or a transport error, so one call can also start more
+// than one search when the server accepts a submission but answers it too
+// late. Organization.ListOpenQueries shows what an organization actually has
+// open.
 //
 // Example:
 //
@@ -489,7 +496,7 @@ func (org *Organization) PollSearchWithContext(ctx context.Context, queryID, tok
 	if token != "" {
 		restReq = restReq.withQueryData(Dict{"token": token})
 	}
-	if err := org.client.reliableRequest(ctx, http.MethodGet, "/v1/search/"+queryID, restReq); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodGet, searchQueryPath(queryID), restReq); err != nil {
 		return nil, fmt.Errorf("failed to poll search %s: %w", queryID, err)
 	}
 	return &resp, nil
@@ -541,9 +548,13 @@ func (org *Organization) FetchSearchPage(ctx context.Context, queryID, token str
 //
 // It returns nil once a page comes back with no continuation token, or once
 // handler asks to stop. A handler that returns an error aborts the search with
-// that error. If ctx is cancelled the search is cancelled server-side on a
-// best-effort basis so the work stops rather than running on unread, and
-// ctx.Err() is returned.
+// that error. If ctx is cancelled, ctx.Err() is returned.
+//
+// Whenever it returns before the search reached its last page - the handler
+// stopped or failed, a page failed, ctx was cancelled - the search is
+// cancelled server-side on a best-effort basis, so it stops holding a
+// concurrency slot rather than running on unread. A search that ran to its
+// last page is left alone, since the server has already finished it.
 //
 // Mode travels with the submission only. Continuation requests carry no body,
 // so every page of one ExecuteSearch call runs under the mode submitted here.
@@ -578,13 +589,20 @@ func (org *Organization) ExecuteSearch(ctx context.Context, req SearchRequest, o
 		opts.OnQueryInitiated(queryID)
 	}
 
+	// Deferred rather than called at each early return, so a handler that
+	// exits through runtime.Goexit (t.FailNow in a test) still releases the
+	// search.
+	finished := false
+	defer func() {
+		if !finished {
+			org.cancelSearchBestEffort(queryID)
+		}
+	}()
+
 	token := ""
 	for pageNumber := 1; ; pageNumber++ {
 		page, err := org.FetchSearchPage(ctx, queryID, token, opts)
 		if err != nil {
-			if ctx.Err() != nil {
-				org.cancelSearchBestEffort(queryID)
-			}
 			return err
 		}
 
@@ -593,6 +611,9 @@ func (org *Organization) ExecuteSearch(ctx context.Context, req SearchRequest, o
 			opts.OnPageCompleted(pageNumber, nextToken)
 		}
 
+		if nextToken == "" {
+			finished = true
+		}
 		keepGoing, err := handler(page)
 		if err != nil {
 			return err
@@ -624,14 +645,15 @@ func (org *Organization) CancelSearchWithContext(ctx context.Context, queryID st
 		return fmt.Errorf("failed to resolve search service root: %w", err)
 	}
 	restReq := makeDefaultRequest(nil).withURLRoot(root).withTimeout(searchRequestTimeout)
-	if err := org.client.reliableRequest(ctx, http.MethodDelete, "/v1/search/"+queryID, restReq); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodDelete, searchQueryPath(queryID), restReq); err != nil {
 		return fmt.Errorf("failed to cancel search %s: %w", queryID, err)
 	}
 	return nil
 }
 
 // cancelSearchBestEffort tells the server to stop a search on a context of its
-// own, because the caller's is already cancelled and would refuse the call.
+// own, because the caller's may already be cancelled and would refuse the
+// call.
 // The outcome is deliberately discarded: the decision to stop has been made,
 // and failing to deliver it changes nothing the caller can act on.
 func (org *Organization) cancelSearchBestEffort(queryID string) {
@@ -674,4 +696,11 @@ func (org *Organization) ValidateSearchWithContext(ctx context.Context, req Sear
 		return nil, fmt.Errorf("failed to validate search: %w", err)
 	}
 	return &resp, nil
+}
+
+// searchQueryPath is the path of one search. The id is escaped as a single
+// path segment because a caller may hand in one it stored, and an id holding
+// a "/" or "?" must not address a different endpoint on the search host.
+func searchQueryPath(queryID string) string {
+	return "/v1/search/" + url.PathEscape(queryID)
 }
