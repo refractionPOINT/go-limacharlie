@@ -218,7 +218,7 @@ func TestHiveListPageLegacyGatewayMtdOnlyStripsData(t *testing.T) {
 // Records named like the envelope keys must not be mistaken for an envelope.
 func TestDecodeHiveListingLegacyRecordNamesLikeEnvelope(t *testing.T) {
 	raw := `{"records":{"data":{"a":1},"sys_mtd":{},"usr_mtd":{}},"next_cursor":{"data":{"b":2},"sys_mtd":{},"usr_mtd":{}}}`
-	recs, next, err := decodeHiveListing([]byte(raw))
+	recs, next, _, err := decodeHiveListing([]byte(raw))
 	require.NoError(t, err)
 	require.Empty(t, next)
 	require.Len(t, recs, 2)
@@ -236,16 +236,16 @@ func TestDecodeHiveListingShapes(t *testing.T) {
 		"null":         `null`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			recs, next, err := decodeHiveListing([]byte(raw))
+			recs, next, _, err := decodeHiveListing([]byte(raw))
 			require.NoError(t, err)
 			require.NotNil(t, recs)
 			require.Empty(t, recs)
 			require.Empty(t, next)
 		})
 	}
-	_, _, err := decodeHiveListing([]byte(`[1,2]`))
+	_, _, _, err := decodeHiveListing([]byte(`[1,2]`))
 	require.Error(t, err)
-	_, _, err = decodeHiveListing([]byte(`{"records":{"a":5},"next_cursor":"x"}`))
+	_, _, _, err = decodeHiveListing([]byte(`{"records":{"a":5},"next_cursor":"x"}`))
 	require.Error(t, err)
 }
 
@@ -257,7 +257,7 @@ func TestDecodeHiveListingEnvelopeWithoutCursor(t *testing.T) {
 		"null":   `{"records":{"a":{"data":{"x":1},"sys_mtd":{"etag":"e"},"usr_mtd":{}}},"next_cursor":null}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			recs, next, err := decodeHiveListing([]byte(raw))
+			recs, next, _, err := decodeHiveListing([]byte(raw))
 			require.NoError(t, err)
 			require.Empty(t, next)
 			require.Len(t, recs, 1)
@@ -268,7 +268,7 @@ func TestDecodeHiveListingEnvelopeWithoutCursor(t *testing.T) {
 
 // A legacy hive whose only record is named "records" is still a legacy map.
 func TestDecodeHiveListingLegacySingleRecordNamedRecords(t *testing.T) {
-	recs, next, err := decodeHiveListing([]byte(`{"records":{"data":{"x":1},"sys_mtd":{"etag":"e"},"usr_mtd":{}}}`))
+	recs, next, _, err := decodeHiveListing([]byte(`{"records":{"data":{"x":1},"sys_mtd":{"etag":"e"},"usr_mtd":{}}}`))
 	require.NoError(t, err)
 	require.Empty(t, next)
 	require.Len(t, recs, 1)
@@ -454,4 +454,32 @@ func TestFullListingRequestOutlastsGateway(t *testing.T) {
 	r := fullListingRequest(nil)
 	require.Greater(t, r.timeout, 120*time.Second)
 	require.True(t, r.noGatewayTimeoutRetry)
+}
+
+func TestDecodeHiveListingCursorWithoutRecords(t *testing.T) {
+	recs, next, isEnv, err := decodeHiveListing([]byte(`{"next_cursor":"opaque"}`))
+	require.NoError(t, err)
+	require.True(t, isEnv)
+	require.Empty(t, recs)
+	require.Equal(t, "opaque", next)
+
+	_, _, _, err = decodeHiveListing([]byte(`{"records":[1],"next_cursor":""}`))
+	require.ErrorContains(t, err, "not an object")
+}
+
+func TestHiveListPageLegacyGatewayTagPrefixAppliedClientSide(t *testing.T) {
+	g := newFakeHiveGateway(4)
+	g.legacy = true
+	for _, k := range []string{"rec-001", "rec-003"} {
+		r := g.records[k]
+		r.UsrMtd.Tags = []string{"env:" + k}
+		g.records[k] = r
+	}
+	h := g.client(t)
+	page, next, err := h.ListPage(testHiveArgs, ListPageOptions{TagPrefix: "env:"})
+	require.NoError(t, err)
+	require.Empty(t, next)
+	require.Len(t, page, 2)
+	require.Contains(t, page, "rec-001")
+	require.Contains(t, page, "rec-003")
 }

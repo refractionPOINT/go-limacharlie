@@ -222,7 +222,8 @@ type ListPageOptions struct {
 //
 // A server that predates paging ignores the limit and cursor and answers with
 // the whole hive as a plain name->record map. That is detected and returned as
-// a single, final page, so callers behave the same against old and new servers.
+// a single, final page, so callers behave the same against old and new servers
+// (MtdOnly and TagPrefix are then applied here).
 func (h *HiveClient) ListPage(args HiveArgs, opts ListPageOptions) (HiveConfigData, string, error) {
 	limit := opts.Limit
 	if limit <= 0 {
@@ -250,9 +251,17 @@ func (h *HiveClient) ListPage(args HiveArgs, opts ListPageOptions) (HiveConfigDa
 		return nil, "", err
 	}
 
-	records, next, err := decodeHiveListing(raw)
+	records, next, isEnvelope, err := decodeHiveListing(raw)
 	if err != nil {
 		return nil, "", err
+	}
+	if opts.TagPrefix != "" && !isEnvelope {
+		// A server that predates paging ignores tag_prefix too.
+		for k, v := range records {
+			if !hasTagPrefix(v.UsrMtd.Tags, opts.TagPrefix) {
+				delete(records, k)
+			}
+		}
 	}
 	if opts.MtdOnly {
 		// Only a server that ignored mtd_only returns data here.
@@ -263,58 +272,65 @@ func (h *HiveClient) ListPage(args HiveArgs, opts ListPageOptions) (HiveConfigDa
 
 // decodeHiveListing decodes a listing response in either the paged envelope
 // {"records": {...}, "next_cursor": "..."} or the legacy plain map of records.
+// The bool result is true for the envelope.
 //
-// It is an envelope when "records" is an object (or null) and "next_cursor" is
-// present as a string (or null). A legacy map cannot match that: every one of
-// its values is a record object, so a record named "next_cursor" or "records"
-// does not have a string value for the former and is itself a record (carrying
-// data/sys_mtd/usr_mtd) for the latter. A response with "records" as its only
-// key and no "next_cursor" is still read as an envelope unless that "records"
-// value is a record: a missing cursor means the last page, and reading such a
-// page as a legacy map would silently drop every record.
-func decodeHiveListing(raw json.RawMessage) (HiveConfigData, string, error) {
+// A "next_cursor" that is a string (or null) marks the envelope: every value
+// of a legacy map is a record object, so a record named "next_cursor" cannot
+// be mistaken for it, and a page with no visible records but more to come is
+// still recognized. Without "next_cursor", "records" as the only key is still
+// read as an envelope unless its value is a record (a legacy map holding one
+// record named "records"): a missing cursor means the last page, and reading
+// that as a legacy map would silently drop every record.
+func decodeHiveListing(raw json.RawMessage) (HiveConfigData, string, bool, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
-		return HiveConfigData{}, "", nil
+		return HiveConfigData{}, "", false, nil
 	}
 
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &top); err != nil {
-		return nil, "", fmt.Errorf("invalid hive listing response: %w", err)
+		return nil, "", false, fmt.Errorf("invalid hive listing response: %w", err)
 	}
 
-	if recordsRaw, ok := top["records"]; ok && isJSONObjectOrNull(recordsRaw) {
-		cursorRaw, hasCursor := top["next_cursor"]
-		isEnvelope := false
-		next := ""
-		if hasCursor {
-			if string(bytes.TrimSpace(cursorRaw)) == "null" {
-				isEnvelope = true
-			} else if err := json.Unmarshal(cursorRaw, &next); err == nil {
-				isEnvelope = true
-			}
-		} else if len(top) == 1 && !looksLikeHiveRecord(recordsRaw) {
+	next := ""
+	isEnvelope := false
+	if cursorRaw, ok := top["next_cursor"]; ok {
+		if string(bytes.TrimSpace(cursorRaw)) == "null" {
+			isEnvelope = true
+		} else if err := json.Unmarshal(cursorRaw, &next); err == nil {
 			isEnvelope = true
 		}
-		if isEnvelope {
-			records := HiveConfigData{}
-			if err := json.Unmarshal(recordsRaw, &records); err != nil {
-				return nil, "", fmt.Errorf("invalid hive listing records: %w", err)
-			}
-			if records == nil {
-				records = HiveConfigData{}
-			}
-			return records, next, nil
-		}
+	}
+	recordsRaw, hasRecords := top["records"]
+	if !isEnvelope && len(top) == 1 && hasRecords && isJSONObjectOrNull(recordsRaw) && !looksLikeHiveRecord(recordsRaw) {
+		isEnvelope = true
 	}
 
 	records := HiveConfigData{}
-	if err := json.Unmarshal(raw, &records); err != nil {
-		return nil, "", fmt.Errorf("invalid hive listing response: %w", err)
+	if isEnvelope {
+		if hasRecords {
+			if !isJSONObjectOrNull(recordsRaw) {
+				return nil, "", false, errors.New("invalid hive listing response: records is not an object")
+			}
+			if err := json.Unmarshal(recordsRaw, &records); err != nil {
+				return nil, "", false, fmt.Errorf("invalid hive listing records: %w", err)
+			}
+		}
+	} else if err := json.Unmarshal(raw, &records); err != nil {
+		return nil, "", false, fmt.Errorf("invalid hive listing response: %w", err)
 	}
 	if records == nil {
 		records = HiveConfigData{}
 	}
-	return records, "", nil
+	return records, next, isEnvelope, nil
+}
+
+func hasTagPrefix(tags []string, prefix string) bool {
+	for _, t := range tags {
+		if strings.HasPrefix(t, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func isJSONObjectOrNull(b json.RawMessage) bool {
