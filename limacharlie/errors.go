@@ -46,6 +46,15 @@ var ErrorNoAPIKeyConfigured = errors.New("no api key configured")
 // RESTError is a generic rest error
 type RESTError struct {
 	s string
+	// status is the HTTP status code of the response, or 0 when the error was
+	// not built from an HTTP response.
+	status int
+}
+
+// StatusCode returns the HTTP status code that produced the error, or 0 when
+// it is unknown.
+func (e RESTError) StatusCode() int {
+	return e.status
 }
 
 // NewRESTError makes a new RESTError

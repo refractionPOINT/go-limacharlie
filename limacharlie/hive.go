@@ -140,29 +140,211 @@ func NewHiveClient(org *Organization) *HiveClient {
 	return &HiveClient{Organization: org}
 }
 
+// List returns every record of a hive, with its data.
+//
+// A single request returning a whole hive can be too big for the server to
+// build. When the server refuses with HIVE_LISTING_TOO_LARGE (HTTP 413), List
+// transparently falls back to walking the hive page by page and returns the
+// combined map. Callers that only need metadata should use ListMtd, and
+// callers that want to bound their own memory should use ListPages.
 func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
 	var hiveSet HiveConfigData
 	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
+		if IsHiveListingTooLarge(err) {
+			return h.ListAllPages(args, ListPageOptions{})
+		}
 		return nil, err
 	}
 
 	return hiveSet, nil
 }
 
+// ListMtd returns every record of a hive without its data. The server does
+// not load the record data at all. Servers that predate the mtd_only
+// parameter answer with the full records, so Data is always cleared here.
 func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
 	var hiveSet HiveConfigData
+	req := makeDefaultRequest(&hiveSet).withQueryData(Dict{"mtd_only": "true"})
 	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
-		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
+		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
+		if IsHiveListingTooLarge(err) {
+			return h.ListAllPages(args, ListPageOptions{MtdOnly: true})
+		}
 		return nil, err
 	}
 
-	// remove data field from return set
-	for k, v := range hiveSet {
-		hiveSet[k] = HiveData{SysMtd: v.SysMtd, UsrMtd: v.UsrMtd}
+	stripHiveData(hiveSet)
+	return hiveSet, nil
+}
+
+// DefaultHivePageSize is the number of records requested per page when
+// ListPageOptions.Limit is not set.
+const DefaultHivePageSize = 50
+
+// ListPageOptions controls one page of a hive listing.
+type ListPageOptions struct {
+	// Limit is the maximum number of records in the page. Values <= 0 use
+	// DefaultHivePageSize. The server may return fewer records (it also
+	// bounds the size of a page) and caps the limit it will honor.
+	Limit int
+	// Cursor is the NextCursor returned by the previous page. Empty for the
+	// first page.
+	Cursor string
+	// MtdOnly returns the records without their data.
+	MtdOnly bool
+	// TagPrefix, when set, only returns records with a tag starting with it.
+	TagPrefix string
+	// MaxBytes optionally lowers the server-side size bound of a page.
+	MaxBytes int
+}
+
+// hiveListingEnvelope is the paged response of the hive listing endpoint.
+type hiveListingEnvelope struct {
+	Records    json.RawMessage `json:"records"`
+	NextCursor *string         `json:"next_cursor"`
+}
+
+// ListPage returns one page of a hive listing, in record name order, and the
+// cursor to pass in ListPageOptions.Cursor to get the next page. An empty
+// cursor means this was the last page.
+//
+// A server that predates paging ignores the limit and cursor and answers with
+// the whole hive as a plain name->record map. That is detected and returned as
+// a single, final page, so callers behave the same against old and new servers.
+func (h *HiveClient) ListPage(args HiveArgs, opts ListPageOptions) (HiveConfigData, string, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = DefaultHivePageSize
+	}
+	// "limit" must always be sent: it is what selects the paged response.
+	q := Dict{"limit": fmt.Sprintf("%d", limit)}
+	if opts.Cursor != "" {
+		q["cursor"] = opts.Cursor
+	}
+	if opts.MtdOnly {
+		q["mtd_only"] = "true"
+	}
+	if opts.TagPrefix != "" {
+		q["tag_prefix"] = opts.TagPrefix
+	}
+	if opts.MaxBytes > 0 {
+		q["max_bytes"] = fmt.Sprintf("%d", opts.MaxBytes)
 	}
 
-	return hiveSet, nil
+	var raw json.RawMessage
+	req := makeDefaultRequest(&raw).withQueryData(q)
+	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
+		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
+		return nil, "", err
+	}
+
+	records, next, err := decodeHiveListing(raw)
+	if err != nil {
+		return nil, "", err
+	}
+	if opts.MtdOnly {
+		// Only a server that ignored mtd_only returns data here.
+		stripHiveData(records)
+	}
+	return records, next, nil
+}
+
+// decodeHiveListing decodes a listing response in either the paged envelope
+// {"records": {...}, "next_cursor": "..."} or the legacy plain map of records.
+//
+// The envelope is recognized by a string "next_cursor" next to an object (or
+// null) "records". A legacy map cannot match: every one of its values is a
+// record object, so a record that happens to be named "next_cursor" or
+// "records" does not have a string value.
+func decodeHiveListing(raw json.RawMessage) (HiveConfigData, string, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return HiveConfigData{}, "", nil
+	}
+	var env hiveListingEnvelope
+	if err := json.Unmarshal(raw, &env); err == nil && env.NextCursor != nil && isJSONObjectOrNull(env.Records) {
+		records := HiveConfigData{}
+		if err := json.Unmarshal(env.Records, &records); err != nil {
+			return nil, "", fmt.Errorf("invalid hive listing records: %w", err)
+		}
+		if records == nil {
+			records = HiveConfigData{}
+		}
+		return records, *env.NextCursor, nil
+	}
+
+	records := HiveConfigData{}
+	if err := json.Unmarshal(raw, &records); err != nil {
+		return nil, "", fmt.Errorf("invalid hive listing response: %w", err)
+	}
+	if records == nil {
+		records = HiveConfigData{}
+	}
+	return records, "", nil
+}
+
+func isJSONObjectOrNull(b json.RawMessage) bool {
+	t := bytes.TrimSpace(b)
+	return len(t) > 0 && (t[0] == '{' || string(t) == "null")
+}
+
+// ListPages walks a whole hive page by page, calling fn with each page, so that
+// only one page needs to be in memory at a time. opts.Cursor is the starting
+// point (empty for the beginning of the hive). Returning an error from fn stops
+// the walk and returns that error.
+func (h *HiveClient) ListPages(args HiveArgs, opts ListPageOptions, fn func(page HiveConfigData) error) error {
+	if fn == nil {
+		return errors.New("page function required")
+	}
+	cursor := opts.Cursor
+	for {
+		opts.Cursor = cursor
+		page, next, err := h.ListPage(args, opts)
+		if err != nil {
+			return err
+		}
+		if err := fn(page); err != nil {
+			return err
+		}
+		if next == "" {
+			return nil
+		}
+		if next == cursor {
+			return errors.New("hive listing did not advance: server returned the same cursor")
+		}
+		cursor = next
+	}
+}
+
+// ListAllPages walks a whole hive page by page and returns the combined map.
+func (h *HiveClient) ListAllPages(args HiveArgs, opts ListPageOptions) (HiveConfigData, error) {
+	all := HiveConfigData{}
+	if err := h.ListPages(args, opts, func(page HiveConfigData) error {
+		for k, v := range page {
+			all[k] = v
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return all, nil
+}
+
+// IsHiveListingTooLarge returns true when err is the server refusing to list a
+// whole hive in one response (HTTP 413, HIVE_LISTING_TOO_LARGE). The listing
+// has to be fetched page by page instead.
+func IsHiveListingTooLarge(err error) bool {
+	var restErr RESTError
+	if errors.As(err, &restErr) && restErr.StatusCode() == http.StatusRequestEntityTooLarge {
+		return true
+	}
+	return err != nil && strings.Contains(err.Error(), "HIVE_LISTING_TOO_LARGE")
+}
+
+func stripHiveData(set HiveConfigData) {
+	for k, v := range set {
+		set[k] = HiveData{SysMtd: v.SysMtd, UsrMtd: v.UsrMtd}
+	}
 }
 
 func (h *HiveClient) Get(args HiveArgs) (*HiveData, error) {

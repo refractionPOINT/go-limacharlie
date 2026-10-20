@@ -553,7 +553,9 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 		if errorDetails, err := ioutil.ReadAll(resp.Body); err == nil {
 			errorStr = string(errorDetails)
 		}
-		return resp.StatusCode, NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
+		restErr := NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
+		restErr.status = resp.StatusCode
+		return resp.StatusCode, restErr
 	}
 
 	// Prior to enforcement of rate limits, we return the headers
