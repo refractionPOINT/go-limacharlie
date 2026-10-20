@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -426,4 +427,31 @@ func TestSyncFetchHiveConfigDataPagedAndLegacy(t *testing.T) {
 			require.Equal(t, g.records["rec-007"].UsrMtd, got["rec-007"].UsrMtd)
 		})
 	}
+}
+
+// A gateway timeout on a whole-hive listing is reported, not replayed against
+// the backend.
+func TestHiveListGatewayTimeoutIsNotRetried(t *testing.T) {
+	var mu sync.Mutex
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		http.Error(w, "timeout", http.StatusGatewayTimeout)
+	}))
+	t.Cleanup(srv.Close)
+	h := NewHiveClient(&Organization{client: &Client{options: ClientOptions{JWT: "j"}, logger: &LCLoggerEmpty{}, httpClient: srv.Client(), baseURL: srv.URL}})
+	for _, list := range []func(HiveArgs) (HiveConfigData, error){h.List, h.ListMtd} {
+		_, err := list(testHiveArgs)
+		require.Error(t, err)
+		require.False(t, IsHiveListingTooLarge(err))
+	}
+	require.Equal(t, 2, calls)
+}
+
+func TestFullListingRequestOutlastsGateway(t *testing.T) {
+	r := fullListingRequest(nil)
+	require.Greater(t, r.timeout, 120*time.Second)
+	require.True(t, r.noGatewayTimeoutRetry)
 }

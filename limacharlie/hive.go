@@ -150,7 +150,7 @@ func NewHiveClient(org *Organization) *HiveClient {
 func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
 	var hiveSet HiveConfigData
 	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
-		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
+		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), fullListingRequest(&hiveSet)); err != nil {
 		if IsHiveListingTooLarge(err) {
 			return h.ListAllPages(args, ListPageOptions{Limit: fallbackHivePageSize})
 		}
@@ -165,7 +165,7 @@ func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
 // parameter answer with the full records, so Data is always cleared here.
 func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
 	var hiveSet HiveConfigData
-	req := makeDefaultRequest(&hiveSet).withQueryData(Dict{"mtd_only": "true"})
+	req := fullListingRequest(&hiveSet).withQueryData(Dict{"mtd_only": "true"})
 	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
 		if IsHiveListingTooLarge(err) {
@@ -176,6 +176,18 @@ func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
 
 	stripHiveData(hiveSet)
 	return hiveSet, nil
+}
+
+// hiveFullListingTimeout is the client timeout of a whole-hive listing. It is
+// longer than the API gateway's own limit for these calls, so the gateway's
+// answer (a result, 413 or 504) is what the caller sees rather than a client
+// deadline, which would be retried.
+const hiveFullListingTimeout = 150 * time.Second
+
+// fullListingRequest is the request of a whole-hive listing. These are heavy
+// for the backend, so a gateway timeout is not replayed.
+func fullListingRequest(response interface{}) restRequest {
+	return makeDefaultRequest(response).withTimeout(hiveFullListingTimeout).withoutGatewayTimeoutRetry()
 }
 
 // DefaultHivePageSize is the number of records requested per page when
