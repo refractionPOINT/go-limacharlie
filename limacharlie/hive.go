@@ -152,7 +152,7 @@ func (h *HiveClient) List(args HiveArgs) (HiveConfigData, error) {
 	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), makeDefaultRequest(&hiveSet)); err != nil {
 		if IsHiveListingTooLarge(err) {
-			return h.ListAllPages(args, ListPageOptions{})
+			return h.ListAllPages(args, ListPageOptions{Limit: fallbackHivePageSize})
 		}
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
 	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
 		fmt.Sprintf("hive/%s/%s", args.HiveName, args.PartitionKey), req); err != nil {
 		if IsHiveListingTooLarge(err) {
-			return h.ListAllPages(args, ListPageOptions{MtdOnly: true})
+			return h.ListAllPages(args, ListPageOptions{Limit: fallbackHivePageSize, MtdOnly: true})
 		}
 		return nil, err
 	}
@@ -181,6 +181,11 @@ func (h *HiveClient) ListMtd(args HiveArgs) (HiveConfigData, error) {
 // DefaultHivePageSize is the number of records requested per page when
 // ListPageOptions.Limit is not set.
 const DefaultHivePageSize = 50
+
+// fallbackHivePageSize is the page size requested when a listing has to be
+// walked page by page. The listing is already known to be big, and the server
+// bounds the byte size of each page, so ask for as many records as it allows.
+const fallbackHivePageSize = 500
 
 // ListPageOptions controls one page of a hive listing.
 type ListPageOptions struct {
@@ -197,12 +202,6 @@ type ListPageOptions struct {
 	TagPrefix string
 	// MaxBytes optionally lowers the server-side size bound of a page.
 	MaxBytes int
-}
-
-// hiveListingEnvelope is the paged response of the hive listing endpoint.
-type hiveListingEnvelope struct {
-	Records    json.RawMessage `json:"records"`
-	NextCursor *string         `json:"next_cursor"`
 }
 
 // ListPage returns one page of a hive listing, in record name order, and the
@@ -253,24 +252,47 @@ func (h *HiveClient) ListPage(args HiveArgs, opts ListPageOptions) (HiveConfigDa
 // decodeHiveListing decodes a listing response in either the paged envelope
 // {"records": {...}, "next_cursor": "..."} or the legacy plain map of records.
 //
-// The envelope is recognized by a string "next_cursor" next to an object (or
-// null) "records". A legacy map cannot match: every one of its values is a
-// record object, so a record that happens to be named "next_cursor" or
-// "records" does not have a string value.
+// It is an envelope when "records" is an object (or null) and "next_cursor" is
+// present as a string (or null). A legacy map cannot match that: every one of
+// its values is a record object, so a record named "next_cursor" or "records"
+// does not have a string value for the former and is itself a record (carrying
+// data/sys_mtd/usr_mtd) for the latter. A response with "records" as its only
+// key and no "next_cursor" is still read as an envelope unless that "records"
+// value is a record: a missing cursor means the last page, and reading such a
+// page as a legacy map would silently drop every record.
 func decodeHiveListing(raw json.RawMessage) (HiveConfigData, string, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return HiveConfigData{}, "", nil
 	}
-	var env hiveListingEnvelope
-	if err := json.Unmarshal(raw, &env); err == nil && env.NextCursor != nil && isJSONObjectOrNull(env.Records) {
-		records := HiveConfigData{}
-		if err := json.Unmarshal(env.Records, &records); err != nil {
-			return nil, "", fmt.Errorf("invalid hive listing records: %w", err)
+
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return nil, "", fmt.Errorf("invalid hive listing response: %w", err)
+	}
+
+	if recordsRaw, ok := top["records"]; ok && isJSONObjectOrNull(recordsRaw) {
+		cursorRaw, hasCursor := top["next_cursor"]
+		isEnvelope := false
+		next := ""
+		if hasCursor {
+			if string(bytes.TrimSpace(cursorRaw)) == "null" {
+				isEnvelope = true
+			} else if err := json.Unmarshal(cursorRaw, &next); err == nil {
+				isEnvelope = true
+			}
+		} else if len(top) == 1 && !looksLikeHiveRecord(recordsRaw) {
+			isEnvelope = true
 		}
-		if records == nil {
-			records = HiveConfigData{}
+		if isEnvelope {
+			records := HiveConfigData{}
+			if err := json.Unmarshal(recordsRaw, &records); err != nil {
+				return nil, "", fmt.Errorf("invalid hive listing records: %w", err)
+			}
+			if records == nil {
+				records = HiveConfigData{}
+			}
+			return records, next, nil
 		}
-		return records, *env.NextCursor, nil
 	}
 
 	records := HiveConfigData{}
@@ -286,6 +308,18 @@ func decodeHiveListing(raw json.RawMessage) (HiveConfigData, string, error) {
 func isJSONObjectOrNull(b json.RawMessage) bool {
 	t := bytes.TrimSpace(b)
 	return len(t) > 0 && (t[0] == '{' || string(t) == "null")
+}
+
+// looksLikeHiveRecord returns true when the JSON object is a hive record
+// rather than a map of records.
+func looksLikeHiveRecord(b json.RawMessage) bool {
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(b, &keys); err != nil {
+		return false
+	}
+	_, hasSys := keys["sys_mtd"]
+	_, hasUsr := keys["usr_mtd"]
+	return hasSys || hasUsr
 }
 
 // ListPages walks a whole hive page by page, calling fn with each page, so that

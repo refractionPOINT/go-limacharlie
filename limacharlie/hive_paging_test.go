@@ -228,6 +228,8 @@ func TestDecodeHiveListingLegacyRecordNamesLikeEnvelope(t *testing.T) {
 func TestDecodeHiveListingShapes(t *testing.T) {
 	for name, raw := range map[string]string{
 		"null records": `{"records":null,"next_cursor":""}`,
+		"null cursor":  `{"records":{},"next_cursor":null}`,
+		"no cursor":    `{"records":{}}`,
 		"empty map":    `{}`,
 		"empty body":   ``,
 		"null":         `null`,
@@ -244,6 +246,32 @@ func TestDecodeHiveListingShapes(t *testing.T) {
 	require.Error(t, err)
 	_, _, err = decodeHiveListing([]byte(`{"records":{"a":5},"next_cursor":"x"}`))
 	require.Error(t, err)
+}
+
+// A paged answer that omits (or nulls) next_cursor on its last page must still
+// be read as an envelope, never as a legacy map holding one record "records".
+func TestDecodeHiveListingEnvelopeWithoutCursor(t *testing.T) {
+	for name, raw := range map[string]string{
+		"absent": `{"records":{"a":{"data":{"x":1},"sys_mtd":{"etag":"e"},"usr_mtd":{}}}}`,
+		"null":   `{"records":{"a":{"data":{"x":1},"sys_mtd":{"etag":"e"},"usr_mtd":{}}},"next_cursor":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			recs, next, err := decodeHiveListing([]byte(raw))
+			require.NoError(t, err)
+			require.Empty(t, next)
+			require.Len(t, recs, 1)
+			require.Equal(t, "e", recs["a"].SysMtd.Etag)
+		})
+	}
+}
+
+// A legacy hive whose only record is named "records" is still a legacy map.
+func TestDecodeHiveListingLegacySingleRecordNamedRecords(t *testing.T) {
+	recs, next, err := decodeHiveListing([]byte(`{"records":{"data":{"x":1},"sys_mtd":{"etag":"e"},"usr_mtd":{}}}`))
+	require.NoError(t, err)
+	require.Empty(t, next)
+	require.Len(t, recs, 1)
+	require.Equal(t, "e", recs["records"].SysMtd.Etag)
 }
 
 func TestHiveListMtdUsesMtdOnly(t *testing.T) {
@@ -265,17 +293,17 @@ func TestHiveListMtdLegacyGatewayStripsData(t *testing.T) {
 }
 
 func TestHiveListFallsBackToPagesOn413(t *testing.T) {
-	g := newFakeHiveGateway(120)
+	g := newFakeHiveGateway(1200)
 	g.tooLargeAt = 100
 	h := g.client(t)
 	got, err := h.List(testHiveArgs)
 	require.NoError(t, err)
 	require.Equal(t, HiveConfigData(g.records), got)
 
-	// One refused full listing (not retried), then 3 pages of 50.
+	// One refused full listing (not retried), then 3 pages of up to 500.
 	require.Len(t, g.queries, 4)
 	require.Empty(t, g.queries[0])
-	require.Equal(t, "50", g.queries[1]["limit"])
+	require.Equal(t, "500", g.queries[1]["limit"])
 }
 
 func TestHiveListNoFallbackWhenSmall(t *testing.T) {
