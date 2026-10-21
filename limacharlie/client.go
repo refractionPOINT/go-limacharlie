@@ -65,6 +65,9 @@ type restRequest struct {
 	response      interface{}
 	urlRoot       string
 	idempotentKey string
+	// noGatewayTimeoutRetry makes a 504 final instead of retried, for heavy
+	// requests that must not be replayed against the backend.
+	noGatewayTimeoutRetry bool
 	// rawBody, when non-nil, is sent verbatim as the request body instead of
 	// form-encoding formData/urlValues. Used for services that expect a JSON
 	// body (e.g. the cases and ai-sessions micro-services).
@@ -126,6 +129,12 @@ func (r restRequest) withRawBody(body []byte, contentType string) restRequest {
 // them to override default headers such as Authorization.
 func (r restRequest) withExtraHeaders(headers map[string]string) restRequest {
 	r.extraHeaders = headers
+	return r
+}
+
+// withoutGatewayTimeoutRetry reports a 504 to the caller instead of retrying.
+func (r restRequest) withoutGatewayTimeoutRetry() restRequest {
+	r.noGatewayTimeoutRetry = true
 	return r
 }
 
@@ -354,6 +363,8 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 			if err := waitForRetry(ctx, 10*time.Second); err != nil {
 				return err
 			}
+		} else if statusCode == http.StatusGatewayTimeout && request.noGatewayTimeoutRetry {
+			return err
 		} else if statusCode == http.StatusGatewayTimeout {
 			// Looks like the API might be under load.
 			if err := waitForRetry(ctx, 5*time.Second); err != nil {
@@ -553,7 +564,9 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 		if errorDetails, err := ioutil.ReadAll(resp.Body); err == nil {
 			errorStr = string(errorDetails)
 		}
-		return resp.StatusCode, NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
+		restErr := NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
+		restErr.status = resp.StatusCode
+		return resp.StatusCode, restErr
 	}
 
 	// Prior to enforcement of rate limits, we return the headers

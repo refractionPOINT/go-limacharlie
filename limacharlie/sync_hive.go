@@ -7,6 +7,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// syncHivePageSize is the page size used when reading hives for a sync. The
+// server still bounds the byte size of each page.
+const syncHivePageSize = 500
+
 type SyncHiveConfigData map[string]SyncHiveData
 type SyncHiveData struct {
 	Data   map[string]interface{} `json:"data" yaml:"data,omitempty"`
@@ -190,22 +194,26 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 func (org *Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData, error) {
 	hiveClient := NewHiveClient(org)
 
-	dataSet, err := hiveClient.List(args)
+	// Walk the hive page by page: a big hive is never requested in one
+	// response (which the server may refuse), and only the fields the sync
+	// compares are kept from each page.
+	currentHiveDataConfig := map[string]SyncHiveData{}
+	err := hiveClient.ListPages(args, ListPageOptions{Limit: syncHivePageSize}, func(page HiveConfigData) error {
+		for k, v := range page {
+			currentHiveDataConfig[k] = SyncHiveData{
+				Data: v.Data,
+				UsrMtd: UsrMtd{
+					Enabled: v.UsrMtd.Enabled,
+					Expiry:  v.UsrMtd.Expiry,
+					Tags:    v.UsrMtd.Tags,
+					Comment: v.UsrMtd.Comment,
+				},
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-
-	currentHiveDataConfig := map[string]SyncHiveData{}
-	for k, v := range dataSet {
-		currentHiveDataConfig[k] = SyncHiveData{
-			Data: v.Data,
-			UsrMtd: UsrMtd{
-				Enabled: v.UsrMtd.Enabled,
-				Expiry:  v.UsrMtd.Expiry,
-				Tags:    v.UsrMtd.Tags,
-				Comment: v.UsrMtd.Comment,
-			},
-		}
 	}
 	return currentHiveDataConfig, nil
 }
