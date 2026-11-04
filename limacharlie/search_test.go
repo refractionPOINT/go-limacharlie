@@ -192,8 +192,8 @@ func TestSearchSubmitBodyShape(t *testing.T) {
 
 // TestSearchSubmitBodyMode covers the tri-state of the Mode field, including a
 // value the SDK does not know. An unknown mode must reach the server, which
-// ignores it and runs the search interactively; rejecting it client-side would
-// make this SDK the thing that blocks a mode added later.
+// treats it as no mode; rejecting it client-side would make this SDK the thing
+// that blocks a mode added later.
 //
 // The two states that look alike and are not: an unset Mode asks for batch,
 // while WithoutMode asks for nothing and lets the organization's own default
@@ -491,9 +491,9 @@ func TestPollSearchFailures(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestSearchStatsDecoding covers the per-page report of how a search actually
-// ran. A mode the server did not recognise is ignored and the search runs
-// interactively, so what the page says it ran as is the only trustworthy
-// answer - not what was asked for.
+// ran. A mode the server did not recognise or declined is treated as no mode,
+// so what the page says it ran as is the only trustworthy answer - not what
+// was asked for.
 func TestSearchStatsDecoding(t *testing.T) {
 	t.Run("reported", func(t *testing.T) {
 		var page SearchPoll
@@ -717,7 +717,10 @@ func TestExecuteSearchPagination(t *testing.T) {
 
 	posts := sr.callsFor(http.MethodPost)
 	require.Len(t, posts, 1, "the criteria are submitted exactly once")
-	require.Contains(t, string(posts[0].body), `"mode":"batch"`)
+	submitted := map[string]interface{}{}
+	require.NoError(t, json.Unmarshal(posts[0].body, &submitted))
+	require.Equal(t, true, submitted["paginated"], "an unset Paginated submits paginated")
+	require.Equal(t, "batch", submitted["mode"], "an unset Mode submits batch")
 
 	// The token threading, and the absence of the mode on every continuation.
 	gets := sr.callsFor(http.MethodGet)
@@ -749,6 +752,84 @@ func TestExecuteSearchEndsWithoutToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, pages)
 	require.Len(t, sr.callsFor(http.MethodGet), 1, "no token means no further fetch")
+}
+
+// TestExecuteSearchFollowsEmptyPages pins that a page with no rows is not the
+// end of a search. A paginated page can legitimately come back empty, for
+// example when a stretch of the time range holds no matching events, and only
+// the missing token ends the search. Stopping at the first empty page would
+// hand a caller a truncated result that looks complete.
+func TestExecuteSearchFollowsEmptyPages(t *testing.T) {
+	_, org, sr := newSearchTestOrg(t)
+	sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+	sr.on(http.MethodGet, "/v1/search/query-1",
+		jsonOK(`{"completed":true,"results":[{"type":"events","rows":[],"nextToken":"token-2"}]}`),
+		jsonOK(`{"completed":true,"results":[{"type":"events","nextToken":"token-3"}]}`),
+		jsonOK(`{"completed":true,"results":[],"nextToken":"ignored"}`),
+	)
+
+	// The third reply carries no result item, so it holds no token: a token on
+	// the response itself is not where the server puts it.
+	pages := 0
+	err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,
+		func(page *SearchPoll) (bool, error) {
+			pages++
+			return true, nil
+		})
+	require.NoError(t, err)
+	require.Equal(t, 3, pages, "every empty page with a token must be followed")
+
+	gets := sr.callsFor(http.MethodGet)
+	require.Len(t, gets, 3)
+	require.Equal(t, "", gets[0].query.Get("token"))
+	require.Equal(t, "token-2", gets[1].query.Get("token"))
+	require.Equal(t, "token-3", gets[2].query.Get("token"))
+	require.Empty(t, sr.callsFor(http.MethodDelete), "a search read to its end is not cancelled")
+}
+
+// TestExecuteSearchSubmitsOverrides pins that the defaults are only defaults:
+// a caller's explicit pagination and mode choices reach the wire unchanged
+// through the driver, not only through the body builder.
+func TestExecuteSearchSubmitsOverrides(t *testing.T) {
+	base := SearchRequest{Query: "* | * | *", StartTime: 1700000000, EndTime: 1700003600}
+
+	for name, tc := range map[string]struct {
+		req           SearchRequest
+		wantPaginated bool
+		wantMode      string
+	}{
+		"defaults":                    {req: base, wantPaginated: true, wantMode: "batch"},
+		"unpaginated and interactive": {req: base.WithPaginated(false).WithMode(SearchModeInteractive), wantPaginated: false, wantMode: "interactive"},
+		"explicit paginated batch":    {req: base.WithPaginated(true).WithMode(SearchModeBatch), wantPaginated: true, wantMode: "batch"},
+		"without mode":                {req: base.WithoutMode(), wantPaginated: true, wantMode: ""},
+		"unpaginated without mode":    {req: base.WithPaginated(false).WithoutMode(), wantPaginated: false, wantMode: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, org, sr := newSearchTestOrg(t)
+			sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
+			// An unpaginated search answers in one page with no token, which
+			// is also what ends a paginated one.
+			sr.on(http.MethodGet, "/v1/search/query-1",
+				jsonOK(`{"completed":true,"results":[{"type":"events","rows":[{"mtd":{"id":"e1"}}]}]}`))
+
+			err := org.ExecuteSearch(context.Background(), tc.req, fastPolling,
+				func(page *SearchPoll) (bool, error) { return true, nil })
+			require.NoError(t, err)
+
+			posts := sr.callsFor(http.MethodPost)
+			require.Len(t, posts, 1)
+			submitted := map[string]interface{}{}
+			require.NoError(t, json.Unmarshal(posts[0].body, &submitted))
+			require.Equal(t, tc.wantPaginated, submitted["paginated"])
+			mode, present := submitted["mode"]
+			if tc.wantMode == "" {
+				require.False(t, present, "mode must be absent, got body %s", posts[0].body)
+			} else {
+				require.Equal(t, tc.wantMode, mode)
+			}
+			require.Len(t, sr.callsFor(http.MethodGet), 1)
+		})
+	}
 }
 
 func TestExecuteSearchHandlerStopsEarly(t *testing.T) {
@@ -818,7 +899,7 @@ func TestExecuteSearchReleasesOnlyAnUnfinishedSearch(t *testing.T) {
 		_, org, sr := newSearchTestOrg(t)
 		sr.on(http.MethodPost, "/v1/search", jsonOK(`{"queryId":"query-1"}`))
 		sr.on(http.MethodGet, "/v1/search/query-1", morePages,
-			jsonStatus(http.StatusInternalServerError, `{"error":"worker lost"}`))
+			jsonStatus(http.StatusInternalServerError, `{"error":"page failed"}`))
 		sr.on(http.MethodDelete, "/v1/search/query-1", jsonOK(`{}`))
 
 		err := org.ExecuteSearch(context.Background(), SearchRequest{Query: "*", StartTime: 1, EndTime: 2}, fastPolling,

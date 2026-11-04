@@ -23,9 +23,11 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
   Every call except `ExecuteSearch` has a `...WithContext` variant. The search host is resolved from the organization's URL map through `getServiceRoot("search")`, the same path the existing search calls use, and every request goes through the SDK's shared request layer, so JWT refresh, retry and error handling behave as they do everywhere else.
 
+- **Searches are paginated by default.** A `SearchRequest` that leaves `Paginated` unset submits `"paginated": true`, and `ExecuteSearch` follows the continuation tokens to the last page, so a caller using it receives the whole result set. `WithPaginated(false)` asks for a single unpaginated response instead. A caller driving `PollSearch` or `FetchSearchPage` by hand follows `SearchPoll.NextToken()` itself.
+
 - **Search types.** `SearchRequest`, `SearchMode` (`SearchModeInteractive`, `SearchModeBatch`), `SearchPoll` with a `NextToken()` helper, `SearchResultItem`, `SearchStats`, `SearchPartialInfo`, `SearchValidation`, `SearchExecuteOptions` and `SearchPageHandler`.
 
-- **`SearchStats` reports what a page actually ran as**, through `SearchMode`, `PageSize` and `PaginatedByteCap`, alongside the scan counters. All three are absent, and so read as zero, for a search that does not paginate. `SearchStats.SearchMode` is the field to trust: a mode the server does not recognise is ignored and the search runs interactively, and nothing else says so.
+- **`SearchStats` reports what a page actually ran as**, through `SearchMode`, `PageSize` and `PaginatedByteCap`, alongside the scan counters. All three are absent, and so read as zero, for a search that does not paginate. `SearchStats.SearchMode` is the field to trust: a mode the server does not recognise, or declines for an organization, is treated as no mode so the organization's default decides, and nothing else says so.
 
 - **`SearchPartialInfo` surfaces a page that is known to be missing data.** A partial page is a successful response, so a client that ignores the block under-reports silently. Its `Reasons` is an open set; treat an unrecognised value as an omission, never as no omission.
 

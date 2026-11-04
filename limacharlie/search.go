@@ -16,10 +16,14 @@ package limacharlie
 // parameter and nothing else, so the criteria submitted once - query, time
 // range, stream, pagination and mode - govern every page of the search.
 //
-// A submission with no mode set asks for SearchModeBatch, on the grounds that
-// what calls an SDK is a program reading every page rather than a person
-// watching one. SearchRequest.WithMode and SearchRequest.WithoutMode are how to
-// ask for anything else.
+// A submission that sets neither Paginated nor Mode sends "paginated": true and
+// "mode": "batch", on the grounds that what calls an SDK is a program reading
+// every page rather than a person watching one. SearchRequest.WithPaginated,
+// SearchRequest.WithMode and SearchRequest.WithoutMode are how to ask for
+// anything else. ExecuteSearch follows the continuation tokens to the last
+// page, so the paginated default never leaves its caller with page one only;
+// a caller driving PollSearch or FetchSearchPage by hand follows
+// SearchPoll.NextToken itself.
 //
 // These calls are served from the search host resolved from the
 // organization's URL map (the "search" key), not from the main API host.
@@ -90,10 +94,16 @@ const (
 // mode takes precedence over the organization's default; omitting the field is
 // what lets that default apply. SearchRequest.WithoutMode is how to omit it.
 //
-// A server that does not recognise the value ignores it and runs the search
-// interactively, so setting a mode is safe against any deployment. For the
-// same reason the SDK does not reject unknown values: a mode added later must
-// reach the server rather than being refused by an older client.
+// A server that does not recognise the value treats it as no mode at all, so
+// the organization's default applies, and setting a mode is safe against any
+// deployment. For the same reason the SDK does not reject unknown values: a
+// mode added later must reach the server rather than being refused by an
+// older client. The server may also decline a requested batch mode for an
+// organization, which resolves the same way, as if no mode had been sent.
+//
+// Batch mode applies only to a search that runs paginated. A search submitted
+// with WithPaginated(false), or a query such as an aggregation that the server
+// runs without pages, runs as interactive whatever was requested.
 //
 // What actually ran is reported per page in SearchStats.SearchMode, which is
 // the field to read - not the one that was requested.
@@ -130,9 +140,12 @@ type SearchRequest struct {
 	// than the SDK pinning one that can drift from it.
 	Stream string
 	// Paginated asks the server to break the results into pages joined by a
-	// continuation token. Nil means paginated, which is what a client wanting
-	// a bounded response per call should use and what ExecuteSearch assumes.
-	// Set it through WithPaginated.
+	// continuation token. Nil, the zero value, submits "paginated": true, which
+	// is what a client wanting a bounded response per call should use.
+	// ExecuteSearch follows the tokens to the last page, so a caller using it
+	// still receives the whole result set. A query the server cannot page,
+	// such as an aggregation, answers in a single page with no token whatever
+	// this says. Set it through WithPaginated.
 	Paginated *bool
 	// Mode declares how the caller will consume the search. See SearchMode.
 	//
@@ -251,9 +264,10 @@ func buildSearchValidateBody(oid string, req SearchRequest) ([]byte, error) {
 // Fields are additive. Ignore ones you do not recognise.
 type SearchStats struct {
 	// SearchMode is the mode the page RAN as, which is the value to trust: a
-	// mode the server did not recognise is ignored and the search runs
-	// interactively, and only this field says so. Empty on a search that does
-	// not paginate, and on a server that does not report it.
+	// mode the server did not recognise or declined is treated as no mode, so
+	// the organization's default decides, and only this field says what that
+	// was. Empty on a search that does not paginate, and on a server that does
+	// not report it.
 	SearchMode SearchMode `json:"searchMode,omitempty"`
 	// PageSize is how many events this page was allowed to return and
 	// PaginatedByteCap how many bytes, both as resolved by the server for this
@@ -556,10 +570,11 @@ func (org *Organization) FetchSearchPage(ctx context.Context, queryID, token str
 // concurrency slot rather than running on unread. A search that ran to its
 // last page is left alone, since the server has already finished it.
 //
-// Mode travels with the submission only. Continuation requests carry no body,
-// so every page of one ExecuteSearch call runs under the mode submitted here.
-// An unset Mode submits SearchModeBatch, which is what reading every page in a
-// loop wants; WithoutMode or WithMode changes that.
+// Mode and pagination travel with the submission only. Continuation requests
+// carry no body, so every page of one ExecuteSearch call runs under what was
+// submitted here. A request that sets neither submits "paginated": true and
+// "mode": "batch", which is what reading every page in a loop wants;
+// WithPaginated, WithMode and WithoutMode change that.
 //
 // Example:
 //
