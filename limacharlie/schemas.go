@@ -80,9 +80,9 @@ func (o *Organization) GetPlatformNames() ([]string, error) {
 // GetSchema retrieves a specific schema definition based on the provided schema name.
 func (o *Organization) GetSchema(name string) (*SchemaResponse, error) {
 	resp := SchemaResponse{}
-	urlPath := fmt.Sprintf("orgs/%s/schema/%s", o.GetOID(), url.PathEscape(name))
+	urlPath := fmt.Sprintf("orgs/%s/schema", o.GetOID())
 
-	request := makeDefaultRequest(&resp)
+	request := makeDefaultRequest(&resp).withQueryData(url.Values{"name": {name}})
 
 	if err := o.client.reliableRequest(context.Background(), http.MethodGet, urlPath, request); err != nil {
 		return nil, err
