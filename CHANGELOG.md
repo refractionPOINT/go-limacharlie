@@ -31,11 +31,19 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 - **`SearchPartialInfo` surfaces a page that is known to be missing data.** A partial page is a successful response, so a client that ignores the block under-reports silently. Its `Reasons` is an open set; treat an unrecognised value as an omission, never as no omission.
 
-- **`CancelSearch` closes a documented gap.** `search_queries.go` already told readers to cancel a search with the search API's delete endpoint, and there was no method to do it with.
+- **`CancelSearch` closes a documented gap.** `search_queries.go` already told readers to cancel a search with the search API's delete endpoint, and there was no method to do it with. A search that has already finished or expired answers 404, and the returned error carries that status (`errors.As` to a `RESTError`, then `StatusCode()`), so a caller that only wants the search stopped can treat it as done.
 
-- **`ExecuteSearch` releases a search it stops reading.** Whenever it returns before the last page (the handler stopped or failed, a page failed, the poll bound was reached, the context was cancelled) it cancels the search server-side on a best-effort basis, so the search stops holding a concurrency slot. A search that ran to its last page is left alone.
+- **`ExecuteSearch` releases a search it stops reading.** Whenever it returns before the last page (the handler stopped, failed or panicked, a callback panicked, a page failed, the poll bound was reached, the context ended) it cancels the search server-side on a best-effort basis, so the search stops holding a concurrency slot. The cancel runs on its own five-second context that keeps the caller's context values. A search that ran to its last page is left alone.
 
-- **End-to-end tests** in `limacharlie/search_e2e_test.go`, which exercise the Search calls against a live organization. `cloudbuild.yaml` sets `LC_SEARCH_E2E=1` next to the build's `_OID` and `_KEY`, so they run on every build. Everywhere else they skip unless `LC_SEARCH_E2E` is set, because they start real, billed searches. `LC_SEARCH_E2E_LOOKBACK_HOURS` and `LC_SEARCH_E2E_MAX_PAGES` size a run.
+- **Criteria that cannot describe a search are refused before anything is sent.** `InitiateSearch`, `ExecuteSearch` and `ValidateSearch` return an error, without a request, for an empty or blank query, a negative time, an end before the start, and a time past the year 5138, which is what a millisecond timestamp in a seconds field looks like. Without that check the server reads a millisecond value as seconds, searches a window thousands of years ahead and answers with no rows. Stream and mode values are not checked client-side, so a value the server adds later still reaches it.
+
+- **Polling is bounded on both sides.** The server's suggested poll delay is honoured between the caller's `PollInterval` floor (500ms by default) and a one-minute ceiling, so a corrupt or very large suggestion cannot park a caller. `FetchSearchPage` reports its poll bound as soon as the last allowed poll comes back incomplete, without waiting out one more delay first.
+
+- **`ExecuteSearch` cannot loop on one page.** A completed page whose continuation token is the token it was fetched with is handed to the handler, then reported as an error, because following it would fetch the same page forever.
+
+- **Query ids address exactly one search.** `PollSearch` and `CancelSearch` escape the id as a single path segment, and refuse `.` and `..`, which URL normalization would resolve against the path to address a different endpoint.
+
+- **End-to-end tests** in `limacharlie/search_e2e_test.go`, which exercise the Search calls against a live organization. `cloudbuild.yaml` sets `LC_SEARCH_E2E=1` next to the build's `_OID` and `_KEY`, so they run on every build, and passes `go test` an explicit `-timeout`. Each test's context ends before that deadline so its server-side cancel still runs. Everywhere else they skip unless `LC_SEARCH_E2E` is set, because they start real, billed searches. A window with no events skips rather than fails. `LC_SEARCH_E2E_LOOKBACK_HOURS` and `LC_SEARCH_E2E_MAX_PAGES` size a run.
 
 ### Changed
 
@@ -58,3 +66,7 @@ This file starts at the entry below. Changes made before it are not reconstructe
   `WithoutMode()` and `WithMode(SearchModeInteractive)` are not two spellings of one request. The server resolves the mode in the order: a server-side override, then the mode in the submission, then the organization's default. An explicit mode therefore overrides that organization default, and an absent one lets it apply. A caller that wants the organization's setting honoured must use `WithoutMode()`, not an explicit interactive.
 
   `SearchRequest.Mode` is a `*SearchMode` to carry those three states: `nil` submits batch, a pointer to a mode submits that mode, and a pointer to the empty `SearchMode` submits no field. Use `WithMode` and `WithoutMode` rather than taking the address of a local.
+
+### Fixed
+
+- **`Dict` decodes every number `encoding/json` decodes.** A number written with an exponent (`1e-07`, `2E+21`), or an integer outside both 64-bit ranges, failed the decode of the whole response it arrived in. It now decodes as a `float64`. Integers that fit are still typed exactly, as `uint64` when non-negative and `int64` when negative. This matters most for Search result rows, which are `Dict`s holding arbitrary event bodies, but applies to every `Dict` and to `UnmarshalCleanJSON`.
