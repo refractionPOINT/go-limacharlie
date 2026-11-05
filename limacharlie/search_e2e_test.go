@@ -39,10 +39,12 @@ package limacharlie
 // Polling follows the server's advised cadence (FetchSearchPage); nothing here
 // sleeps for a fixed time.
 //
-// Each search is bounded by searchE2EBudget, and every context also ends
-// searchE2ECleanupMargin before the test binary's -timeout deadline, so a slow
-// or hung search fails its test with a context error while the server-side
-// cancel still runs, instead of the binary panicking with searches left open.
+// Each search is bounded by searchE2EBudget, counted from when it holds a slot
+// so time queued behind the semaphore is not charged to it. Every context,
+// including the wait for a slot, also ends searchE2ECleanupMargin before the
+// test binary's -timeout deadline, so a slow or hung search fails its test
+// with a context error while the server-side cancel still runs, instead of
+// the binary panicking with searches left open.
 // Every search these tests start is cancelled server-side when they stop
 // early, so none is left holding a concurrency slot.
 //
@@ -97,6 +99,10 @@ const (
 	// searchE2EMaxParallel caps how many searches these tests run at once,
 	// whatever the organization's limit allows.
 	searchE2EMaxParallel = 4
+
+	// searchE2EMaxSlotWait bounds the wait for a search slot when the test
+	// binary has no -timeout deadline to bound it instead.
+	searchE2EMaxSlotWait = 10 * time.Minute
 
 	// searchE2EQuery matches everything in the window, which is what gives a
 	// paginated search the best chance of producing more than one page.
@@ -184,10 +190,20 @@ func newSearchE2EEnv(t *testing.T) *searchE2EEnv {
 	return searchE2EShared
 }
 
-// acquire takes a search slot, or fails the test if ctx ends first. The
-// returned func gives it back and is safe to call more than once.
-func (e *searchE2EEnv) acquire(t *testing.T, ctx context.Context) (release func()) {
+// acquire takes a search slot, waiting as long as the test binary's deadline
+// allows (less searchE2ECleanupMargin), or searchE2EMaxSlotWait when there is
+// no deadline. The wait is bounded apart from searchE2EBudget on purpose: a
+// search's budget starts only once it holds a slot, so searches queued behind
+// a small semaphore do not spend their own budget waiting. The returned func
+// gives the slot back and is safe to call more than once.
+func (e *searchE2EEnv) acquire(t *testing.T) (release func()) {
 	t.Helper()
+	deadline := time.Now().Add(searchE2EMaxSlotWait)
+	if testDeadline, ok := t.Deadline(); ok {
+		deadline = testDeadline.Add(-searchE2ECleanupMargin)
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
 	select {
 	case e.slots <- struct{}{}:
 	case <-ctx.Done():
@@ -331,10 +347,10 @@ func requireWholeRows(t *testing.T, page *SearchPoll) int {
 // slot for the rest of its life.
 func runSearchE2EFirstPage(t *testing.T, env *searchE2EEnv, req SearchRequest) *SearchPoll {
 	t.Helper()
+	release := env.acquire(t)
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
 
-	release := env.acquire(t, ctx)
 	queryID, err := env.org.InitiateSearchWithContext(ctx, req)
 	if err != nil {
 		release()
@@ -426,10 +442,10 @@ func TestSearchE2EPaginationIsConsistentAcrossPages(t *testing.T) {
 	start, end := searchE2EWindow(t)
 	maxPages := searchE2EEnvInt(t, searchE2EMaxPagesEnv, defaultSearchE2EMaxPages)
 
+	release := env.acquire(t)
+	defer release()
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
-	release := env.acquire(t, ctx)
-	defer release()
 
 	pages, rows := 0, 0
 	firstMode := SearchMode("")
@@ -495,10 +511,10 @@ type searchE2ERows struct {
 // finished rather than being stopped at the cap.
 func collectSearchE2ERows(t *testing.T, env *searchE2EEnv, req SearchRequest, maxRows int) searchE2ERows {
 	t.Helper()
+	release := env.acquire(t)
+	defer release()
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
-	release := env.acquire(t, ctx)
-	defer release()
 
 	var out searchE2ERows
 	err := env.org.ExecuteSearch(ctx, req, SearchExecuteOptions{}, func(page *SearchPoll) (bool, error) {
@@ -618,10 +634,10 @@ func TestSearchE2ECancelEndsTheSearch(t *testing.T) {
 	env := newSearchE2EEnv(t)
 	start, end := searchE2EWindow(t)
 
+	release := env.acquire(t)
+	defer release()
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
-	release := env.acquire(t, ctx)
-	defer release()
 
 	queryID, err := env.org.InitiateSearchWithContext(ctx, SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end})
 	require.NoError(t, err)
