@@ -47,6 +47,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -67,6 +68,13 @@ const (
 	// complete suggests no cadence at all.
 	fallbackSearchPollInterval = time.Second
 
+	// maxSearchPollInterval is the ceiling applied to the server's suggested
+	// poll delay. A suggestion past it, whether a deliberate long back-off or a
+	// corrupt value, is shortened to it, so one reply can never park a caller
+	// with no deadline on its context for longer than this between polls. A
+	// caller's own PollInterval floor is honoured even above it.
+	maxSearchPollInterval = time.Minute
+
 	// defaultSearchMaxPollAttempts bounds how many times FetchSearchPage polls
 	// a single page before giving up. It is a guard against an unbounded loop,
 	// not a deadline: prefer a context with a deadline for that. At the
@@ -75,8 +83,16 @@ const (
 	defaultSearchMaxPollAttempts = 3600
 
 	// cancelSearchTimeout is the budget for the best-effort cancel issued when
-	// a caller's context is cancelled mid-search.
+	// ExecuteSearch returns before the last page.
 	cancelSearchTimeout = 5 * time.Second
+
+	// maxPlausibleSearchTime is the largest StartTime or EndTime accepted, in
+	// Unix seconds. It is in the year 5138, so no real search window reaches
+	// it, while a time in milliseconds (13 digits today) is far past it. The
+	// server reads both fields as seconds, so a millisecond value would
+	// otherwise search a window thousands of years in the future and come back
+	// empty, which looks exactly like a search that matched nothing.
+	maxPlausibleSearchTime = 100_000_000_000
 )
 
 // SearchMode declares how the caller intends to CONSUME a search. It is not a
@@ -203,6 +219,30 @@ func (r SearchRequest) resolveMode() SearchMode {
 		return SearchModeBatch
 	}
 	return *r.Mode
+}
+
+// validate rejects criteria the server would refuse, or would accept and then
+// answer with a result that cannot be right, before any request is sent.
+//
+// It checks only the fields every search needs: a query, and a time range in
+// Unix seconds that is not inverted. Stream and Mode are deliberately left to
+// the server, which owns their value sets: a value added server-side has to be
+// able to reach it rather than be refused by an older client.
+func (r SearchRequest) validate() error {
+	if strings.TrimSpace(r.Query) == "" {
+		return fmt.Errorf("invalid search request: a query is required")
+	}
+	if r.StartTime < 0 || r.EndTime < 0 {
+		return fmt.Errorf("invalid search request: times cannot be negative (start %d, end %d)", r.StartTime, r.EndTime)
+	}
+	if r.StartTime > maxPlausibleSearchTime || r.EndTime > maxPlausibleSearchTime {
+		return fmt.Errorf("invalid search request: start %d or end %d is not a time in Unix seconds; "+
+			"a millisecond timestamp must be divided by 1000", r.StartTime, r.EndTime)
+	}
+	if r.EndTime < r.StartTime {
+		return fmt.Errorf("invalid search request: end %d is before start %d", r.EndTime, r.StartTime)
+	}
+	return nil
 }
 
 // searchSubmitBody is the wire form of a POST /v1/search body.
@@ -388,6 +428,10 @@ type SearchValidation struct {
 
 // SearchExecuteOptions tunes how pages are polled and observed. The zero value
 // is usable and applies the defaults described on each field.
+//
+// The callbacks run synchronously on the goroutine that called ExecuteSearch,
+// so they need no locking of their own against it. A callback that panics
+// propagates the panic to that caller, after the search has been released.
 type SearchExecuteOptions struct {
 	// MaxPollAttempts bounds how many times a single page is polled before the
 	// call gives up. Defaults to 3600, about an hour per page at the server's
@@ -395,12 +439,15 @@ type SearchExecuteOptions struct {
 	// time budget belongs on the context.
 	MaxPollAttempts int
 	// PollInterval is the floor under the server's suggested poll delay. The
-	// server's suggestion governs whenever it is larger. Defaults to 500ms.
+	// server's suggestion governs whenever it is larger, up to a ceiling of one
+	// minute. Defaults to 500ms.
 	PollInterval time.Duration
 	// OnQueryInitiated, when set, is called by ExecuteSearch with the query id
 	// as soon as the submission is accepted and before any page is fetched.
 	// It is the hook for persisting the id, which is what makes a search
-	// resumable or cancellable after the calling process is gone.
+	// resumable or cancellable after the calling process is gone. The search is
+	// already covered by ExecuteSearch's release by then, so a callback that
+	// panics or exits its goroutine does not leave it running.
 	OnQueryInitiated func(queryID string)
 	// OnPageCompleted, when set, is called by ExecuteSearch once per completed
 	// page with the 1-based page number and that page's continuation token,
@@ -432,6 +479,10 @@ type SearchPageHandler func(page *SearchPoll) (keepGoing bool, err error)
 // ExecuteSearch to do both. Mode, stream and pagination are fixed by this call
 // for the whole search.
 //
+// Criteria that cannot describe a search (an empty query, a negative or
+// inverted time range, or a time in milliseconds rather than seconds) are
+// rejected before anything is sent, so no search is started for them.
+//
 // A submission that fails may still have started a search, because the failure
 // can happen after the server accepted it. The SDK's shared request layer
 // retries a 5xx, a 504 or a transport error, so one call can also start more
@@ -453,6 +504,9 @@ func (org *Organization) InitiateSearch(req SearchRequest) (string, error) {
 // InitiateSearchWithContext is InitiateSearch with a context for cancellation
 // and deadlines.
 func (org *Organization) InitiateSearchWithContext(ctx context.Context, req SearchRequest) (string, error) {
+	if err := req.validate(); err != nil {
+		return "", err
+	}
 	root, err := org.getServiceRoot("search")
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve search service root: %w", err)
@@ -495,8 +549,9 @@ func (org *Organization) PollSearch(queryID, token string) (*SearchPoll, error) 
 // PollSearchWithContext is PollSearch with a context for cancellation and
 // deadlines.
 func (org *Organization) PollSearchWithContext(ctx context.Context, queryID, token string) (*SearchPoll, error) {
-	if queryID == "" {
-		return nil, fmt.Errorf("a query id is required to poll a search")
+	path, err := searchQueryPath(queryID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot poll search: %w", err)
 	}
 	root, err := org.getServiceRoot("search")
 	if err != nil {
@@ -510,7 +565,7 @@ func (org *Organization) PollSearchWithContext(ctx context.Context, queryID, tok
 	if token != "" {
 		restReq = restReq.withQueryData(Dict{"token": token})
 	}
-	if err := org.client.reliableRequest(ctx, http.MethodGet, searchQueryPath(queryID), restReq); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodGet, path, restReq); err != nil {
 		return nil, fmt.Errorf("failed to poll search %s: %w", queryID, err)
 	}
 	return &resp, nil
@@ -524,11 +579,12 @@ func (org *Organization) PollSearchWithContext(ctx context.Context, queryID, tok
 //
 // Only the polling fields of opts are used. A search error reported in the
 // page body is returned as an error, so a non-nil page is always a page that
-// ran.
+// ran. When ctx ends first, the returned error satisfies errors.Is(err,
+// ctx.Err()).
 func (org *Organization) FetchSearchPage(ctx context.Context, queryID, token string, opts SearchExecuteOptions) (*SearchPoll, error) {
 	opts = opts.withDefaults()
 
-	for attempt := 0; attempt < opts.MaxPollAttempts; attempt++ {
+	for attempt := 1; ; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -542,19 +598,38 @@ func (org *Organization) FetchSearchPage(ctx context.Context, queryID, token str
 		if page.Completed {
 			return page, nil
 		}
-
-		wait := time.Duration(page.NextPollInMs) * time.Millisecond
-		if wait <= 0 {
-			wait = fallbackSearchPollInterval
+		// Checked before waiting, so the last allowed poll is not followed by
+		// a wait whose only outcome is the error below.
+		if attempt >= opts.MaxPollAttempts {
+			return nil, fmt.Errorf("search %s did not produce a page within %d polls", queryID, opts.MaxPollAttempts)
 		}
-		if wait < opts.PollInterval {
-			wait = opts.PollInterval
-		}
-		if err := waitForRetry(ctx, wait); err != nil {
+		if err := waitForRetry(ctx, searchPollDelay(page.NextPollInMs, opts.PollInterval)); err != nil {
 			return nil, err
 		}
 	}
-	return nil, fmt.Errorf("search %s did not produce a page within %d polls", queryID, opts.MaxPollAttempts)
+}
+
+// searchPollDelay turns the server's suggested delay into the wait before the
+// next poll: the suggestion, or fallbackSearchPollInterval when there is none,
+// capped at maxSearchPollInterval, and never below the caller's floor.
+//
+// The suggestion is compared in milliseconds before it is converted, because
+// converting an arbitrary int64 of milliseconds to a Duration can overflow
+// into a negative or a wrong positive value.
+func searchPollDelay(nextPollInMs int64, floor time.Duration) time.Duration {
+	var wait time.Duration
+	switch {
+	case nextPollInMs <= 0:
+		wait = fallbackSearchPollInterval
+	case nextPollInMs >= maxSearchPollInterval.Milliseconds():
+		wait = maxSearchPollInterval
+	default:
+		wait = time.Duration(nextPollInMs) * time.Millisecond
+	}
+	if wait < floor {
+		wait = floor
+	}
+	return wait
 }
 
 // ExecuteSearch runs a whole search: it submits the criteria, fetches every
@@ -562,12 +637,19 @@ func (org *Organization) FetchSearchPage(ctx context.Context, queryID, token str
 //
 // It returns nil once a page comes back with no continuation token, or once
 // handler asks to stop. A handler that returns an error aborts the search with
-// that error. If ctx is cancelled, ctx.Err() is returned.
+// that error, unwrapped. If ctx ends first, the returned error satisfies
+// errors.Is(err, ctx.Err()).
+//
+// A completed page whose continuation token is the one it was fetched with is
+// reported as an error after the page is handed to handler: following it would
+// fetch the same page forever.
 //
 // Whenever it returns before the search reached its last page - the handler
-// stopped or failed, a page failed, ctx was cancelled - the search is
-// cancelled server-side on a best-effort basis, so it stops holding a
-// concurrency slot rather than running on unread. A search that ran to its
+// stopped, failed or panicked, a callback panicked, a page failed, the poll
+// bound was reached, ctx ended - the search is cancelled server-side on a
+// best-effort basis, so it stops holding a concurrency slot rather than running
+// on unread. The cancel runs on a context of its own, bounded at five seconds,
+// that keeps ctx's values but not its cancellation. A search that ran to its
 // last page is left alone, since the server has already finished it.
 //
 // Mode and pagination travel with the submission only. Continuation requests
@@ -600,19 +682,21 @@ func (org *Organization) ExecuteSearch(ctx context.Context, req SearchRequest, o
 	if err != nil {
 		return err
 	}
-	if opts.OnQueryInitiated != nil {
-		opts.OnQueryInitiated(queryID)
-	}
 
-	// Deferred rather than called at each early return, so a handler that
-	// exits through runtime.Goexit (t.FailNow in a test) still releases the
-	// search.
+	// Deferred rather than called at each early return, so a callback that
+	// panics or exits through runtime.Goexit (t.FailNow in a test) still
+	// releases the search. Registered before the first callback runs, for the
+	// same reason.
 	finished := false
 	defer func() {
 		if !finished {
-			org.cancelSearchBestEffort(queryID)
+			org.cancelSearchBestEffort(ctx, queryID)
 		}
 	}()
+
+	if opts.OnQueryInitiated != nil {
+		opts.OnQueryInitiated(queryID)
+	}
 
 	token := ""
 	for pageNumber := 1; ; pageNumber++ {
@@ -636,6 +720,10 @@ func (org *Organization) ExecuteSearch(ctx context.Context, req SearchRequest, o
 		if !keepGoing || nextToken == "" {
 			return nil
 		}
+		if nextToken == token {
+			return fmt.Errorf("search %s answered page %d with the continuation token it was fetched with; "+
+				"stopping rather than fetching the same page again", queryID, pageNumber)
+		}
 		token = nextToken
 	}
 }
@@ -643,8 +731,11 @@ func (org *Organization) ExecuteSearch(ctx context.Context, req SearchRequest, o
 // CancelSearch asks the server to stop a search and release the concurrency
 // slot it holds.
 //
-// Cancelling a search that has already finished or expired is not an error
-// worth acting on: the outcome the caller wanted is the outcome either way.
+// A search that has already finished or expired is gone, and the server
+// answers 404 for it as it does for an id it never issued. That comes back as
+// an error carrying the status: errors.As with a RESTError and its StatusCode
+// gives http.StatusNotFound. A caller that only wants the search stopped can
+// treat that status as done.
 func (org *Organization) CancelSearch(queryID string) error {
 	return org.CancelSearchWithContext(context.Background(), queryID)
 }
@@ -652,27 +743,30 @@ func (org *Organization) CancelSearch(queryID string) error {
 // CancelSearchWithContext is CancelSearch with a context for cancellation and
 // deadlines.
 func (org *Organization) CancelSearchWithContext(ctx context.Context, queryID string) error {
-	if queryID == "" {
-		return fmt.Errorf("a query id is required to cancel a search")
+	path, err := searchQueryPath(queryID)
+	if err != nil {
+		return fmt.Errorf("cannot cancel search: %w", err)
 	}
 	root, err := org.getServiceRoot("search")
 	if err != nil {
 		return fmt.Errorf("failed to resolve search service root: %w", err)
 	}
 	restReq := makeDefaultRequest(nil).withURLRoot(root).withTimeout(searchRequestTimeout)
-	if err := org.client.reliableRequest(ctx, http.MethodDelete, searchQueryPath(queryID), restReq); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodDelete, path, restReq); err != nil {
 		return fmt.Errorf("failed to cancel search %s: %w", queryID, err)
 	}
 	return nil
 }
 
-// cancelSearchBestEffort tells the server to stop a search on a context of its
-// own, because the caller's may already be cancelled and would refuse the
-// call.
+// cancelSearchBestEffort tells the server to stop a search. It runs on a
+// context detached from parent's cancellation, because parent may already be
+// done and would refuse the call, while keeping parent's values for anything
+// that reads them; cancelSearchTimeout bounds it instead.
+//
 // The outcome is deliberately discarded: the decision to stop has been made,
 // and failing to deliver it changes nothing the caller can act on.
-func (org *Organization) cancelSearchBestEffort(queryID string) {
-	ctx, cancel := context.WithTimeout(context.Background(), cancelSearchTimeout)
+func (org *Organization) cancelSearchBestEffort(parent context.Context, queryID string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), cancelSearchTimeout)
 	defer cancel()
 	_ = org.CancelSearchWithContext(ctx, queryID)
 }
@@ -685,7 +779,10 @@ func (org *Organization) cancelSearchBestEffort(queryID string) {
 //
 // A query the server rejects comes back as a SearchValidation with Error set,
 // not as a call failure: the returned error is for a validation that could not
-// be performed at all.
+// be performed at all. That includes criteria InitiateSearch would refuse
+// before sending (an empty query, a negative, inverted or millisecond time
+// range), which the server also answers with an error status rather than a
+// judgement of the query.
 func (org *Organization) ValidateSearch(req SearchRequest) (*SearchValidation, error) {
 	return org.ValidateSearchWithContext(context.Background(), req)
 }
@@ -693,6 +790,9 @@ func (org *Organization) ValidateSearch(req SearchRequest) (*SearchValidation, e
 // ValidateSearchWithContext is ValidateSearch with a context for cancellation
 // and deadlines.
 func (org *Organization) ValidateSearchWithContext(ctx context.Context, req SearchRequest) (*SearchValidation, error) {
+	if err := req.validate(); err != nil {
+		return nil, err
+	}
 	root, err := org.getServiceRoot("search")
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve search service root: %w", err)
@@ -713,9 +813,22 @@ func (org *Organization) ValidateSearchWithContext(ctx context.Context, req Sear
 	return &resp, nil
 }
 
-// searchQueryPath is the path of one search. The id is escaped as a single
-// path segment because a caller may hand in one it stored, and an id holding
-// a "/" or "?" must not address a different endpoint on the search host.
-func searchQueryPath(queryID string) string {
-	return "/v1/search/" + url.PathEscape(queryID)
+// searchQueryPath is the path of one search. A caller may hand in an id it
+// stored, so the id must address that search and nothing else on the search
+// host.
+//
+// url.PathEscape keeps it to one segment: a "/", "?" or "#" in it is escaped
+// rather than starting a new segment, a query string or a fragment. What
+// escaping cannot do is stop "." and ".." from being dot-segments, which URL
+// normalization (RFC 3986 section 5.2.4) resolves against the path, turning
+// "/v1/search/.." into "/v1/". Those two, and the empty id that would address
+// the collection, are refused instead. No server-issued id takes either form.
+func searchQueryPath(queryID string) (string, error) {
+	switch queryID {
+	case "":
+		return "", fmt.Errorf("a query id is required")
+	case ".", "..":
+		return "", fmt.Errorf("query id %q is not a valid path segment", queryID)
+	}
+	return "/v1/search/" + url.PathEscape(queryID), nil
 }
