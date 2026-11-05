@@ -13,8 +13,7 @@ package limacharlie
 // alone, deliberately. The rest of this package's credential-gated tests run
 // wherever _OID and _KEY happen to be set. These also start real searches,
 // which take a concurrency slot and are billed, and they need an organization
-// with telemetry in the last day. Setting the variable is what says both are
-// intended.
+// with recent telemetry. Setting the variable is what says both are intended.
 //
 // To run them:
 //
@@ -25,18 +24,27 @@ package limacharlie
 //
 // Optional knobs, both with defaults that keep a run small:
 //
-//	LC_SEARCH_E2E_LOOKBACK_HOURS   how far back to search (default 24)
+//	LC_SEARCH_E2E_LOOKBACK_HOURS   how far back to search (default 2)
 //	LC_SEARCH_E2E_MAX_PAGES        pages to walk before stopping (default 3)
 //
-// Widen the lookback on a quiet organization to get past a single page, and
-// narrow it on a busy one to keep the scan cheap. Every search these tests
-// start is cancelled server-side when they stop early, so none is left holding
-// a concurrency slot.
+// Cost and time. Every window is as small as its assertion needs: two hours
+// for the tests that need one page with rows, and one settled hour for the
+// cross-mode comparison. The tests run in parallel with each other (t.Parallel)
+// and share one Organization, built and authenticated once. The number of
+// searches in flight at once is bounded by a semaphore sized from the
+// organization's own concurrency limit (GetSearchLimits), at half of it so a
+// concurrent build against the same organization still has room, and at most
+// searchE2EMaxParallel; without that bound, parallel tests would be refused
+// with 429 and wait out the request layer's retry back-off instead of running.
+// Polling follows the server's advised cadence (FetchSearchPage); nothing here
+// sleeps for a fixed time.
 //
-// Each test's context ends before the test binary's own -timeout deadline, by
-// searchE2ECleanupMargin, so a slow search fails its test with a context error
-// and the cancel still runs, instead of the binary panicking with searches
-// left open. cloudbuild.yaml passes an explicit -timeout for the same reason.
+// Each search is bounded by searchE2EBudget, and every context also ends
+// searchE2ECleanupMargin before the test binary's -timeout deadline, so a slow
+// or hung search fails its test with a context error while the server-side
+// cancel still runs, instead of the binary panicking with searches left open.
+// Every search these tests start is cancelled server-side when they stop
+// early, so none is left holding a concurrency slot.
 //
 // A window with no events is not a failure: the tests that need rows skip,
 // saying so, because which organization CI points at and how busy it is are
@@ -52,9 +60,12 @@ package limacharlie
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -68,12 +79,13 @@ const (
 	searchE2ELookbackEnv = "LC_SEARCH_E2E_LOOKBACK_HOURS"
 	searchE2EMaxPagesEnv = "LC_SEARCH_E2E_MAX_PAGES"
 
-	defaultSearchE2ELookbackHours = 24
+	defaultSearchE2ELookbackHours = 2
 	defaultSearchE2EMaxPages      = 3
 
-	// searchE2EBudget bounds one search. A live page can take minutes on a
-	// broad query, and the point of the bound is to fail rather than hang.
-	searchE2EBudget = 3 * time.Minute
+	// searchE2EBudget bounds one search. A first page over these windows
+	// takes seconds; the bound is there so a hang fails fast rather than
+	// eating the build's time.
+	searchE2EBudget = 90 * time.Second
 
 	// searchE2ECleanupMargin is how long before the test binary's deadline a
 	// test's context ends, which leaves time for the server-side cancel.
@@ -81,6 +93,10 @@ const (
 
 	// searchE2ECancelBudget bounds the cancel a test issues while cleaning up.
 	searchE2ECancelBudget = 15 * time.Second
+
+	// searchE2EMaxParallel caps how many searches these tests run at once,
+	// whatever the organization's limit allows.
+	searchE2EMaxParallel = 4
 
 	// searchE2EQuery matches everything in the window, which is what gives a
 	// paginated search the best chance of producing more than one page.
@@ -100,44 +116,85 @@ var knownAppliedSearchModes = map[SearchMode]struct{}{
 	SearchModeBatch:       {},
 }
 
-// newSearchE2EOrg returns an Organization pointed at a live deployment, or
-// skips the test.
+// searchE2EEnv is what every test in this file shares: one authenticated
+// Organization and the semaphore that bounds concurrent searches.
+type searchE2EEnv struct {
+	org *Organization
+	// slots holds one token per search allowed in flight.
+	slots chan struct{}
+}
+
+var (
+	searchE2EOnce   sync.Once
+	searchE2EShared *searchE2EEnv
+	searchE2EErr    error
+)
+
+// newSearchE2EEnv returns the shared environment, building it on first use,
+// or skips the test.
 //
 // It SKIPS rather than fails when the environment is absent. The shared
 // fixture in test_fixture.go calls FailNow for a missing _OID, which is why a
 // checkout without credentials reports failures rather than skips; these tests
 // must not add to that.
-func newSearchE2EOrg(t *testing.T) *Organization {
+//
+// The Organization is built once and authenticated by the GetSearchLimits
+// call that sizes the semaphore, so the parallel tests start with a JWT in
+// place rather than each exchanging the API key.
+func newSearchE2EEnv(t *testing.T) *searchE2EEnv {
 	t.Helper()
 
 	if os.Getenv(searchE2EGateEnv) == "" {
-		t.Skipf("skipping Search API end-to-end test: set %s=1, plus _OID and _KEY for a live organization with telemetry "+
-			"in the last day, to run it. It is opt-in rather than credential-gated because it starts real, billed searches.",
+		t.Skipf("skipping Search API end-to-end test: set %s=1, plus _OID and _KEY for a live organization with recent "+
+			"telemetry, to run it. It is opt-in rather than credential-gated because it starts real, billed searches.",
 			searchE2EGateEnv)
 	}
-
 	oid, key := os.Getenv("_OID"), os.Getenv("_KEY")
 	if oid == "" || key == "" {
 		t.Skipf("skipping Search API end-to-end test: %s is set but _OID and/or _KEY are not, and both are needed to "+
 			"authenticate against a live organization.", searchE2EGateEnv)
 	}
 
-	org, err := NewOrganizationFromClientOptions(ClientOptions{OID: oid, APIKey: key}, &LCLoggerGCP{})
-	require.NoError(t, err, "could not build an organization from _OID and _KEY")
-	return org
+	searchE2EOnce.Do(func() {
+		org, err := NewOrganizationFromClientOptions(ClientOptions{OID: oid, APIKey: key}, &LCLoggerGCP{})
+		if err != nil {
+			searchE2EErr = err
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), searchE2ECancelBudget)
+		defer cancel()
+		parallel := 1
+		if limits, err := org.GetSearchLimitsWithContext(ctx); err == nil {
+			parallel = limits.Concurrency.MaxConcurrentQueries / 2
+		} else {
+			// Serial is always safe; the limit only decides how much faster
+			// than serial the run may go.
+			t.Logf("could not read the organization's search limits, running searches one at a time: %v", err)
+		}
+		if parallel < 1 {
+			parallel = 1
+		}
+		if parallel > searchE2EMaxParallel {
+			parallel = searchE2EMaxParallel
+		}
+		t.Logf("running up to %d search(es) at once", parallel)
+		searchE2EShared = &searchE2EEnv{org: org, slots: make(chan struct{}, parallel)}
+	})
+	require.NoError(t, searchE2EErr, "could not build an organization from _OID and _KEY")
+	return searchE2EShared
 }
 
-// searchE2EEnvInt reads a positive integer knob, falling back to its default.
-func searchE2EEnvInt(t *testing.T, name string, fallback int) int {
+// acquire takes a search slot, or fails the test if ctx ends first. The
+// returned func gives it back and is safe to call more than once.
+func (e *searchE2EEnv) acquire(t *testing.T, ctx context.Context) (release func()) {
 	t.Helper()
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
+	select {
+	case e.slots <- struct{}{}:
+	case <-ctx.Done():
+		require.NoError(t, ctx.Err(), "timed out waiting for a search slot")
 	}
-	v, err := strconv.Atoi(raw)
-	require.NoError(t, err, "%s must be an integer, got %q", name, raw)
-	require.Greater(t, v, 0, "%s must be positive", name)
-	return v
+	var once sync.Once
+	return func() { once.Do(func() { <-e.slots }) }
 }
 
 // searchE2EContext returns a context for one search: searchE2EBudget long, but
@@ -174,6 +231,19 @@ func pageEventRows(page *SearchPoll) int {
 		}
 	}
 	return rows
+}
+
+// searchE2EEnvInt reads a positive integer knob, falling back to its default.
+func searchE2EEnvInt(t *testing.T, name string, fallback int) int {
+	t.Helper()
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(raw)
+	require.NoError(t, err, "%s must be an integer, got %q", name, raw)
+	require.Greater(t, v, 0, "%s must be positive", name)
+	return v
 }
 
 // searchE2EWindow returns the time range to search, ending now.
@@ -256,19 +326,26 @@ func requireWholeRows(t *testing.T, page *SearchPoll) int {
 }
 
 // runSearchE2EFirstPage submits a paginated search and returns its first
-// completed page, cancelling the search afterwards so it does not sit holding
-// a concurrency slot for the rest of its life.
-func runSearchE2EFirstPage(t *testing.T, org *Organization, req SearchRequest) *SearchPoll {
+// completed page. The search holds a slot from submission until it is
+// cancelled in the test's cleanup, so it does not sit holding a concurrency
+// slot for the rest of its life.
+func runSearchE2EFirstPage(t *testing.T, env *searchE2EEnv, req SearchRequest) *SearchPoll {
 	t.Helper()
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
 
-	queryID, err := org.InitiateSearchWithContext(ctx, req)
+	release := env.acquire(t, ctx)
+	queryID, err := env.org.InitiateSearchWithContext(ctx, req)
+	if err != nil {
+		release()
+	}
 	require.NoError(t, err, "submitting the search failed")
 	require.NotEmpty(t, queryID)
-	t.Cleanup(func() { cancelSearchE2E(t, org, queryID) })
+	// Cleanups run last-in first-out: cancel, then give the slot back.
+	t.Cleanup(release)
+	t.Cleanup(func() { cancelSearchE2E(t, env.org, queryID) })
 
-	page, err := org.FetchSearchPage(ctx, queryID, "", SearchExecuteOptions{})
+	page, err := env.org.FetchSearchPage(ctx, queryID, "", SearchExecuteOptions{})
 	require.NoError(t, err, "fetching the first page failed")
 	require.True(t, page.Completed)
 	if page.Partial != nil {
@@ -277,75 +354,58 @@ func runSearchE2EFirstPage(t *testing.T, org *Organization, req SearchRequest) *
 	return page
 }
 
-// TestSearchE2EDefaultModeIsApplied is the one that matters most: it proves the
-// mode this SDK fills in for a caller who sets none reaches a real server and
-// comes back applied, rather than being silently dropped somewhere in between.
-func TestSearchE2EDefaultModeIsApplied(t *testing.T) {
-	org := newSearchE2EOrg(t)
-	start, end := searchE2EWindow(t)
-
-	// No mode set, which is what most callers will do and what submits batch.
-	page := runSearchE2EFirstPage(t, org, SearchRequest{
-		Query:     searchE2EQuery,
-		StartTime: start,
-		EndTime:   end,
-	})
-
-	mode := requireAppliedSearchMode(t, page)
-	t.Logf("submitted no mode (so %q went on the wire), page ran as %q", SearchModeBatch, mode)
-}
-
-// TestSearchE2EInteractiveModeIsApplied submits the other mode explicitly and
-// asserts a page still reports what it ran as.
+// TestSearchE2EFirstPageReportsAppliedMode submits one search per way of
+// setting the mode and asserts each first page reports a mode it ran as. The
+// three are independent and run in parallel.
 //
-// It does not assert that the answer is interactive. The server decides, and
-// this test does not control the organization's configuration.
-func TestSearchE2EInteractiveModeIsApplied(t *testing.T) {
-	org := newSearchE2EOrg(t)
+// It does not assert that the answer equals what was requested: the server
+// decides, and this test does not control the organization's configuration.
+func TestSearchE2EFirstPageReportsAppliedMode(t *testing.T) {
+	t.Parallel()
+	env := newSearchE2EEnv(t)
 	start, end := searchE2EWindow(t)
+	base := SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end}
 
-	page := runSearchE2EFirstPage(t, org, SearchRequest{
-		Query:     searchE2EQuery,
-		StartTime: start,
-		EndTime:   end,
-	}.WithMode(SearchModeInteractive))
+	// The one that matters most: the mode this SDK fills in for a caller who
+	// sets none reaches a real server and comes back applied. The same page
+	// is a paginated one, so it must also report the two limits that decide
+	// where it stopped; they are only meaningful together with the mode.
+	t.Run("unset mode submits batch", func(t *testing.T) {
+		t.Parallel()
+		page := runSearchE2EFirstPage(t, env, base)
+		mode := requireAppliedSearchMode(t, page)
 
-	mode := requireAppliedSearchMode(t, page)
-	t.Logf("submitted %q, page ran as %q", SearchModeInteractive, mode)
-}
-
-// TestSearchE2EPaginatedPageReportsItsLimits asserts a paginated page reports
-// the two limits that decide where it stopped, alongside the mode.
-//
-// These are the three fields a client needs to explain a page that came back
-// smaller than expected, and they are only meaningful together.
-func TestSearchE2EPaginatedPageReportsItsLimits(t *testing.T) {
-	org := newSearchE2EOrg(t)
-	start, end := searchE2EWindow(t)
-
-	page := runSearchE2EFirstPage(t, org, SearchRequest{
-		Query:     searchE2EQuery,
-		StartTime: start,
-		EndTime:   end,
-	})
-
-	// Asserted first, because it is what skips a window with no events.
-	mode := requireAppliedSearchMode(t, page)
-	require.NotEmpty(t, page.Results, "a completed page should carry at least one result item")
-
-	var stats SearchStats
-	for _, item := range page.Results {
-		if item.Stats.SearchMode != "" {
-			stats = item.Stats
-			break
+		var stats SearchStats
+		for _, item := range page.Results {
+			if item.Stats.SearchMode != "" {
+				stats = item.Stats
+				break
+			}
 		}
-	}
-	require.Greater(t, stats.PageSize, int64(0),
-		"a paginated page must report the event count it was allowed to return in stats.pageSize")
-	require.Greater(t, stats.PaginatedByteCap, int64(0),
-		"a paginated page must report the byte ceiling it was allowed to return in stats.paginatedByteCap")
-	t.Logf("applied mode %q, pageSize %d, paginatedByteCap %d, eventsScanned %d",
-		mode, stats.PageSize, stats.PaginatedByteCap, stats.EventsScanned)
+		require.Greater(t, stats.PageSize, int64(0),
+			"a paginated page must report the event count it was allowed to return in stats.pageSize")
+		require.Greater(t, stats.PaginatedByteCap, int64(0),
+			"a paginated page must report the byte ceiling it was allowed to return in stats.paginatedByteCap")
+		t.Logf("submitted no mode (so %q went on the wire), page ran as %q; pageSize %d, paginatedByteCap %d, "+
+			"eventsScanned %d", SearchModeBatch, mode, stats.PageSize, stats.PaginatedByteCap, stats.EventsScanned)
+	})
+
+	t.Run("explicit interactive", func(t *testing.T) {
+		t.Parallel()
+		page := runSearchE2EFirstPage(t, env, base.WithMode(SearchModeInteractive))
+		mode := requireAppliedSearchMode(t, page)
+		t.Logf("submitted %q, page ran as %q", SearchModeInteractive, mode)
+	})
+
+	// No mode key at all, the request an SDK without the field would send.
+	// Which mode applies is the organization's configuration to decide, so it
+	// is logged rather than asserted.
+	t.Run("without mode leaves it to the organization", func(t *testing.T) {
+		t.Parallel()
+		page := runSearchE2EFirstPage(t, env, base.WithoutMode())
+		mode := requireAppliedSearchMode(t, page)
+		t.Logf("submitted no mode key, page ran as %q", mode)
+	})
 }
 
 // TestSearchE2EPaginationIsConsistentAcrossPages walks a paginated search and
@@ -361,12 +421,15 @@ func TestSearchE2EPaginatedPageReportsItsLimits(t *testing.T) {
 // than silently passing as if it had. Widen LC_SEARCH_E2E_LOOKBACK_HOURS to
 // get past a single page.
 func TestSearchE2EPaginationIsConsistentAcrossPages(t *testing.T) {
-	org := newSearchE2EOrg(t)
+	t.Parallel()
+	env := newSearchE2EEnv(t)
 	start, end := searchE2EWindow(t)
 	maxPages := searchE2EEnvInt(t, searchE2EMaxPagesEnv, defaultSearchE2EMaxPages)
 
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
+	release := env.acquire(t, ctx)
+	defer release()
 
 	pages, rows := 0, 0
 	firstMode := SearchMode("")
@@ -375,7 +438,7 @@ func TestSearchE2EPaginationIsConsistentAcrossPages(t *testing.T) {
 	// Stopping at the page cap leaves pages unread, and ExecuteSearch
 	// releases the search itself when that happens, including when an
 	// assertion below stops the test inside the handler.
-	err := org.ExecuteSearch(ctx, SearchRequest{
+	err := env.org.ExecuteSearch(ctx, SearchRequest{
 		Query:     searchE2EQuery,
 		StartTime: start,
 		EndTime:   end,
@@ -410,26 +473,35 @@ func TestSearchE2EPaginationIsConsistentAcrossPages(t *testing.T) {
 	t.Logf("walked %d page(s) as %q, %d row(s), reached the end: %v", pages, firstMode, rows, reachedEnd)
 }
 
-// searchE2ESettledWindow is a two-hour window that ended a day ago. Two
+// searchE2ESettledWindow is a one-hour window that ended a day ago. Two
 // searches over it see the same data: telemetry that arrives late, such as a
 // sensor uploading what it buffered while offline, has had a day to land, so it
 // cannot reach one run and not the other, which is what a test comparing two
 // runs needs.
 func searchE2ESettledWindow() (start, end int64) {
 	settled := time.Now().Add(-24 * time.Hour)
-	return settled.Add(-2 * time.Hour).Unix(), settled.Unix()
+	return settled.Add(-time.Hour).Unix(), settled.Unix()
+}
+
+// searchE2ERows is what one cross-mode run collected.
+type searchE2ERows struct {
+	rows       []string
+	reachedEnd bool
 }
 
 // collectSearchE2ERows runs one search to the end, or until it has returned
 // maxRows rows, and returns every event row it delivered, each serialized so
 // two runs can be compared exactly. reachedEnd reports whether the search
 // finished rather than being stopped at the cap.
-func collectSearchE2ERows(t *testing.T, org *Organization, req SearchRequest, maxRows int) (rows []string, reachedEnd bool) {
+func collectSearchE2ERows(t *testing.T, env *searchE2EEnv, req SearchRequest, maxRows int) searchE2ERows {
 	t.Helper()
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
+	release := env.acquire(t, ctx)
+	defer release()
 
-	err := org.ExecuteSearch(ctx, req, SearchExecuteOptions{}, func(page *SearchPoll) (bool, error) {
+	var out searchE2ERows
+	err := env.org.ExecuteSearch(ctx, req, SearchExecuteOptions{}, func(page *SearchPoll) (bool, error) {
 		for _, item := range page.Results {
 			if item.Type != "events" {
 				continue
@@ -437,21 +509,21 @@ func collectSearchE2ERows(t *testing.T, org *Organization, req SearchRequest, ma
 			for _, row := range item.Rows {
 				b, err := json.Marshal(row)
 				require.NoError(t, err)
-				rows = append(rows, string(b))
+				out.rows = append(out.rows, string(b))
 			}
 		}
 		if page.NextToken() == "" {
-			reachedEnd = true
+			out.reachedEnd = true
 		}
-		return len(rows) < maxRows, nil
+		return len(out.rows) < maxRows, nil
 	})
 	require.NoError(t, err)
-	return rows, reachedEnd
+	return out
 }
 
 // TestSearchE2EBothModesReturnTheSameRows asserts the property the mode rests
 // on: it moves where one page ends and the next begins, never which rows come
-// back.
+// back. The two runs are independent and execute in parallel.
 //
 // The two result sets are compared as multisets, each row serialized whole.
 // Order is deliberately not compared: events that share a timestamp have no
@@ -463,69 +535,71 @@ func collectSearchE2ERows(t *testing.T, org *Organization, req SearchRequest, ma
 // when either run is cut off the test skips, saying so, rather than comparing
 // two prefixes that need not match.
 func TestSearchE2EBothModesReturnTheSameRows(t *testing.T) {
-	org := newSearchE2EOrg(t)
+	t.Parallel()
+	env := newSearchE2EEnv(t)
 	start, end := searchE2ESettledWindow()
 	const maxRows = 5000
 	req := SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end}
 
-	batch, batchEnd := collectSearchE2ERows(t, org, req.WithMode(SearchModeBatch), maxRows)
-	interactive, interactiveEnd := collectSearchE2ERows(t, org, req.WithMode(SearchModeInteractive), maxRows)
-	if len(batch) == 0 && len(interactive) == 0 {
+	var batch, interactive searchE2ERows
+	// The group returns once both parallel subtests have finished.
+	t.Run("collect", func(t *testing.T) {
+		t.Run("batch", func(t *testing.T) {
+			t.Parallel()
+			batch = collectSearchE2ERows(t, env, req.WithMode(SearchModeBatch), maxRows)
+		})
+		t.Run("interactive", func(t *testing.T) {
+			t.Parallel()
+			interactive = collectSearchE2ERows(t, env, req.WithMode(SearchModeInteractive), maxRows)
+		})
+	})
+	if t.Failed() {
+		return
+	}
+
+	if len(batch.rows) == 0 && len(interactive.rows) == 0 {
 		t.Skipf("the settled window holds no events for this organization, so there is nothing to compare")
 	}
-	if !batchEnd || !interactiveEnd {
+	if !batch.reachedEnd || !interactive.reachedEnd {
 		t.Skipf("the settled window holds more than %d events (batch reached the end: %v, interactive: %v), so "+
 			"neither run holds a complete result set to compare; point the test at a quieter organization",
-			maxRows, batchEnd, interactiveEnd)
+			maxRows, batch.reachedEnd, interactive.reachedEnd)
 	}
 
-	require.Equal(t, len(batch), len(interactive),
+	require.Equal(t, len(batch.rows), len(interactive.rows),
 		"the two modes returned a different number of rows for the same settled window")
-	sort.Strings(batch)
-	sort.Strings(interactive)
-	for i := range batch {
-		require.Equal(t, batch[i], interactive[i],
+	sort.Strings(batch.rows)
+	sort.Strings(interactive.rows)
+	for i := range batch.rows {
+		require.Equal(t, batch.rows[i], interactive.rows[i],
 			"the two modes returned different rows for the same settled window; first difference in sorted position %d", i)
 	}
-	t.Logf("compared %d row(s) as multisets; both runs reached the end", len(batch))
-}
-
-// TestSearchE2EWithoutModeLeavesItToTheOrganization sends no mode key at all,
-// the request an SDK without the field would send, and asserts a page still
-// reports a mode it ran as. Which one is the organization's configuration to
-// decide, so it is logged rather than asserted.
-func TestSearchE2EWithoutModeLeavesItToTheOrganization(t *testing.T) {
-	org := newSearchE2EOrg(t)
-	start, end := searchE2EWindow(t)
-
-	page := runSearchE2EFirstPage(t, org, SearchRequest{
-		Query:     searchE2EQuery,
-		StartTime: start,
-		EndTime:   end,
-	}.WithoutMode())
-
-	mode := requireAppliedSearchMode(t, page)
-	t.Logf("submitted no mode key, page ran as %q", mode)
+	t.Logf("compared %d row(s) as multisets; both runs reached the end", len(batch.rows))
 }
 
 // TestSearchE2EValidateReportsBothOutcomes asserts that validation reports a
 // good query as valid and a malformed one through the result's Error field,
 // not as a failed call: a caller must be able to show the reason to a user.
+// Validation runs no search and holds no slot, so the two cases run in
+// parallel without taking one.
 func TestSearchE2EValidateReportsBothOutcomes(t *testing.T) {
-	org := newSearchE2EOrg(t)
+	t.Parallel()
+	env := newSearchE2EEnv(t)
 	start, end := searchE2EWindow(t)
 
 	t.Run("valid query", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := searchE2EContext(t)
 		defer cancel()
-		v, err := org.ValidateSearchWithContext(ctx, SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end})
+		v, err := env.org.ValidateSearchWithContext(ctx, SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end})
 		require.NoError(t, err)
 		require.Empty(t, v.Error, "a valid query was reported invalid")
 	})
 	t.Run("malformed query", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := searchE2EContext(t)
 		defer cancel()
-		v, err := org.ValidateSearchWithContext(ctx, SearchRequest{Query: "* | * | event/FILE_PATH ==== (((", StartTime: start, EndTime: end})
+		v, err := env.org.ValidateSearchWithContext(ctx, SearchRequest{Query: "* | * | event/FILE_PATH ==== (((", StartTime: start, EndTime: end})
 		require.NoError(t, err, "a malformed query is a validation outcome, not a failed call")
 		require.NotEmpty(t, v.Error, "a malformed query was reported valid")
 		t.Logf("validation error: %s", v.Error)
@@ -533,22 +607,42 @@ func TestSearchE2EValidateReportsBothOutcomes(t *testing.T) {
 }
 
 // TestSearchE2ECancelEndsTheSearch asserts that a cancelled search is gone
-// server-side: it cannot be polled afterwards, so it holds no concurrency slot
-// and bills nothing further.
+// server-side: polling it fails with 404, so it holds no concurrency slot and
+// bills nothing further.
+//
+// The poll after the cancel is repeated with a short, bounded back-off rather
+// than asserted once, so a server that completes a cancel asynchronously is
+// not reported as a failure while the cancel is still landing.
 func TestSearchE2ECancelEndsTheSearch(t *testing.T) {
-	org := newSearchE2EOrg(t)
+	t.Parallel()
+	env := newSearchE2EEnv(t)
 	start, end := searchE2EWindow(t)
 
 	ctx, cancel := searchE2EContext(t)
 	defer cancel()
+	release := env.acquire(t, ctx)
+	defer release()
 
-	queryID, err := org.InitiateSearchWithContext(ctx, SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end})
+	queryID, err := env.org.InitiateSearchWithContext(ctx, SearchRequest{Query: searchE2EQuery, StartTime: start, EndTime: end})
 	require.NoError(t, err)
 	require.NotEmpty(t, queryID)
 
-	require.NoError(t, org.CancelSearchWithContext(ctx, queryID), "cancelling a running search failed")
+	require.NoError(t, env.org.CancelSearchWithContext(ctx, queryID), "cancelling a running search failed")
 
-	_, err = org.PollSearchWithContext(ctx, queryID, "")
-	require.Error(t, err, "a cancelled search could still be polled")
-	t.Logf("poll after cancel: %v", err)
+	pollCtx, pollCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer pollCancel()
+	delay := 250 * time.Millisecond
+	for attempt := 1; ; attempt++ {
+		_, err = env.org.PollSearchWithContext(pollCtx, queryID, "")
+		var restErr RESTError
+		if errors.As(err, &restErr) && restErr.StatusCode() == http.StatusNotFound {
+			t.Logf("poll %d after cancel: %v", attempt, err)
+			return
+		}
+		require.NoError(t, waitForRetry(pollCtx, delay),
+			"a cancelled search could still be polled 30s after the cancel; last poll error: %v", err)
+		if delay < 2*time.Second {
+			delay *= 2
+		}
+	}
 }
