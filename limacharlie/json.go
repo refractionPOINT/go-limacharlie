@@ -105,42 +105,35 @@ func unmarshalCleanJSONList(out []interface{}) error {
 	return nil
 }
 
+// unmarshalCleanJSONElement types a json.Number as the narrowest Go number that
+// holds it exactly: uint64 for a non-negative integer, int64 for a negative
+// one, and float64 for anything else. "Anything else" is a fraction, an
+// exponent (which is how encoders commonly write very small and very large
+// values, such as 1e-07), and an integer outside both 64-bit ranges, which a
+// float64 holds approximately rather than not at all. Only a value outside
+// float64's own range is an error, as it is for encoding/json.
 func unmarshalCleanJSONElement(out interface{}) (interface{}, error) {
-	if val, ok := out.(json.Number); ok {
-		// This is a Number, we need to check if it has
-		// a float component originally to see if we should
-		// type it as an int64 or a float64.
-		original := val.String()
-		if !strings.Contains(original, ".") {
-			// No dot component, return as uint64 so
-			// that it gets serialized back to a notation
-			// without a dot in it.
-			if !strings.HasPrefix(original, "-") {
-				// We cannot use val.Int64() because it does not
-				// support Unsigned 64 bit ints.
-				i, err := strconv.ParseUint(original, 10, 64)
-				if err != nil {
-					return nil, err
-				}
-				out = i
-			} else {
-				// Looks like a signed value.
-				i, err := val.Int64()
-				if err != nil {
-					return nil, err
-				}
-				out = i
+	val, ok := out.(json.Number)
+	if !ok {
+		return out, nil
+	}
+	original := val.String()
+	if !strings.ContainsAny(original, ".eE") {
+		if !strings.HasPrefix(original, "-") {
+			// val.Int64() cannot be used here because it does not support
+			// unsigned 64 bit ints.
+			if i, err := strconv.ParseUint(original, 10, 64); err == nil {
+				return i, nil
 			}
-		} else {
-			// There is a dot, assume a float.
-			i, err := val.Float64()
-			if err != nil {
-				return nil, err
-			}
-			out = i
+		} else if i, err := val.Int64(); err == nil {
+			return i, nil
 		}
 	}
-	return out, nil
+	f, err := val.Float64()
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func (d Dict) UnMarshalToStruct(out interface{}) error {
