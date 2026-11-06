@@ -66,6 +66,7 @@ var Platforms = struct {
 	Harmony                  uint32
 	ThreatLocker             uint32
 	HaloPSA                  uint32
+	Detonation               uint32
 }{
 	Windows:  0x10000000,
 	Linux:    0x20000000,
@@ -132,6 +133,7 @@ var Platforms = struct {
 	Harmony:                  0x31000000,
 	ThreatLocker:             0x32000000,
 	HaloPSA:                  0x33000000,
+	Detonation:               0x37000000,
 }
 
 var Architectures = struct {
@@ -224,6 +226,7 @@ var PlatformStrings = map[uint32]string{
 	Platforms.Harmony:                  "harmony",
 	Platforms.ThreatLocker:             "threatlocker",
 	Platforms.HaloPSA:                  "halopsa",
+	Platforms.Detonation:               "detonation",
 }
 
 var ArchitectureStrings = map[uint32]string{
@@ -306,6 +309,7 @@ var StringToPlatform = map[string]uint32{
 	"harmony":                      Platforms.Harmony,
 	"threatlocker":                 Platforms.ThreatLocker,
 	"halopsa":                      Platforms.HaloPSA,
+	"detonation":                   Platforms.Detonation,
 }
 
 var StringToArchitecture = map[string]uint32{
