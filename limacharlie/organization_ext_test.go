@@ -242,7 +242,10 @@ func TestAPIKeyLifecycle(t *testing.T) {
 	time.Sleep(2 * time.Second) // Give it a moment to propagate
 	keysAfterCreate, err := org.GetAPIKeys()
 	a.NoError(err)
-	a.Equal(initialCount+1, len(keysAfterCreate))
+	// The test org is shared with concurrently running test builds that
+	// create and delete their own keys, so the total count is not stable.
+	// Membership of this test's key is what proves the create.
+	t.Logf("API key count after create: %d", len(keysAfterCreate))
 
 	// Find our key in the list
 	found := false
@@ -270,7 +273,7 @@ func TestAPIKeyLifecycle(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	keysAfterDelete, err := org.GetAPIKeys()
 	a.NoError(err)
-	a.Equal(initialCount, len(keysAfterDelete))
+	t.Logf("API key count after delete: %d", len(keysAfterDelete))
 
 	// Verify our key is gone
 	for _, key := range keysAfterDelete {
