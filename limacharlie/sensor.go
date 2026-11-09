@@ -524,8 +524,11 @@ func resolveSelectorSIDsRequest(response interface{}) restRequest {
 // seconds). A gateway timeout (504) is returned to the caller rather than
 // retried, because the resolution is heavy for the backend and replaying it
 // immediately only adds load; the server caches the result, so a later call
-// is cheaper. Rate limiting (429), an expired JWT and other 5xx answers are
-// retried as for any other call.
+// is cheaper. Rate limiting (429), an expired JWT, other 5xx answers and
+// transport errors are retried as for any other call; a 5xx or transport
+// error is retried immediately, up to 3 more times, so with a ctx that has
+// no deadline one call can take up to four client timeouts. Callers should
+// always set a deadline on ctx to bound the call.
 //
 // Servers that predate this route answer HTTP 404. Detect that with
 // IsResolveSelectorSIDsUnavailable (or errors.As into a RESTError and

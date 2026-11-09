@@ -249,29 +249,37 @@ func TestResolveSelectorSIDsContext(t *testing.T) {
 		require.Zero(t, rec.count())
 	})
 
-	t.Run("caller deadline interrupts a slow server", func(t *testing.T) {
+	t.Run("cancelling the caller context interrupts an in-flight request", func(t *testing.T) {
 		release := make(chan struct{})
 		t.Cleanup(func() { close(release) })
+		entered := make(chan struct{})
+		var once sync.Once
 		var mu sync.Mutex
 		calls := 0
 		org, _ := newSIDsTestOrg(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			mu.Lock()
 			calls++
 			mu.Unlock()
+			once.Do(func() { close(entered) })
 			select {
 			case <-r.Context().Done():
 			case <-release:
 			}
 		}))
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		// The deadline is only a safety net: the context is cancelled once
+		// the server holds the request, so the outcome does not depend on
+		// how fast the request reaches the handler.
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		start := time.Now()
+		go func() {
+			<-entered
+			cancel()
+		}()
 		_, err := org.ResolveSelectorSIDs(ctx, "plat == windows")
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.Less(t, time.Since(start), 10*time.Second)
+		require.ErrorIs(t, err, context.Canceled)
 		mu.Lock()
 		defer mu.Unlock()
-		require.Equal(t, 1, calls, "once the caller context expired no further attempt may reach the server")
+		require.Equal(t, 1, calls, "once the caller context is cancelled no further attempt may reach the server")
 	})
 }
 
