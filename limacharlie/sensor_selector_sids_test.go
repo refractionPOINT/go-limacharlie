@@ -183,6 +183,16 @@ func TestResolveSelectorSIDsResponse(t *testing.T) {
 		require.Equal(t, SelectorSIDs{SIDs: []string{"0a", "1b", "2c"}, MatchedCount: 3, Truncated: true}, got)
 	})
 
+	t.Run("matched count is passed through as sent", func(t *testing.T) {
+		// The server sends len(sids). A count that differs from it shows the
+		// client decodes the field instead of deriving it from SIDs.
+		rec := &sidsRecorder{body: `{"sids":["0a","1b","2c"],"matched_count":7,"truncated":true}`}
+		org, _ := newSIDsTestOrg(t, rec)
+		got, err := org.ResolveSelectorSIDs(context.Background(), "plat == windows", ResolveSelectorSIDsOptions{Limit: 3})
+		require.NoError(t, err)
+		require.Equal(t, 7, got.MatchedCount)
+	})
+
 	t.Run("complete result is not truncated", func(t *testing.T) {
 		rec := &sidsRecorder{body: okSIDsBody}
 		org, _ := newSIDsTestOrg(t, rec)
