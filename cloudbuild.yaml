@@ -1,10 +1,14 @@
 steps:
 - name: 'golang'
   dir: limacharlie
-  args: ['go', 'test', '.', '-v']
+  # An explicit -timeout, inside the build timeout set below. The Search
+  # end-to-end tests end their contexts before this deadline so their
+  # server-side cancels still run (see limacharlie/search_e2e_test.go).
+  args: ['go', 'test', '.', '-v', '-timeout', '30m']
   env:
     - '_OID=${_OID}'
     - 'LC_CURRENT_ENV=test_env'
+    - 'LC_SEARCH_E2E=1'
     # Loader-test fixtures only (asserted verbatim by TestEnvironmentLoader); not credentials.
     - 'LC_OID=00000000-0000-4000-8000-000000000001'
     - 'LC_UID=00000000-0000-4000-8000-000000000002'
@@ -17,6 +21,9 @@ availableSecrets:
   secretManager:
   - versionName: projects/${PROJECT_ID}/secrets/GO_LIMACHARLIE_TEST_KEY/versions/latest
     env: '_KEY'
+# Stated rather than left to the default, so the go test -timeout above always
+# fires first and reports which test was slow.
+timeout: '3600s'
 options:
   machineType: 'N1_HIGHCPU_8'
   # Tolerate substitutions defined on the trigger that this config no longer references.
