@@ -677,6 +677,8 @@ func (ms *MockServer) handleSensorsList(w http.ResponseWriter, r *http.Request) 
 // does not evaluate the selector: every sensor in SensorStore matches. It
 // honours is_online_only (against SensorOnline) and limit (server default
 // 20000), and returns the SIDs sorted ascending with the lowest limit kept.
+// As on the server, matched_count is the number of SIDs returned, also when
+// the answer is truncated.
 func (ms *MockServer) handleSensorSIDs(w http.ResponseWriter, r *http.Request) {
 	body := readBody(r)
 	ms.recordCall(r, body)
@@ -703,14 +705,13 @@ func (ms *MockServer) handleSensorSIDs(w http.ResponseWriter, r *http.Request) {
 		sids = append(sids, sid)
 	}
 	sort.Strings(sids)
-	matched := len(sids)
-	truncated := matched > limit
+	truncated := len(sids) > limit
 	if truncated {
 		sids = sids[:limit]
 	}
 	ms.writeJSON(w, SelectorSIDs{
 		SIDs:         sids,
-		MatchedCount: matched,
+		MatchedCount: len(sids),
 		Truncated:    truncated,
 	})
 }

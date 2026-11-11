@@ -176,11 +176,11 @@ func TestResolveSelectorSIDsRequest(t *testing.T) {
 
 func TestResolveSelectorSIDsResponse(t *testing.T) {
 	t.Run("decodes sids, matched count and truncated", func(t *testing.T) {
-		rec := &sidsRecorder{body: `{"sids":["0a","1b","2c"],"matched_count":250001,"truncated":true}`}
+		rec := &sidsRecorder{body: `{"sids":["0a","1b","2c"],"matched_count":3,"truncated":true}`}
 		org, _ := newSIDsTestOrg(t, rec)
 		got, err := org.ResolveSelectorSIDs(context.Background(), "plat == windows", ResolveSelectorSIDsOptions{Limit: 3})
 		require.NoError(t, err)
-		require.Equal(t, SelectorSIDs{SIDs: []string{"0a", "1b", "2c"}, MatchedCount: 250001, Truncated: true}, got)
+		require.Equal(t, SelectorSIDs{SIDs: []string{"0a", "1b", "2c"}, MatchedCount: 3, Truncated: true}, got)
 	})
 
 	t.Run("complete result is not truncated", func(t *testing.T) {
@@ -381,7 +381,7 @@ func TestResolveSelectorSIDsMockServer(t *testing.T) {
 		require.Equal(t, SelectorSIDs{SIDs: []string{
 			"bbbbbbbb-0000-4000-8000-000000000002",
 			"cccccccc-0000-4000-8000-000000000003",
-		}, MatchedCount: 3, Truncated: true}, got)
+		}, MatchedCount: 2, Truncated: true}, got)
 	})
 
 	t.Run("empty store is a non-nil empty slice", func(t *testing.T) {
