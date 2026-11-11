@@ -589,7 +589,7 @@ func TestDeployDetectionPack(t *testing.T) {
 | **FP Rules** | List, Add (with replace), Delete |
 | **Installation Keys** | List, Get by IID, Add (auto or custom IID), Delete |
 | **Outputs** | List, Add, Delete |
-| **Sensors** | List, ListFromSelector, Get, Tags (add/remove/list), Isolation (isolate/rejoin), Delete, Task, ActiveSensors, GetAllTags, GetSensorsWithTag |
+| **Sensors** | List, ListFromSelector, ResolveSelectorSIDs (every stored sensor matches; honours limit and is_online_only), Get, Tags (add/remove/list), Isolation (isolate/rejoin), Delete, Task, ActiveSensors, GetAllTags, GetSensorsWithTag |
 | **Devices** | AddTag |
 | **Users** | List, Add, Remove, Permissions (add/remove/list), SetRole |
 | **Resources** | List, Subscribe, Unsubscribe |

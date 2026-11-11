@@ -199,6 +199,36 @@ func TestListUserOrgsWithOptionsAllParams(t *testing.T) {
 	}
 }
 
+// apiKeyPropagationTimeout bounds how long waitForAPIKey polls for a created
+// or deleted key to show up in the key list.
+const apiKeyPropagationTimeout = 30 * time.Second
+
+// waitForAPIKey polls the org's API key list until the key with keyHash is
+// present (or absent, when present is false) or apiKeyPropagationTimeout
+// passes, and returns the last list it read. A list error ends the wait.
+// The caller asserts on the returned list, so a key that never propagates
+// still fails the test.
+func waitForAPIKey(org *Organization, keyHash string, present bool) ([]APIKeyInfo, error) {
+	deadline := time.Now().Add(apiKeyPropagationTimeout)
+	for {
+		keys, err := org.GetAPIKeys()
+		if err != nil {
+			return nil, err
+		}
+		has := false
+		for _, key := range keys {
+			if key.KeyHash == keyHash {
+				has = true
+				break
+			}
+		}
+		if has == present || time.Now().After(deadline) {
+			return keys, nil
+		}
+		time.Sleep(time.Second)
+	}
+}
+
 // TestAPIKeyLifecycle tests the full API key lifecycle
 func TestAPIKeyLifecycle(t *testing.T) {
 	a := assert.New(t)
@@ -238,11 +268,13 @@ func TestAPIKeyLifecycle(t *testing.T) {
 		}
 	}()
 
-	// 3. Verify key appears in list
-	time.Sleep(2 * time.Second) // Give it a moment to propagate
-	keysAfterCreate, err := org.GetAPIKeys()
+	// 3. Verify key appears in list. The test org is shared with
+	// concurrently running test builds that create and delete their own
+	// keys, so the total count is not stable: membership of this test's
+	// key is what proves the create.
+	keysAfterCreate, err := waitForAPIKey(org, keyHashToDelete, true)
 	a.NoError(err)
-	a.Equal(initialCount+1, len(keysAfterCreate))
+	t.Logf("API key count after create: %d", len(keysAfterCreate))
 
 	// Find our key in the list
 	found := false
@@ -267,10 +299,9 @@ func TestAPIKeyLifecycle(t *testing.T) {
 	keyHashToDelete = ""
 
 	// 5. Verify key is removed from list
-	time.Sleep(2 * time.Second)
-	keysAfterDelete, err := org.GetAPIKeys()
+	keysAfterDelete, err := waitForAPIKey(org, createdKey.KeyHash, false)
 	a.NoError(err)
-	a.Equal(initialCount, len(keysAfterDelete))
+	t.Logf("API key count after delete: %d", len(keysAfterDelete))
 
 	// Verify our key is gone
 	for _, key := range keysAfterDelete {

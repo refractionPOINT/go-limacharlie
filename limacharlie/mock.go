@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -292,7 +294,7 @@ func (ms *MockServer) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/jwt", ms.handleJWT)
 
 	// WhoAmI
-	mux.HandleFunc(fmt.Sprintf("/v1/who"), ms.handleWhoAmI)
+	mux.HandleFunc("/v1/who", ms.handleWhoAmI)
 
 	// Organization info
 	mux.HandleFunc(fmt.Sprintf("/v1/orgs/%s", ms.OID), ms.handleOrgInfo)
@@ -315,6 +317,7 @@ func (ms *MockServer) registerRoutes(mux *http.ServeMux) {
 
 	// Sensors
 	mux.HandleFunc(fmt.Sprintf("/v1/sensors/%s", ms.OID), ms.handleSensorsList)
+	mux.HandleFunc(fmt.Sprintf("/v1/sensors/%s/sids", ms.OID), ms.handleSensorSIDs)
 	mux.HandleFunc(fmt.Sprintf("/v1/tags/%s/", ms.OID), ms.handleSensorsWithTag)
 	mux.HandleFunc(fmt.Sprintf("/v1/tags/%s", ms.OID), ms.handleAllTags)
 
@@ -376,13 +379,13 @@ func (ms *MockServer) registerRoutes(mux *http.ServeMux) {
 
 func (ms *MockServer) writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func (ms *MockServer) writeError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(Dict{"error": msg})
+	_ = json.NewEncoder(w).Encode(Dict{"error": msg})
 }
 
 func readBody(r *http.Request) string {
@@ -458,7 +461,7 @@ func (ms *MockServer) handleOnline(w http.ResponseWriter, r *http.Request) {
 
 	// POST - check which SIDs are online
 	r.Body = io.NopCloser(strings.NewReader(body))
-	r.ParseForm()
+	_ = r.ParseForm()
 	result := map[string]bool{}
 	for _, sid := range r.Form["sids"] {
 		result[sid] = ms.SensorOnline[sid]
@@ -510,7 +513,7 @@ func (ms *MockServer) handleFPRules(w http.ResponseWriter, r *http.Request) {
 		form := parseFormFromBody(body)
 		name := form.Get("name")
 		var det Dict
-		json.Unmarshal([]byte(form.Get("rule")), &det)
+		_ = json.Unmarshal([]byte(form.Get("rule")), &det)
 		ms.FPRules[name] = FPRule{
 			Detection: det,
 			OID:       ms.OID,
@@ -667,6 +670,48 @@ func (ms *MockServer) handleSensorsList(w http.ResponseWriter, r *http.Request) 
 	ms.writeJSON(w, rawSensorListPage{
 		Sensors:           compressed,
 		ContinuationToken: "",
+	})
+}
+
+// handleSensorSIDs serves GET sensors/{oid}/sids. Like handleSensorsList it
+// does not evaluate the selector: every sensor in SensorStore matches. It
+// honours is_online_only (against SensorOnline) and limit (server default
+// 20000), and returns the SIDs sorted ascending with the lowest limit kept.
+func (ms *MockServer) handleSensorSIDs(w http.ResponseWriter, r *http.Request) {
+	body := readBody(r)
+	ms.recordCall(r, body)
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	q := r.URL.Query()
+	onlineOnly := q.Get("is_online_only") == "true"
+	limit := 20000
+	if l := q.Get("limit"); l != "" {
+		n, err := strconv.Atoi(l)
+		if err != nil || n <= 0 {
+			ms.writeError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+		limit = n
+	}
+
+	sids := []string{}
+	for sid := range ms.SensorStore {
+		if onlineOnly && !ms.SensorOnline[sid] {
+			continue
+		}
+		sids = append(sids, sid)
+	}
+	sort.Strings(sids)
+	matched := len(sids)
+	truncated := matched > limit
+	if truncated {
+		sids = sids[:limit]
+	}
+	ms.writeJSON(w, SelectorSIDs{
+		SIDs:         sids,
+		MatchedCount: matched,
+		Truncated:    truncated,
 	})
 }
 
@@ -1129,25 +1174,25 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				gz, err := gzip.NewReader(bytes.NewReader(b64Dec))
 				if err == nil {
-					json.NewDecoder(gz).Decode(&data)
-					gz.Close()
+					_ = json.NewDecoder(gz).Decode(&data)
+					_ = gz.Close()
 				}
 			}
 		}
 
 		// Parse usr_mtd
 		if umStr := form.Get("usr_mtd"); umStr != "" {
-			json.Unmarshal([]byte(umStr), &usrMtd)
+			_ = json.Unmarshal([]byte(umStr), &usrMtd)
 		}
 
 		// Parse sys_mtd (for updates)
 		if smStr := form.Get("sys_mtd"); smStr != "" {
-			json.Unmarshal([]byte(smStr), &sysMtd)
+			_ = json.Unmarshal([]byte(smStr), &sysMtd)
 		}
 
 		// Parse uncompressed data (for Update)
 		if dataStr := form.Get("data"); dataStr != "" && data == nil {
-			json.Unmarshal([]byte(dataStr), &data)
+			_ = json.Unmarshal([]byte(dataStr), &data)
 		}
 
 		// target=mtd corresponds to the set_record_mtd RPC, which only mutates
@@ -1226,7 +1271,7 @@ func (ms *MockServer) handleServiceRequest(w http.ResponseWriter, r *http.Reques
 	reqDataB64 := form.Get("request_data")
 	reqDataBytes, _ := base64.StdEncoding.DecodeString(reqDataB64)
 	reqData := Dict{}
-	json.Unmarshal(reqDataBytes, &reqData)
+	_ = json.Unmarshal(reqDataBytes, &reqData)
 
 	action, _ := reqData["action"].(string)
 

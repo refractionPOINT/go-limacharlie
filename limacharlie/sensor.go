@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -450,6 +451,131 @@ func (org *Organization) ListSensorsFromSelectorIteratively(ctx context.Context,
 	return m, lastToken, nil
 }
 
+// ResolveSelectorSIDsOptions configures ResolveSelectorSIDs.
+type ResolveSelectorSIDsOptions struct {
+	// Limit caps the number of SIDs returned. Zero (or a negative value)
+	// defers to the server default, which is 20000. The server enforces a
+	// maximum of 200000.
+	Limit int
+	// OnlineOnly restricts the result to sensors that are currently online.
+	// The default (false) resolves every non-deleted sensor matching the
+	// selector, online or not.
+	OnlineOnly bool
+}
+
+// SelectorSIDs is the result of ResolveSelectorSIDs.
+type SelectorSIDs struct {
+	// SIDs holds the IDs of the matching sensors, unique and sorted ascending
+	// (byte-wise string order). When Truncated is true it holds the lowest
+	// Limit SIDs of the match set. It is never nil on success, an empty
+	// match is an empty slice.
+	SIDs []string `json:"sids"`
+	// MatchedCount is the number of sensors the selector matched before the
+	// limit was applied, so it is greater than len(SIDs) when Truncated is
+	// true.
+	MatchedCount int `json:"matched_count"`
+	// Truncated reports that more sensors matched than the limit allowed, so
+	// SIDs is a prefix of the full, sorted match set.
+	Truncated bool `json:"truncated"`
+}
+
+// resolveSelectorSIDsTimeout is the client timeout of a selector resolution.
+// It is longer than the API gateway's own limit for long calls, so the
+// gateway's answer (a result or a 504, which is not retried) is what the
+// caller sees rather than a client deadline, which reliableRequest would
+// retry. A caller wanting a shorter bound sets a deadline on ctx.
+const resolveSelectorSIDsTimeout = 150 * time.Second
+
+// errBlankSelector is returned by ResolveSelectorSIDs for an empty or
+// whitespace-only selector.
+var errBlankSelector = errors.New("selector must not be blank")
+
+// resolveSelectorSIDsRequest is the request of a selector resolution. A
+// large organization can take tens of seconds to resolve, so it gets a
+// longer timeout than the default, and since the request is heavy for the
+// backend (which caches the result) a gateway timeout is reported instead of
+// replayed.
+func resolveSelectorSIDsRequest(response interface{}) restRequest {
+	return makeDefaultRequest(response).withTimeout(resolveSelectorSIDsTimeout).withoutGatewayTimeoutRetry()
+}
+
+// ResolveSelectorSIDs returns the IDs of the sensors that match selector,
+// using the sensors API GET sensors/{oid}/sids route. It returns only SIDs,
+// in one request, so it is much faster than paging through
+// ListSensorsFromSelectorIteratively when the caller does not need the
+// sensor records.
+//
+// Contract:
+//   - SIDs are unique and sorted ascending. Deleted sensors are never
+//     included.
+//   - At most options.Limit SIDs are returned (server default 20000, server
+//     maximum 200000). When more sensors match, SIDs is the lowest Limit
+//     SIDs of the match set, Truncated is true and MatchedCount is the size
+//     of the whole match set. A caller that needs every match must check
+//     Truncated and either raise Limit or fall back to paging.
+//   - limit is sent only when options.Limit > 0 and is_online_only only
+//     when options.OnlineOnly is true, so the default request carries the
+//     selector alone.
+//   - A blank selector is rejected with an error before any request is made.
+//   - ctx bounds the whole call, including retries.
+//
+// Timeouts and retries: each attempt has a client timeout longer than the
+// API gateway's limit (resolving a large organization can take tens of
+// seconds). A gateway timeout (504) is returned to the caller rather than
+// retried, because the resolution is heavy for the backend and replaying it
+// immediately only adds load; the server caches the result, so a later call
+// is cheaper. Rate limiting (429), an expired JWT, other 5xx answers and
+// transport errors are retried as for any other call; a 5xx or transport
+// error is retried immediately, up to 3 more times, so with a ctx that has
+// no deadline one call can take up to four client timeouts. Callers should
+// always set a deadline on ctx to bound the call.
+//
+// Servers that predate this route answer HTTP 404. Detect that with
+// IsResolveSelectorSIDsUnavailable (or errors.As into a RESTError and
+// compare StatusCode() with http.StatusNotFound) and fall back to
+// ListSensorsFromSelectorIteratively. Any other error is a genuine failure
+// of the resolution and should not trigger the fallback.
+func (org *Organization) ResolveSelectorSIDs(ctx context.Context, selector string, options ...ResolveSelectorSIDsOptions) (SelectorSIDs, error) {
+	if isEmpty(selector) {
+		return SelectorSIDs{}, errBlankSelector
+	}
+
+	effectiveOptions := ResolveSelectorSIDsOptions{}
+	if len(options) != 0 {
+		effectiveOptions = options[0]
+	}
+
+	queryData := Dict{
+		"selector": selector,
+	}
+	if effectiveOptions.Limit > 0 {
+		queryData["limit"] = effectiveOptions.Limit
+	}
+	if effectiveOptions.OnlineOnly {
+		queryData["is_online_only"] = true
+	}
+
+	resp := SelectorSIDs{}
+	q := resolveSelectorSIDsRequest(&resp).withQueryData(queryData)
+	if err := org.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("sensors/%s/sids", org.client.options.OID), q); err != nil {
+		return SelectorSIDs{}, err
+	}
+	if resp.SIDs == nil {
+		resp.SIDs = []string{}
+	}
+	return resp, nil
+}
+
+// IsResolveSelectorSIDsUnavailable reports whether err, as returned by
+// ResolveSelectorSIDs, means the server does not offer the selector
+// resolution route (HTTP 404). Callers then fall back to
+// ListSensorsFromSelectorIteratively. It returns false for nil and for every
+// other error, including a cancelled or expired context.
+func IsResolveSelectorSIDsUnavailable(err error) bool {
+	var restErr RESTError
+	return errors.As(err, &restErr) && restErr.StatusCode() == http.StatusNotFound
+}
+
 func (org *Organization) GetAllTags() ([]string, error) {
 	tags := struct {
 		Tags []string `json:"tags"`
@@ -487,7 +613,7 @@ func decompressPayload(data string, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer z.Close()
+	defer z.Close() //nolint:errcheck // a gzip reader holds nothing to flush, its Close error carries no information
 	// We decode the JSON.
 	if err := json.NewDecoder(z).Decode(out); err != nil {
 		return err
