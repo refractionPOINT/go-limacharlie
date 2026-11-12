@@ -470,9 +470,11 @@ type SelectorSIDs struct {
 	// Limit SIDs of the match set. It is never nil on success, an empty
 	// match is an empty slice.
 	SIDs []string `json:"sids"`
-	// MatchedCount is the number of sensors the selector matched before the
-	// limit was applied, so it is greater than len(SIDs) when Truncated is
-	// true.
+	// MatchedCount is the number of SIDs returned, len(SIDs). It is not the
+	// size of the whole match set: when Truncated is true the server stops
+	// resolving once it has proven that more than Limit sensors match, so
+	// the total is never computed. Truncated is what reports that more
+	// sensors matched.
 	MatchedCount int `json:"matched_count"`
 	// Truncated reports that more sensors matched than the limit allowed, so
 	// SIDs is a prefix of the full, sorted match set.
@@ -510,9 +512,10 @@ func resolveSelectorSIDsRequest(response interface{}) restRequest {
 //     included.
 //   - At most options.Limit SIDs are returned (server default 20000, server
 //     maximum 200000). When more sensors match, SIDs is the lowest Limit
-//     SIDs of the match set, Truncated is true and MatchedCount is the size
-//     of the whole match set. A caller that needs every match must check
-//     Truncated and either raise Limit or fall back to paging.
+//     SIDs of the match set and Truncated is true. MatchedCount is always
+//     len(SIDs); the size of a truncated match set is not reported. A
+//     caller that needs every match must check Truncated and either raise
+//     Limit or fall back to paging.
 //   - limit is sent only when options.Limit > 0 and is_online_only only
 //     when options.OnlineOnly is true, so the default request carries the
 //     selector alone.

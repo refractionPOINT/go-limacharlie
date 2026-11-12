@@ -69,4 +69,6 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Fixed
 
+- **`SelectorSIDs.MatchedCount` is documented as what the server returns.** The docs said it was the size of the whole match set, greater than `len(SIDs)` when `Truncated` is true. The server returns `len(SIDs)`: it stops resolving once it has proven that more than `Limit` sensors match, so the total is never computed, and `Truncated` is what reports that more matched. `MockServer` now answers the same way, so a test against the mock no longer sees a count the real server never sends.
+
 - **`Dict` decodes every number `encoding/json` decodes.** A number written with an exponent (`1e-07`, `2E+21`), or an integer outside both 64-bit ranges, failed the decode of the whole response it arrived in. It now decodes as a `float64`. Integers that fit are still typed exactly, as `uint64` when non-negative and `int64` when negative. This matters most for Search result rows, which are `Dict`s holding arbitrary event bodies, but applies to every `Dict` and to `UnmarshalCleanJSON`.
