@@ -179,6 +179,64 @@ func TestAISessions_StartSession(t *testing.T) {
 	require.Equal(t, "bar", env["FOO"])
 }
 
+func TestAISessions_StartSession_Effort(t *testing.T) {
+	ms, org := setupMock(t)
+
+	ms.HiveStore["ai_agent/"+testOID] = map[string]HiveData{
+		"with-effort": {
+			Data: map[string]interface{}{
+				"prompt": "investigate",
+				"model":  "claude-sonnet-4-6",
+				"effort": "medium",
+			},
+		},
+		"no-effort": {
+			Data: map[string]interface{}{
+				"prompt": "investigate",
+				"model":  "claude-sonnet-4-6",
+			},
+		},
+	}
+
+	var gotProfile map[string]interface{}
+	ms.CustomHandlers["/v1/api/sessions"] = func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var body Dict
+		require.NoError(t, json.Unmarshal(raw, &body))
+		gotProfile, _ = body["profile"].(map[string]interface{})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"session_id":"new-sess","status":"starting"}`))
+	}
+
+	start := func(definition string, opts *StartSessionOptions) map[string]interface{} {
+		t.Helper()
+		gotProfile = nil
+		_, err := org.AI().StartSession(context.Background(), definition, opts)
+		require.NoError(t, err)
+		require.NotNil(t, gotProfile)
+		return gotProfile
+	}
+
+	// The template's effort is carried into the inline profile.
+	profile := start("with-effort", nil)
+	require.Equal(t, "medium", profile["effort"])
+
+	// An override replaces the template's effort.
+	high := "high"
+	profile = start("with-effort", &StartSessionOptions{Effort: &high})
+	require.Equal(t, "high", profile["effort"])
+
+	// An override applies when the template has none.
+	maxEffort := "max"
+	profile = start("no-effort", &StartSessionOptions{Effort: &maxEffort})
+	require.Equal(t, "max", profile["effort"])
+
+	// Unset everywhere: no effort key is sent, so the model's default applies.
+	profile = start("no-effort", &StartSessionOptions{})
+	_, present := profile["effort"]
+	require.False(t, present, "effort must not be sent when unset")
+}
+
 func TestAISessions_ListUsageIdentities(t *testing.T) {
 	ms, org := setupMock(t)
 
