@@ -39,7 +39,7 @@ const hiveAIAgentPrefix = "hive://ai_agent/"
 // maps one-to-one onto a field of the server's ProfileContent type.
 var profileScalarFields = []string{
 	"allowed_tools", "denied_tools", "permission_mode",
-	"model", "max_turns", "max_budget_usd", "task_budget_tokens",
+	"model", "effort", "max_turns", "max_budget_usd", "task_budget_tokens",
 	"ttl_seconds", "one_shot", "plugins",
 }
 
@@ -200,6 +200,10 @@ type StartSessionOptions struct {
 
 	// Model replaces the Anthropic model (e.g. "claude-sonnet-4-6").
 	Model *string
+	// Effort replaces the reasoning effort: "low", "medium", "high", "xhigh"
+	// or "max". An empty string means the model's own default. The server
+	// validates the value; it is passed through as given.
+	Effort *string
 	// MaxTurns replaces the maximum number of agent turns.
 	MaxTurns *int
 	// MaxBudgetUSD replaces the hard USD cost cap.
@@ -298,6 +302,9 @@ func (a *AISessions) StartSession(ctx context.Context, definitionName string, op
 	// Apply scalar / list overrides. A nil override means "keep template".
 	if opts.Model != nil {
 		profile["model"] = *opts.Model
+	}
+	if opts.Effort != nil {
+		profile["effort"] = *opts.Effort
 	}
 	if opts.MaxTurns != nil {
 		profile["max_turns"] = *opts.MaxTurns
