@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1901,4 +1902,26 @@ func TestMockSensors_IsolateFromNetworkWithContextStopsAtTheDeadline(t *testing.
 	err = (&Sensor{OID: testOID, SID: sid, Organization: o}).IsolateFromNetworkWithContext(ctx) // GetSensor itself would call the slow server
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Less(t, time.Since(start), 5*time.Second)
+}
+
+func TestMockSensors_IsolateFromNetworkWithContextMakesNoRequestOnACancelledContext(t *testing.T) {
+	var requests int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := &Client{
+		options:    ClientOptions{OID: testOID, JWT: "jwt"},
+		logger:     &LCLoggerEmpty{},
+		httpClient: srv.Client(),
+		baseURL:    srv.URL,
+	}
+	o, err := NewOrganization(c)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = (&Sensor{OID: testOID, SID: "sid", Organization: o}).IsolateFromNetworkWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Zero(t, atomic.LoadInt32(&requests), "a finished context must not start any attempt")
 }
