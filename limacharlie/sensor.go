@@ -161,6 +161,11 @@ func (s *Sensor) GetTags() ([]TagInfo, error) {
 }
 
 func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
+	return s.AddTagWithContext(context.Background(), tag, ttl)
+}
+
+// AddTagWithContext adds a tag like AddTag, applying ctx to every attempt and every retry wait.
+func (s *Sensor) AddTagWithContext(ctx context.Context, tag string, ttl time.Duration) error {
 	resp := Dict{}
 	form := Dict{"tags": tag}
 	// Only send a ttl when one is requested. Mirrors the Python SDK (which
@@ -170,7 +175,7 @@ func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 		form["ttl"] = ttl / time.Second
 	}
 	req := makeDefaultRequest(&resp).withFormData(form)
-	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+	if err := s.Organization.client.reliableRequest(ctx, http.MethodPost, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
 		return err
 	}
@@ -178,11 +183,16 @@ func (s *Sensor) AddTag(tag string, ttl time.Duration) error {
 }
 
 func (s *Sensor) RemoveTag(tag string) error {
+	return s.RemoveTagWithContext(context.Background(), tag)
+}
+
+// RemoveTagWithContext removes a tag like RemoveTag, applying ctx to every attempt and every retry wait.
+func (s *Sensor) RemoveTagWithContext(ctx context.Context, tag string) error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp).withFormData(Dict{
 		"tags": tag,
 	})
-	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
+	if err := s.Organization.client.reliableRequest(ctx, http.MethodDelete, fmt.Sprintf("%s/tags", s.SID), req); err != nil {
 		s.LastError = err
 		return err
 	}
