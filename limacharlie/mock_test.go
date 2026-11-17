@@ -1955,7 +1955,9 @@ func TestMockWithContextVariantsActLikeTheirPlainCalls(t *testing.T) {
 	sid := uuid.New().String()
 	ms.SensorStore[sid] = &Sensor{OID: testOID, SID: sid}
 	require.NoError(t, org.GetSensor(sid).AddTagWithContext(ctx, "t1", 0))
+	assert.Contains(t, ms.SensorTags[sid], "t1")
 	require.NoError(t, org.GetSensor(sid).RemoveTagWithContext(ctx, "t1"))
+	assert.NotContains(t, ms.SensorTags[sid], "t1")
 
 	ms.PayloadStore["p1"] = Payload{}
 	require.NoError(t, org.DeletePayloadWithContext(ctx, "p1"))
