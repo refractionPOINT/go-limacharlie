@@ -10,6 +10,8 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Added
 
+- **`Sensor.IsolateFromNetworkWithContext(ctx)`.** `IsolateFromNetwork` runs on `context.Background()`, so a caller with a deadline could not stop it while the SDK retried. The new call applies the caller's context to every attempt and every retry wait; `IsolateFromNetwork` now calls it with `context.Background()` and behaves as before.
+
 - **Search API submission.** `limacharlie/search.go` adds the calls that start a search and read its pages, which the SDK previously had no way to do. `Organization.ListOpenQueries` and `Organization.GetSearchLimits` could already report on searches, but nothing could submit one.
 
   | Call | Endpoint |

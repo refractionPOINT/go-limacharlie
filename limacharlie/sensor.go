@@ -117,8 +117,17 @@ func (s *Sensor) Update() *Sensor {
 }
 
 func (s *Sensor) IsolateFromNetwork() error {
+	return s.IsolateFromNetworkWithContext(context.Background())
+}
+
+// IsolateFromNetworkWithContext is IsolateFromNetwork under the caller's
+// context: the deadline or cancellation applies to every attempt and to the
+// waits between retries, so a caller that holds a lease or a request deadline
+// is not kept waiting by the SDK's retries (4 attempts of up to 30s each, plus
+// backoff).
+func (s *Sensor) IsolateFromNetworkWithContext(ctx context.Context) error {
 	resp := Dict{}
-	if err := s.Organization.client.reliableRequest(context.Background(), http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(&resp)); err != nil {
+	if err := s.Organization.client.reliableRequest(ctx, http.MethodPost, fmt.Sprintf("%s/isolation", s.SID), makeDefaultRequest(&resp)); err != nil {
 		s.LastError = err
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -1867,4 +1868,37 @@ func TestMockGetURLs_Caching(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, urlCalls, "expected only 1 URL fetch, rest should be cached")
+}
+
+func TestMockSensors_IsolateFromNetworkWithContextStopsAtTheDeadline(t *testing.T) {
+	ms, org := setupMock(t)
+	sid := uuid.New().String()
+	ms.SensorStore[sid] = &Sensor{OID: testOID, SID: sid}
+
+	// A live context works like IsolateFromNetwork.
+	require.NoError(t, org.GetSensor(sid).IsolateFromNetworkWithContext(context.Background()))
+	assert.True(t, ms.SensorIsolation[sid])
+
+	// A slow platform: the deadline ends the call instead of the SDK's retries.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(30 * time.Second):
+		}
+	}))
+	defer slow.Close()
+	c := &Client{
+		options:    ClientOptions{OID: testOID, JWT: "jwt"},
+		logger:     &LCLoggerEmpty{},
+		httpClient: slow.Client(),
+		baseURL:    slow.URL,
+	}
+	o, err := NewOrganization(c)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	err = (&Sensor{OID: testOID, SID: sid, Organization: o}).IsolateFromNetworkWithContext(ctx) // GetSensor itself would call the slow server
+	require.Error(t, err)
+	assert.Less(t, time.Since(start), 5*time.Second)
 }
