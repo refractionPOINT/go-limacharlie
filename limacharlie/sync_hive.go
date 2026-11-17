@@ -2,6 +2,7 @@ package limacharlie
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -13,6 +14,8 @@ const syncHivePageSize = 500
 
 type SyncHiveConfigData map[string]SyncHiveData
 type SyncHiveData struct {
+	// Apply-time version only; never serialized into Git.
+	etag   string
 	Data   map[string]interface{} `json:"data" yaml:"data,omitempty"`
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
@@ -108,11 +111,12 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 					orgOps = append(orgOps, op)
 					continue
 				}
-				err = org.addHiveConfigData(HiveArgs{
-					Key:          hiveKey,
-					HiveName:     hiveName,
-					PartitionKey: orgInfo.OID,
-				}, newConfigData[hiveKey])
+				ha := HiveArgs{Key: hiveKey, HiveName: hiveName, PartitionKey: orgInfo.OID}
+				if isInvestigationSyncHive(hiveName) {
+					err = org.writeInvestigationHive(ha, ncd, "")
+				} else {
+					err = org.addHiveConfigData(ha, newConfigData[hiveKey])
+				}
 				if err != nil {
 					return orgOps, err
 				}
@@ -121,6 +125,10 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 				// if new config data exists in current config
 				// check to see if data is equal if not update
 				curData := currentConfigData[hiveKey]
+				// Preserve the established metadata-only update semantics.
+				if isInvestigationSyncHive(hiveName) && len(ncd.Data) == 0 {
+					ncd.Data = curData.Data
+				}
 				equals, err := ncd.Equals(curData)
 				if err != nil {
 					return orgOps, err
@@ -139,11 +147,15 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 						orgOps = append(orgOps, op)
 						continue
 					}
-					err = org.updateHiveConfigData(HiveArgs{
-						Key:          hiveKey,
-						HiveName:     hiveName,
-						PartitionKey: orgInfo.OID},
-						ncd)
+					ha := HiveArgs{Key: hiveKey, HiveName: hiveName, PartitionKey: orgInfo.OID}
+					if isInvestigationSyncHive(hiveName) {
+						if curData.etag == "" {
+							return orgOps, fmt.Errorf("%s/%s: missing native etag; reload before applying", hiveName, hiveKey)
+						}
+						err = org.writeInvestigationHive(ha, ncd, curData.etag)
+					} else {
+						err = org.updateHiveConfigData(ha, ncd)
+					}
 					if err != nil {
 						return orgOps, err
 					}
@@ -209,6 +221,11 @@ func (org *Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData,
 					Comment: v.UsrMtd.Comment,
 				},
 			}
+			if isInvestigationSyncHive(args.HiveName) {
+				rec := currentHiveDataConfig[k]
+				rec.etag = v.SysMtd.Etag
+				currentHiveDataConfig[k] = rec
+			}
 		}
 		return nil
 	})
@@ -226,11 +243,6 @@ func (org *Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) erro
 		return err
 	}
 
-	current, err := hiveClient.Get(ha)
-	if err != nil {
-		return err
-	}
-	etag := current.SysMtd.Etag
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	tags := hd.UsrMtd.Tags
@@ -244,10 +256,9 @@ func (org *Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) erro
 		Expiry:       &expiry,
 		Tags:         tags,
 		Comment:      &comment,
-		ETag:         &etag,
 	}
 
-	_, err = hiveClient.Add(args) // Replace data using the version read at apply time.
+	_, err = hiveClient.Update(args) // run actual update call
 	if err != nil {
 		return err
 	}
@@ -262,8 +273,6 @@ func (org *Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		return err
 	}
 
-	// Do not overwrite a record created after the apply-time listing.
-	etag := "create-only: the record must not exist"
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	tags := hd.UsrMtd.Tags
@@ -277,7 +286,6 @@ func (org *Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		Expiry:       &expiry,
 		Tags:         tags,
 		Comment:      &comment,
-		ETag:         &etag,
 	}
 
 	_, err = hiveClient.Add(args)
@@ -369,4 +377,23 @@ func (hd HiveData) AsSyncData() SyncHiveData {
 		Data:   hd.Data,
 		UsrMtd: hd.UsrMtd,
 	}
+}
+
+func isInvestigationSyncHive(hive string) bool {
+	return hive == "investigation_policy" || hive == "investigation_plan"
+}
+
+// writeInvestigationHive uses the version from the listing used to compute
+// the diff. Native Hive only checks nonempty etags on existing records: an
+// empty etag on create follows UpdateTx's convention, not create-only semantics.
+func (org *Organization) writeInvestigationHive(ha HiveArgs, hd SyncHiveData, etag string) error {
+	if err := encodeDecodeHiveData(&hd.Data); err != nil {
+		return err
+	}
+	_, err := NewHiveClient(org).Add(HiveArgs{
+		Key: ha.Key, PartitionKey: ha.PartitionKey, HiveName: ha.HiveName,
+		Data: hd.Data, Enabled: &hd.UsrMtd.Enabled, Expiry: &hd.UsrMtd.Expiry,
+		Tags: hd.UsrMtd.Tags, Comment: &hd.UsrMtd.Comment, ETag: &etag,
+	})
+	return err
 }

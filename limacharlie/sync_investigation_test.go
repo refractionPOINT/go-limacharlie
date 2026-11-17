@@ -1,9 +1,12 @@
 package limacharlie
 
 import (
+	"bytes"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -58,25 +61,108 @@ func TestInvestigationSyncFixture(t *testing.T) {
 	require.Contains(t, ms.HiveStore["investigation_plan/"+testOID], "fictional-triage")
 }
 
-// Conflicts must be returned, without retrying an unconditional overwrite.
+// The listing is the diff baseline, not a later Get of the changed record.
 func TestInvestigationSyncNativeCASConflict(t *testing.T) {
-	ms, org := setupMock(t)
-	seen := false
-	ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if req.Method == http.MethodGet {
-			w.Write([]byte(`{"data":{"old":true},"usr_mtd":{},"sys_mtd":{"etag":"native-version"}}`))
-			return
-		}
-		require.NoError(t, req.ParseForm())
-		require.Equal(t, "native-version", req.Form.Get("etag"))
-		require.Empty(t, req.Form.Get("sys_mtd"))
-		seen = true
-		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(`{"error":"ETAG_MISMATCH"}`))
+	for _, hive := range []string{"investigation_policy", "investigation_plan"} {
+		t.Run(hive, func(t *testing.T) {
+			ms, org := setupMock(t)
+			key := hive + "/" + testOID
+			ms.HiveStore[key] = map[string]HiveData{"default": {Data: Dict{"value": "concurrent"}, SysMtd: SysMtd{Etag: "new-version"}}}
+			forms := make(chan string, 1)
+			ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == http.MethodGet {
+					w.Header().Set("Content-Type", "application/json")
+					// The store has advanced since the snapshot used for the diff.
+					w.Write([]byte(`{"default":{"data":{"value":"old"},"usr_mtd":{},"sys_mtd":{"etag":"listed-version"}}}`))
+					return
+				}
+				body, _ := io.ReadAll(req.Body)
+				form, _ := url.ParseQuery(string(body))
+				forms <- form.Get("etag")
+				req.Body = io.NopCloser(bytes.NewReader(body))
+				ms.handleHive(w, req)
+			}
+			_, err := org.SyncPush(OrgConfig{Version: 3, Hives: orgSyncHives{hive: {"default": {Data: Dict{"value": "desired"}}}}}, SyncOptions{SyncHives: map[string]bool{hive: true}})
+			require.ErrorContains(t, err, "ETAG_MISMATCH")
+			require.Equal(t, "listed-version", <-forms)
+			require.Equal(t, "concurrent", ms.HiveStore[key]["default"].Data["value"])
+		})
 	}
-	err := org.updateHiveConfigData(HiveArgs{HiveName: "investigation_policy", PartitionKey: testOID, Key: "default"}, SyncHiveData{Data: Dict{}, UsrMtd: UsrMtd{Enabled: true}})
-	require.Error(t, err)
-	require.True(t, seen)
-	require.Contains(t, err.Error(), "ETAG_MISMATCH")
+}
+
+func TestInvestigationSyncNativeCreateAndMetadataOnly(t *testing.T) {
+	ms, org := setupMock(t)
+	for _, hive := range []string{"investigation_policy", "investigation_plan"} {
+		ha := HiveArgs{HiveName: hive, PartitionKey: testOID, Key: "default"}
+		// Missing-record create follows native semantics, with an empty ETag.
+		require.NoError(t, org.writeInvestigationHive(ha, SyncHiveData{Data: Dict{"keep": "original"}}, ""))
+		cfg := OrgConfig{Version: 3, Hives: orgSyncHives{hive: {"default": {UsrMtd: UsrMtd{Enabled: true, Comment: "metadata only"}}}}}
+		_, err := org.SyncPush(cfg, SyncOptions{SyncHives: map[string]bool{hive: true}})
+		require.NoError(t, err)
+		record := ms.HiveStore[hive+"/"+testOID]["default"]
+		require.Equal(t, "original", record.Data["keep"])
+		require.Equal(t, "metadata only", record.UsrMtd.Comment)
+		// A stale version fails; the current one succeeds.
+		require.ErrorContains(t, org.writeInvestigationHive(ha, SyncHiveData{Data: Dict{"keep": "bad"}}, "stale"), "ETAG_MISMATCH")
+		require.NoError(t, org.writeInvestigationHive(ha, SyncHiveData{Data: Dict{"keep": "updated"}}, record.SysMtd.Etag))
+	}
+}
+
+func TestInvestigationSyncAllForceOmittedHivesUntouched(t *testing.T) {
+	ms, org := setupMock(t)
+	for _, h := range []string{"investigation_policy", "investigation_plan"} {
+		ms.HiveStore[h+"/"+testOID] = map[string]HiveData{"default": {Data: Dict{"keep": true}}}
+	}
+	// SyncAll selects exports, but force deletion only visits config-present hives.
+	opts := SyncAll()
+	opts.IsForce = true
+	_, err := org.SyncPush(OrgConfig{Version: 3, Hives: orgSyncHives{"fp": {}}}, opts)
+	require.NoError(t, err)
+	for _, h := range []string{"investigation_policy", "investigation_plan"} {
+		require.Contains(t, ms.HiveStore[h+"/"+testOID], "default")
+	}
+}
+
+func TestInvestigationSyncOtherHiveWriteProtocolUnchanged(t *testing.T) {
+	for _, hive := range KnownHives {
+		if isInvestigationSyncHive(hive) {
+			continue
+		}
+		t.Run(hive, func(t *testing.T) {
+			ms, org := setupMock(t)
+			posts := make(chan url.Values, 3)
+			ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == http.MethodPost {
+					body, _ := io.ReadAll(req.Body)
+					form, _ := url.ParseQuery(string(body))
+					posts <- form
+					req.Body = io.NopCloser(bytes.NewReader(body))
+				}
+				ms.handleHive(w, req)
+			}
+			opts := SyncOptions{SyncHives: map[string]bool{hive: true}}
+			cfg := OrgConfig{Version: 3, Hives: orgSyncHives{hive: {"default": {Data: Dict{"value": "old"}}}}}
+			_, err := org.SyncPush(cfg, opts)
+			require.NoError(t, err)
+			created := <-posts
+			require.False(t, created.Has("etag"))
+			require.True(t, created.Has("gzdata"))
+			cfg.Hives[hive]["default"] = SyncHiveData{Data: Dict{"value": "new"}}
+			_, err = org.SyncPush(cfg, opts)
+			require.NoError(t, err)
+			updated := <-posts
+			require.False(t, updated.Has("etag"))
+			require.True(t, updated.Has("sys_mtd"))
+			require.True(t, updated.Has("data"))
+			require.False(t, updated.Has("gzdata"))
+			cfg.Hives[hive]["default"] = SyncHiveData{UsrMtd: UsrMtd{Comment: "metadata"}}
+			_, err = org.SyncPush(cfg, opts)
+			require.NoError(t, err)
+			metadata := <-posts
+			require.True(t, metadata.Has("etag"))
+			require.False(t, metadata.Has("data"))
+			require.False(t, metadata.Has("gzdata"))
+			require.Equal(t, "new", ms.HiveStore[hive+"/"+testOID]["default"].Data["value"])
+		})
+	}
 }

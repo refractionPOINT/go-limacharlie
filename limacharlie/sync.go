@@ -75,6 +75,9 @@ var KnownHives = []string{
 	"investigation_plan",
 }
 
+// SyncAll selects all supported hives for export/apply. Force deletion still
+// visits only hives explicitly present in the input configuration; omit an
+// investigation hive to leave it untouched, or supply an empty map to clear it.
 func SyncAll() SyncOptions {
 	return SyncOptions{
 		SyncDRRules:          true,
