@@ -6,6 +6,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -70,10 +71,14 @@ func TestInvestigationSyncNativeCASConflict(t *testing.T) {
 			ms.HiveStore[key] = map[string]HiveData{"default": {Data: Dict{"value": "concurrent"}, SysMtd: SysMtd{Etag: "new-version"}}}
 			forms := make(chan string, 1)
 			ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
-				if req.Method == http.MethodGet {
+				if req.Method == http.MethodGet && !strings.HasSuffix(req.URL.Path, "/data") {
 					w.Header().Set("Content-Type", "application/json")
 					// The store has advanced since the snapshot used for the diff.
 					w.Write([]byte(`{"default":{"data":{"value":"old"},"usr_mtd":{},"sys_mtd":{"etag":"listed-version"}}}`))
+					return
+				}
+				if req.Method == http.MethodGet {
+					ms.handleHive(w, req)
 					return
 				}
 				body, _ := io.ReadAll(req.Body)
@@ -164,5 +169,75 @@ func TestInvestigationSyncOtherHiveWriteProtocolUnchanged(t *testing.T) {
 			require.False(t, metadata.Has("gzdata"))
 			require.Equal(t, "new", ms.HiveStore[hive+"/"+testOID]["default"].Data["value"])
 		})
+	}
+}
+
+// A timeout can hide a committed write. Replaying its old ETag must not
+// report a conflict unless the desired state differs or cannot be verified.
+func TestInvestigationSyncTimeoutReadback(t *testing.T) {
+	for _, hive := range []string{"investigation_policy", "investigation_plan"} {
+		for _, scenario := range []string{"committed", "data changed", "metadata changed", "read denied"} {
+			t.Run(hive+"/"+scenario, func(t *testing.T) {
+				t.Parallel()
+				ms, org := setupMock(t)
+				key := hive + "/" + testOID
+				ms.HiveStore[key] = map[string]HiveData{"default": {Data: Dict{"value": "old"}, SysMtd: SysMtd{Etag: "listed"}}}
+				attempts := make(chan string, 4)
+				first := true
+				ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
+					if req.Method == http.MethodPost {
+						attempts <- "write"
+						if first {
+							first = false
+							// Commit through the enforcing mock, then lose the response.
+							ms.handleHive(httptest.NewRecorder(), req)
+							ms.mu.Lock()
+							rec := ms.HiveStore[key]["default"]
+							if scenario == "data changed" {
+								rec.Data = Dict{"value": "concurrent"}
+							}
+							if scenario == "metadata changed" {
+								rec.UsrMtd.Comment = "concurrent"
+							}
+							ms.HiveStore[key]["default"] = rec
+							ms.mu.Unlock()
+							w.WriteHeader(http.StatusGatewayTimeout)
+							return
+						}
+					} else if strings.HasSuffix(req.URL.Path, "/data") {
+						attempts <- "readback"
+						if scenario == "read denied" {
+							ms.writeError(w, http.StatusForbidden, "DENIED")
+							return
+						}
+					}
+					ms.handleHive(w, req)
+				}
+				desired := SyncHiveData{Data: Dict{"value": "desired"}, UsrMtd: UsrMtd{Enabled: true, Expiry: 1900000000, Tags: []string{"fictional"}, Comment: "authored"}}
+				_, err := org.SyncPush(OrgConfig{Version: 3, Hives: orgSyncHives{hive: {"default": desired}}}, SyncOptions{SyncHives: map[string]bool{hive: true}})
+				if scenario == "committed" {
+					require.NoError(t, err)
+				} else {
+					require.ErrorContains(t, err, "ETAG_MISMATCH")
+				}
+				require.Equal(t, "write", <-attempts)
+				require.Equal(t, "write", <-attempts)
+				require.Equal(t, "readback", <-attempts)
+				require.Empty(t, attempts) // No write with a refreshed ETag.
+				ms.mu.Lock()
+				stored := ms.HiveStore[key]["default"]
+				ms.mu.Unlock()
+				if scenario == "data changed" {
+					require.Equal(t, "concurrent", stored.Data["value"])
+				} else {
+					require.Equal(t, "desired", stored.Data["value"])
+				}
+				if scenario == "metadata changed" {
+					require.Equal(t, "concurrent", stored.UsrMtd.Comment)
+				} else {
+					require.Equal(t, "authored", stored.UsrMtd.Comment)
+				}
+			})
+		}
 	}
 }

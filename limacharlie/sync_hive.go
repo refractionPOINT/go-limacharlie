@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -395,5 +396,16 @@ func (org *Organization) writeInvestigationHive(ha HiveArgs, hd SyncHiveData, et
 		Data: hd.Data, Enabled: &hd.UsrMtd.Enabled, Expiry: &hd.UsrMtd.Expiry,
 		Tags: hd.UsrMtd.Tags, Comment: &hd.UsrMtd.Comment, ETag: &etag,
 	})
+	// Add may replay a request after a gateway timeout even when the first
+	// write committed. Reconcile a mismatch by reading, never by rewriting
+	// with a newer version. Matching data AND metadata already satisfy sync.
+	if err != nil && strings.Contains(err.Error(), "ETAG_MISMATCH") {
+		stored, readErr := NewHiveClient(org).Get(ha)
+		if readErr == nil {
+			if equal, compareErr := hd.Equals(stored.AsSyncData()); compareErr == nil && equal {
+				return nil
+			}
+		}
+	}
 	return err
 }
