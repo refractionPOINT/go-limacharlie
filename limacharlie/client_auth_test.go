@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -292,7 +293,10 @@ func (s *ClientAuthTestSuite) TestCancelDuringPrimingExchange() {
 	// does not notice the client hanging up while it holds an unread body.
 	release := make(chan struct{})
 	defer close(release)
+	entered := make(chan struct{})
+	var enterOnce sync.Once
 	f.refreshWith(func(_ http.ResponseWriter, r *http.Request) {
+		enterOnce.Do(func() { close(entered) })
 		select {
 		case <-release:
 		case <-r.Context().Done():
@@ -301,7 +305,7 @@ func (s *ClientAuthTestSuite) TestCancelDuringPrimingExchange() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		time.Sleep(200 * time.Millisecond)
+		<-entered
 		cancel()
 	}()
 	start := time.Now()
@@ -323,7 +327,10 @@ func (s *ClientAuthTestSuite) TestCancelDuringRefreshAfterUnauthorized() {
 	// does not notice the client hanging up while it holds an unread body.
 	release := make(chan struct{})
 	defer close(release)
+	entered := make(chan struct{})
+	var enterOnce sync.Once
 	f.refreshWith(func(_ http.ResponseWriter, r *http.Request) {
+		enterOnce.Do(func() { close(entered) })
 		select {
 		case <-release:
 		case <-r.Context().Done():
@@ -332,7 +339,7 @@ func (s *ClientAuthTestSuite) TestCancelDuringRefreshAfterUnauthorized() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		time.Sleep(200 * time.Millisecond)
+		<-entered
 		cancel()
 	}()
 	start := time.Now()
@@ -349,9 +356,12 @@ func (s *ClientAuthTestSuite) TestCancelDuringRefreshAfterUnauthorized() {
 // from the interrupted body read.
 func (s *ClientAuthTestSuite) TestCancelWhileErrorBodyStalls() {
 	release := make(chan struct{})
+	flushed := make(chan struct{})
+	var flushOnce sync.Once
 	f := s.newAuthFixture(func(_ int32, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		w.(http.Flusher).Flush()
+		flushOnce.Do(func() { close(flushed) })
 		select {
 		case <-release:
 		case <-r.Context().Done():
@@ -362,7 +372,7 @@ func (s *ClientAuthTestSuite) TestCancelWhileErrorBodyStalls() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		time.Sleep(200 * time.Millisecond)
+		<-flushed
 		cancel()
 	}()
 	start := time.Now()
