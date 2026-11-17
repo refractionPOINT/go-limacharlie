@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestInvestigationSyncFixture(t *testing.T) {
@@ -89,7 +90,12 @@ func TestInvestigationSyncNativeCASConflict(t *testing.T) {
 			}
 			_, err := org.SyncPush(OrgConfig{Version: 3, Hives: orgSyncHives{hive: {"default": {Data: Dict{"value": "desired"}}}}}, SyncOptions{SyncHives: map[string]bool{hive: true}})
 			require.ErrorContains(t, err, "ETAG_MISMATCH")
-			require.Equal(t, "listed-version", <-forms)
+			select {
+			case etag := <-forms:
+				require.Equal(t, "listed-version", etag)
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for CAS request form")
+			}
 			require.Equal(t, "concurrent", ms.HiveStore[key]["default"].Data["value"])
 		})
 	}
@@ -149,13 +155,23 @@ func TestInvestigationSyncOtherHiveWriteProtocolUnchanged(t *testing.T) {
 			cfg := OrgConfig{Version: 3, Hives: orgSyncHives{hive: {"default": {Data: Dict{"value": "old"}}}}}
 			_, err := org.SyncPush(cfg, opts)
 			require.NoError(t, err)
-			created := <-posts
+			var created url.Values
+			select {
+			case created = <-posts:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for created request form")
+			}
 			require.False(t, created.Has("etag"))
 			require.True(t, created.Has("gzdata"))
 			cfg.Hives[hive]["default"] = SyncHiveData{Data: Dict{"value": "new"}}
 			_, err = org.SyncPush(cfg, opts)
 			require.NoError(t, err)
-			updated := <-posts
+			var updated url.Values
+			select {
+			case updated = <-posts:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for updated request form")
+			}
 			require.False(t, updated.Has("etag"))
 			require.True(t, updated.Has("sys_mtd"))
 			require.True(t, updated.Has("data"))
@@ -163,7 +179,12 @@ func TestInvestigationSyncOtherHiveWriteProtocolUnchanged(t *testing.T) {
 			cfg.Hives[hive]["default"] = SyncHiveData{UsrMtd: UsrMtd{Comment: "metadata"}}
 			_, err = org.SyncPush(cfg, opts)
 			require.NoError(t, err)
-			metadata := <-posts
+			var metadata url.Values
+			select {
+			case metadata = <-posts:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for metadata request form")
+			}
 			require.True(t, metadata.Has("etag"))
 			require.False(t, metadata.Has("data"))
 			require.False(t, metadata.Has("gzdata"))
@@ -180,6 +201,7 @@ func TestInvestigationSyncTimeoutReadback(t *testing.T) {
 			t.Run(hive+"/"+scenario, func(t *testing.T) {
 				t.Parallel()
 				ms, org := setupMock(t)
+				org.client.gatewayTimeoutRetryDelay = time.Millisecond
 				key := hive + "/" + testOID
 				ms.HiveStore[key] = map[string]HiveData{"default": {Data: Dict{"value": "old"}, SysMtd: SysMtd{Etag: "listed"}}}
 				attempts := make(chan string, 4)
@@ -220,9 +242,14 @@ func TestInvestigationSyncTimeoutReadback(t *testing.T) {
 				} else {
 					require.ErrorContains(t, err, "ETAG_MISMATCH")
 				}
-				require.Equal(t, "write", <-attempts)
-				require.Equal(t, "write", <-attempts)
-				require.Equal(t, "readback", <-attempts)
+				for i, expected := range []string{"write", "write", "readback"} {
+					select {
+					case actual := <-attempts:
+						require.Equal(t, expected, actual)
+					case <-time.After(5 * time.Second):
+						t.Fatalf("timed out waiting for request %d (%s)", i+1, expected)
+					}
+				}
 				require.Empty(t, attempts) // No write with a refreshed ETag.
 				ms.mu.Lock()
 				stored := ms.HiveStore[key]["default"]
