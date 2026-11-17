@@ -1899,6 +1899,6 @@ func TestMockSensors_IsolateFromNetworkWithContextStopsAtTheDeadline(t *testing.
 	defer cancel()
 	start := time.Now()
 	err = (&Sensor{OID: testOID, SID: sid, Organization: o}).IsolateFromNetworkWithContext(ctx) // GetSensor itself would call the slow server
-	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Less(t, time.Since(start), 5*time.Second)
 }

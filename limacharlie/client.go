@@ -327,6 +327,10 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 
 	request.nRetries++
 	for request.nRetries > 0 {
+		// A finished context ends the call: do not make attempts that cannot succeed.
+		if cerr := ctx.Err(); cerr != nil {
+			return cerr
+		}
 		var statusCode int
 		statusCode, err = c.request(ctx, verb, path, request)
 		if err == nil && statusCode == http.StatusOK {
