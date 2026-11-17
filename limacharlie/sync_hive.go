@@ -226,6 +226,11 @@ func (org *Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) erro
 		return err
 	}
 
+	current, err := hiveClient.Get(ha)
+	if err != nil {
+		return err
+	}
+	etag := current.SysMtd.Etag
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	tags := hd.UsrMtd.Tags
@@ -239,9 +244,10 @@ func (org *Organization) updateHiveConfigData(ha HiveArgs, hd SyncHiveData) erro
 		Expiry:       &expiry,
 		Tags:         tags,
 		Comment:      &comment,
+		ETag:         &etag,
 	}
 
-	_, err = hiveClient.Update(args) // run actual update call
+	_, err = hiveClient.Add(args) // Replace data using the version read at apply time.
 	if err != nil {
 		return err
 	}
@@ -256,6 +262,8 @@ func (org *Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		return err
 	}
 
+	// Do not overwrite a record created after the apply-time listing.
+	etag := "create-only: the record must not exist"
 	enabled := hd.UsrMtd.Enabled
 	expiry := hd.UsrMtd.Expiry
 	tags := hd.UsrMtd.Tags
@@ -269,6 +277,7 @@ func (org *Organization) addHiveConfigData(ha HiveArgs, hd SyncHiveData) error {
 		Expiry:       &expiry,
 		Tags:         tags,
 		Comment:      &comment,
+		ETag:         &etag,
 	}
 
 	_, err = hiveClient.Add(args)
