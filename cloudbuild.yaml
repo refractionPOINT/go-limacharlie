@@ -25,6 +25,7 @@ availableSecrets:
 # fires first and reports which test was slow.
 timeout: '3600s'
 options:
+  logging: CLOUD_LOGGING_ONLY
   machineType: 'N1_HIGHCPU_8'
   # Tolerate substitutions defined on the trigger that this config no longer references.
   substitutionOption: 'ALLOW_LOOSE'
