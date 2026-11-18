@@ -71,8 +71,13 @@ var KnownHives = []string{
 	"sop",
 	"app_control_policy",
 	"app_control_rule",
+	"investigation_policy",
+	"investigation_plan",
 }
 
+// SyncAll selects all supported hives for export/apply. Force deletion still
+// visits only hives explicitly present in the input configuration; omit an
+// investigation hive to leave it untouched, or supply an empty map to clear it.
 func SyncAll() SyncOptions {
 	return SyncOptions{
 		SyncDRRules:          true,
@@ -87,26 +92,28 @@ func SyncAll() SyncOptions {
 		SyncInstallationKeys: true,
 		SyncYara:             true,
 		SyncHives: map[string]bool{
-			"acl":                true,
-			"dr-general":         true,
-			"dr-managed":         true,
-			"dr-service":         true,
-			"fp":                 true,
-			"cloud_sensor":       true,
-			"extension_config":   true,
-			"yara":               true,
-			"secret":             true,
-			"lookup":             true,
-			"query":              true,
-			"playbook":           true,
-			"ai_agent":           true,
-			"ai_skill":           true,
-			"ai_memory":          true,
-			"external_adapter":   true,
-			"org_notes":          true,
-			"sop":                true,
-			"app_control_policy": true,
-			"app_control_rule":   true,
+			"acl":                  true,
+			"dr-general":           true,
+			"dr-managed":           true,
+			"dr-service":           true,
+			"fp":                   true,
+			"cloud_sensor":         true,
+			"extension_config":     true,
+			"yara":                 true,
+			"secret":               true,
+			"lookup":               true,
+			"query":                true,
+			"playbook":             true,
+			"ai_agent":             true,
+			"ai_skill":             true,
+			"ai_memory":            true,
+			"external_adapter":     true,
+			"org_notes":            true,
+			"sop":                  true,
+			"app_control_policy":   true,
+			"app_control_rule":     true,
+			"investigation_policy": true,
+			"investigation_plan":   true,
 		},
 	}
 }

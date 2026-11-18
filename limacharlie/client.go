@@ -35,6 +35,9 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string // overrides rootURL when non-empty
 	jwtURL     string // overrides getJWTURL when non-empty
+	// gatewayTimeoutRetryDelay overrides the five-second default when positive.
+	// Set before making requests; kept per client so tests can run in parallel.
+	gatewayTimeoutRetryDelay time.Duration
 }
 
 // ClientOptions holds all options for Client
@@ -367,7 +370,11 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 			return err
 		} else if statusCode == http.StatusGatewayTimeout {
 			// Looks like the API might be under load.
-			if err := waitForRetry(ctx, 5*time.Second); err != nil {
+			delay := c.gatewayTimeoutRetryDelay
+			if delay <= 0 {
+				delay = 5 * time.Second
+			}
+			if err := waitForRetry(ctx, delay); err != nil {
 				return err
 			}
 		} else if statusCode >= 400 && statusCode < 500 {

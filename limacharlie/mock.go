@@ -1191,6 +1191,19 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 			_ = json.Unmarshal([]byte(smStr), &sysMtd)
 		}
 
+		// Match native Hive CAS semantics only for investigation sync fixtures.
+		// Missing records accept any etag; existing records check nonempty ones.
+		if hiveName == "investigation_policy" || hiveName == "investigation_plan" {
+			presented := form.Get("etag")
+			if presented == "" {
+				presented = sysMtd.Etag
+			}
+			if existing, ok := ms.HiveStore[storeKey][key]; ok && presented != "" && presented != existing.SysMtd.Etag {
+				ms.writeError(w, 409, "ETAG_MISMATCH")
+				return
+			}
+		}
+
 		// Parse uncompressed data (for Update)
 		if dataStr := form.Get("data"); dataStr != "" && data == nil {
 			_ = json.Unmarshal([]byte(dataStr), &data)
