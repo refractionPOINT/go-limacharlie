@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1867,4 +1869,139 @@ func TestMockGetURLs_Caching(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, urlCalls, "expected only 1 URL fetch, rest should be cached")
+}
+
+func TestMockSensors_IsolateFromNetworkWithContextStopsAtTheDeadline(t *testing.T) {
+	ms, org := setupMock(t)
+	sid := uuid.New().String()
+	ms.SensorStore[sid] = &Sensor{OID: testOID, SID: sid}
+
+	// A live context works like IsolateFromNetwork.
+	require.NoError(t, org.GetSensor(sid).IsolateFromNetworkWithContext(context.Background()))
+	assert.True(t, ms.SensorIsolation[sid])
+
+	// A slow platform: the deadline ends the call instead of the SDK's retries.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(30 * time.Second):
+		}
+	}))
+	defer slow.Close()
+	c := &Client{
+		options:    ClientOptions{OID: testOID, JWT: "jwt"},
+		logger:     &LCLoggerEmpty{},
+		httpClient: slow.Client(),
+		baseURL:    slow.URL,
+	}
+	o, err := NewOrganization(c)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	err = (&Sensor{OID: testOID, SID: sid, Organization: o}).IsolateFromNetworkWithContext(ctx) // GetSensor itself would call the slow server
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(start), 5*time.Second)
+}
+
+func TestMockSensors_IsolateFromNetworkWithContextMakesNoRequestOnACancelledContext(t *testing.T) {
+	var requests int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := &Client{
+		options:    ClientOptions{OID: testOID, JWT: "jwt"},
+		logger:     &LCLoggerEmpty{},
+		httpClient: srv.Client(),
+		baseURL:    srv.URL,
+	}
+	o, err := NewOrganization(c)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = (&Sensor{OID: testOID, SID: "sid", Organization: o}).IsolateFromNetworkWithContext(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Zero(t, atomic.LoadInt32(&requests), "a finished context must not start any attempt")
+}
+
+// The context-aware variants of the write paths: with a live context they act
+// like the plain calls on the mock platform, and a context that is done sends
+// nothing (the plain calls run on context.Background() and cannot be stopped).
+func TestMockWithContextVariantsActLikeTheirPlainCalls(t *testing.T) {
+	ms, org := setupMock(t)
+	ctx := context.Background()
+	hc := NewHiveClient(org)
+	args := HiveArgs{HiveName: "dr-general", PartitionKey: testOID, Key: "r1", Data: Dict{"a": "b"}}
+	_, err := hc.AddWithContext(ctx, args)
+	require.NoError(t, err)
+	rec, err := hc.GetWithContext(ctx, args)
+	require.NoError(t, err)
+	assert.Equal(t, "b", rec.Data["a"])
+	_, err = hc.UpdateTxWithContext(ctx, args, func(r *HiveData) (*HiveData, error) {
+		r.Data = map[string]interface{}{"a": "c"}
+		return r, nil
+	})
+	require.NoError(t, err)
+	rec, err = hc.GetWithContext(ctx, args)
+	require.NoError(t, err)
+	assert.Equal(t, "c", rec.Data["a"])
+	_, err = hc.RemoveWithContext(ctx, args)
+	require.NoError(t, err)
+	_, err = hc.GetWithContext(ctx, args)
+	require.Error(t, err)
+
+	sid := uuid.New().String()
+	ms.SensorStore[sid] = &Sensor{OID: testOID, SID: sid}
+	require.NoError(t, org.GetSensor(sid).AddTagWithContext(ctx, "t1", 0))
+	assert.Contains(t, ms.SensorTags[sid], "t1")
+	require.NoError(t, org.GetSensor(sid).RemoveTagWithContext(ctx, "t1"))
+	assert.NotContains(t, ms.SensorTags[sid], "t1")
+
+	ms.PayloadStore["p1"] = Payload{}
+	require.NoError(t, org.DeletePayloadWithContext(ctx, "p1"))
+	assert.NotContains(t, ms.PayloadStore, "p1")
+
+	iid, err := org.AddInstallationKey(InstallationKey{Description: "d", Tags: []string{"x"}})
+	require.NoError(t, err)
+	keys, err := org.InstallationKeysWithContext(ctx)
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	require.NoError(t, org.DelInstallationKeyWithContext(ctx, iid))
+	keys, err = org.InstallationKeysWithContext(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, keys)
+}
+
+func TestWithContextVariantsSendNothingOnceTheContextIsDone(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		http.Error(w, "boom", http.StatusInternalServerError) // the SDK would retry this
+	}))
+	defer srv.Close()
+	o, err := NewOrganization(&Client{
+		options: ClientOptions{OID: testOID, JWT: "jwt"}, logger: &LCLoggerEmpty{}, httpClient: srv.Client(), baseURL: srv.URL,
+	})
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	hc := NewHiveClient(o)
+	args := HiveArgs{HiveName: "h", PartitionKey: testOID, Key: "k", Data: Dict{}}
+	sensor := &Sensor{OID: testOID, SID: "sid", Organization: o}
+	_, e1 := hc.GetWithContext(ctx, args)
+	_, e2 := hc.AddWithContext(ctx, args)
+	_, e3 := hc.RemoveWithContext(ctx, args)
+	_, e4 := hc.UpdateTxWithContext(ctx, args, func(r *HiveData) (*HiveData, error) { return r, nil })
+	e5 := sensor.AddTagWithContext(ctx, "t", 0)
+	e6 := sensor.RemoveTagWithContext(ctx, "t")
+	e7 := o.DeletePayloadWithContext(ctx, "p")
+	_, e8 := o.InstallationKeysWithContext(ctx)
+	e9 := o.DelInstallationKeyWithContext(ctx, "i")
+	for i, e := range []error{e1, e2, e3, e4, e5, e6, e7, e8, e9} {
+		require.Error(t, e, "call %d", i)
+		assert.ErrorIs(t, e, context.Canceled, "call %d", i)
+	}
+	assert.Equal(t, int32(0), atomic.LoadInt32(&calls), "a done context must send no request")
 }

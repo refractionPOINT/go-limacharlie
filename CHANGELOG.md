@@ -10,6 +10,10 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Added
 
+- **`Sensor.IsolateFromNetworkWithContext(ctx)`.** `IsolateFromNetwork` runs on `context.Background()`, so a caller with a deadline could not stop it while the SDK retried. The new call applies the caller's context to every attempt and every retry wait; `IsolateFromNetwork` now calls it with `context.Background()` and behaves as before.
+
+- **Context-aware variants of the write paths.** `HiveClient.GetWithContext`, `AddWithContext`, `UpdateTxWithContext` and `RemoveWithContext`, `Sensor.AddTagWithContext` and `RemoveTagWithContext`, `Organization.DeletePayloadWithContext`, `InstallationKeysWithContext` and `DelInstallationKeyWithContext`. The plain calls run every request and retry on `context.Background()`, so a caller whose deadline or lease ended could not stop a retrying delete or write. The new calls apply the caller's context to every attempt and retry wait (and end the `UpdateTx` loop); the plain calls now call them with `context.Background()` and behave as before.
+
 - **Search API submission.** `limacharlie/search.go` adds the calls that start a search and read its pages, which the SDK previously had no way to do. `Organization.ListOpenQueries` and `Organization.GetSearchLimits` could already report on searches, but nothing could submit one.
 
   | Call | Endpoint |

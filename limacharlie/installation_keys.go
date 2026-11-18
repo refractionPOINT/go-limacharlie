@@ -111,10 +111,15 @@ func (k InstallationKey) EqualsContent(k2 InstallationKey) bool {
 }
 
 func (org *Organization) InstallationKeys() ([]InstallationKey, error) {
+	return org.InstallationKeysWithContext(context.Background())
+}
+
+// InstallationKeysWithContext lists the installation keys like InstallationKeys, applying ctx to every attempt and every retry wait.
+func (org *Organization) InstallationKeysWithContext(ctx context.Context) ([]InstallationKey, error) {
 	resp := map[string]map[string]InstallationKey{}
 
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(context.Background(), http.MethodGet, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodGet, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
 		return nil, err
 	}
 	keys := []InstallationKey{}
@@ -154,12 +159,17 @@ func (org *Organization) AddInstallationKey(k InstallationKey) (string, error) {
 }
 
 func (org *Organization) DelInstallationKey(iid string) error {
+	return org.DelInstallationKeyWithContext(context.Background(), iid)
+}
+
+// DelInstallationKeyWithContext deletes an installation key like DelInstallationKey, applying ctx to every attempt and every retry wait.
+func (org *Organization) DelInstallationKeyWithContext(ctx context.Context, iid string) error {
 	resp := Dict{}
 
 	request := makeDefaultRequest(&resp).withFormData(Dict{
 		"iid": iid,
 	})
-	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodDelete, fmt.Sprintf("installationkeys/%s", org.client.options.OID), request); err != nil {
 		return err
 	}
 	return nil

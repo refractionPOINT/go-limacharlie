@@ -410,12 +410,17 @@ func stripHiveData(set HiveConfigData) {
 }
 
 func (h *HiveClient) Get(args HiveArgs) (*HiveData, error) {
+	return h.GetWithContext(context.Background(), args)
+}
+
+// GetWithContext returns a record like Get, applying ctx to every attempt and every retry wait.
+func (h *HiveClient) GetWithContext(ctx context.Context, args HiveArgs) (*HiveData, error) {
 	if args.Key == "" {
 		return nil, errors.New("key is required")
 	}
 
 	var hiveSet HiveData
-	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodGet,
+	if err := h.Organization.client.reliableRequest(ctx, http.MethodGet,
 		fmt.Sprintf("hive/%s/%s/%s/data", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&hiveSet)); err != nil {
 		return nil, err
 	}
@@ -470,6 +475,11 @@ func (h *HiveClient) GetMTD(args HiveArgs) (*HiveData, error) {
 }
 
 func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
+	return h.AddWithContext(context.Background(), args)
+}
+
+// AddWithContext creates or replaces a record like Add, applying ctx to every attempt and every retry wait.
+func (h *HiveClient) AddWithContext(ctx context.Context, args HiveArgs) (*HiveResp, error) {
 	if args.Key == "" {
 		return nil, errors.New("key required")
 	}
@@ -523,7 +533,7 @@ func (h *HiveClient) Add(args HiveArgs) (*HiveResp, error) {
 
 	var hiveResp HiveResp
 	req := makeDefaultRequest(&hiveResp).withFormData(reqDict).withTimeout(30 * time.Second)
-	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodPost,
+	if err := h.Organization.client.reliableRequest(ctx, http.MethodPost,
 		fmt.Sprintf("hive/%s/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key), target), req); err != nil {
 		return nil, err
 	}
@@ -590,6 +600,11 @@ func (h *HiveClient) Update(args HiveArgs) (*HiveResp, error) {
 }
 
 func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveData, error)) (*HiveResp, error) {
+	return h.UpdateTxWithContext(context.Background(), args, tx)
+}
+
+// UpdateTxWithContext is UpdateTx with ctx applied to every request, attempt and retry wait of the transaction. A done ctx ends the loop.
+func (h *HiveClient) UpdateTxWithContext(ctx context.Context, args HiveArgs, tx func(record *HiveData) (*HiveData, error)) (*HiveResp, error) {
 	// Perform a transactional update of the record
 	// by using the "etag" provided by the API to make
 	// sure we don't overwrite changes made to the
@@ -601,11 +616,14 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 	if tx == nil {
 		return nil, errors.New("tx function required")
 	}
-	rec, err := h.Get(args)
+	rec, err := h.GetWithContext(ctx, args)
 	if err != nil && !strings.Contains(err.Error(), "RECORD_NOT_FOUND") {
 		return nil, err
 	}
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		eTag := ""
 		if rec != nil {
 			eTag = rec.SysMtd.Etag
@@ -620,7 +638,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 		}
 		rec = newRec
 		// Try to update the record.
-		updResp, err := h.Add(HiveArgs{
+		updResp, err := h.AddWithContext(ctx, HiveArgs{
 			HiveName:     args.HiveName,
 			PartitionKey: args.PartitionKey,
 			Key:          args.Key,
@@ -642,7 +660,7 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 		}
 		// The update failed, the record changed on us.
 		// Fetch the new record and try again.
-		rec, err = h.Get(args)
+		rec, err = h.GetWithContext(ctx, args)
 		if err != nil {
 			return nil, err
 		}
@@ -650,8 +668,13 @@ func (h *HiveClient) UpdateTx(args HiveArgs, tx func(record *HiveData) (*HiveDat
 }
 
 func (h *HiveClient) Remove(args HiveArgs) (interface{}, error) {
+	return h.RemoveWithContext(context.Background(), args)
+}
+
+// RemoveWithContext deletes a record like Remove, applying ctx to every attempt and every retry wait.
+func (h *HiveClient) RemoveWithContext(ctx context.Context, args HiveArgs) (interface{}, error) {
 	var delResp interface{}
-	if err := h.Organization.client.reliableRequest(context.Background(), http.MethodDelete,
+	if err := h.Organization.client.reliableRequest(ctx, http.MethodDelete,
 		fmt.Sprintf("hive/%s/%s/%s", args.HiveName, args.PartitionKey, url.PathEscape(args.Key)), makeDefaultRequest(&delResp)); err != nil {
 		return nil, err
 	}

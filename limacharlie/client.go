@@ -239,6 +239,13 @@ func validateUUID(s string) error {
 }
 
 func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
+	return c.refreshJWT(context.Background(), expiry)
+}
+
+// refreshJWT exchanges the API key for a JWT. The exchange runs under the
+// caller's context (in addition to its own 10s timeout), so a finished context
+// ends it.
+func (c *Client) refreshJWT(parent context.Context, expiry time.Duration) (string, error) {
 	if c.options.APIKey == "" {
 		return "", ErrorNoAPIKeyConfigured
 	}
@@ -257,7 +264,7 @@ func (c *Client) RefreshJWT(expiry time.Duration) (string, error) {
 		authData.Set("perms", strings.Join(c.options.Permissions, ","))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 
 	jwtEndpoint := c.jwtURL
@@ -317,10 +324,19 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 	// an expired token, so there is nothing to gain from refreshing again.
 	jwtRefreshed := false
 
+	// A finished context must not even start the JWT priming exchange.
+	if cerr := ctx.Err(); cerr != nil {
+		return cerr
+	}
+
 	// If no JWT is ready and we have an API key, prime it (similar to Python SDK behavior).
 	// This prevents sending empty JWT on first request which causes billing server to complain.
 	if c.options.JWT == "" && c.options.APIKey != "" {
-		if _, err = c.RefreshJWT(c.options.JWTExpiryTime); err != nil {
+		if _, err = c.refreshJWT(ctx, c.options.JWTExpiryTime); err != nil {
+			// Report the caller's own cancellation as such.
+			if cerr := ctx.Err(); cerr != nil {
+				return cerr
+			}
 			return err
 		}
 		// The token the first attempt is about to use was just minted, so an
@@ -330,12 +346,23 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 
 	request.nRetries++
 	for request.nRetries > 0 {
+		// A finished context ends the call: do not make attempts that cannot succeed.
+		if cerr := ctx.Err(); cerr != nil {
+			return cerr
+		}
 		var statusCode int
 		statusCode, err = c.request(ctx, verb, path, request)
 		if err == nil && statusCode == http.StatusOK {
 			break
 		}
 		request.nRetries--
+
+		// A call whose context finished reports that, whatever the failed
+		// attempt returned: an interrupted error body read would otherwise
+		// surface as a plain REST error. Never fires for Background.
+		if cerr := ctx.Err(); cerr != nil {
+			return cerr
+		}
 
 		if statusCode == http.StatusUnauthorized {
 			// Unauthorized, the JWT may have expired, refresh
@@ -353,7 +380,11 @@ func (c *Client) reliableRequest(ctx context.Context, verb string, path string, 
 			// variable. Assigning it to err would overwrite the error of
 			// the request above and, on a successful refresh, silently
 			// turn an Unauthorized into a nil error for the caller.
-			if _, refreshErr := c.RefreshJWT(c.options.JWTExpiryTime); refreshErr != nil {
+			if _, refreshErr := c.refreshJWT(ctx, c.options.JWTExpiryTime); refreshErr != nil {
+				// The caller's cancellation ends the call as such.
+				if cerr := ctx.Err(); cerr != nil {
+					return cerr
+				}
 				// If we cannot get a new JWT there is no point in
 				// retrying with bad creds. Both errors are reported: the
 				// message the API returned carries the details callers

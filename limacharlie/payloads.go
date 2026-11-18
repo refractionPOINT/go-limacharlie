@@ -59,9 +59,14 @@ func (org *Organization) Payload(name PayloadName) ([]byte, error) {
 
 // Delete a Payload from within an LC organization.
 func (org *Organization) DeletePayload(name PayloadName) error {
+	return org.DeletePayloadWithContext(context.Background(), name)
+}
+
+// DeletePayloadWithContext deletes a payload like DeletePayload, applying ctx to every attempt and every retry wait.
+func (org *Organization) DeletePayloadWithContext(ctx context.Context, name PayloadName) error {
 	resp := Dict{}
 	request := makeDefaultRequest(&resp)
-	if err := org.client.reliableRequest(context.Background(), http.MethodDelete, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
+	if err := org.client.reliableRequest(ctx, http.MethodDelete, fmt.Sprintf("payload/%s/%s", org.client.options.OID, url.PathEscape(name)), request); err != nil {
 		return err
 	}
 	return nil

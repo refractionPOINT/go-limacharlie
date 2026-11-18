@@ -2,10 +2,13 @@ package limacharlie
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -258,4 +261,124 @@ func (s *ClientAuthTestSuite) TestSuccessfulRequestUnaffected() {
 	s.Equal("ok", resp["value"])
 	s.EqualValues(1, f.APICalls())
 	s.EqualValues(0, f.JWTCalls())
+}
+
+// A context that is already finished must not send any request, including the
+// token exchange that primes a client holding an API key but no JWT.
+func (s *ClientAuthTestSuite) TestCancelledContextSendsNoPrimingExchange() {
+	f := s.newAuthFixture(func(_ int32, w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{}`))
+	})
+	defer f.Close()
+	f.c.options.JWT = ""
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.c.reliableRequest(ctx, http.MethodGet, "test", makeDefaultRequest(&Dict{}))
+
+	s.ErrorIs(err, context.Canceled)
+	s.EqualValues(0, f.JWTCalls(), "no token exchange may be sent on a finished context")
+	s.EqualValues(0, f.APICalls())
+}
+
+// Cancelling while the priming exchange is stalled ends the call promptly, and
+// the error is the caller's cancellation.
+func (s *ClientAuthTestSuite) TestCancelDuringPrimingExchange() {
+	f := s.newAuthFixture(func(_ int32, w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{}`))
+	})
+	defer f.Close()
+	f.c.options.JWT = ""
+	// The stalled exchange is released once the call has returned; the server
+	// does not notice the client hanging up while it holds an unread body.
+	release := make(chan struct{})
+	defer close(release)
+	entered := make(chan struct{})
+	var enterOnce sync.Once
+	f.refreshWith(func(_ http.ResponseWriter, r *http.Request) {
+		enterOnce.Do(func() { close(entered) })
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-entered
+		cancel()
+	}()
+	start := time.Now()
+	err := f.c.reliableRequest(ctx, http.MethodGet, "test", makeDefaultRequest(&Dict{}))
+
+	s.ErrorIs(err, context.Canceled)
+	s.Less(time.Since(start), 5*time.Second)
+	s.EqualValues(0, f.APICalls())
+}
+
+// Cancelling while the refresh that follows an Unauthorized answer is stalled
+// ends the call promptly with the caller's cancellation.
+func (s *ClientAuthTestSuite) TestCancelDuringRefreshAfterUnauthorized() {
+	f := s.newAuthFixture(func(_ int32, w http.ResponseWriter, _ *http.Request) {
+		unauthorized(w, "expired")
+	})
+	defer f.Close()
+	// The stalled exchange is released once the call has returned; the server
+	// does not notice the client hanging up while it holds an unread body.
+	release := make(chan struct{})
+	defer close(release)
+	entered := make(chan struct{})
+	var enterOnce sync.Once
+	f.refreshWith(func(_ http.ResponseWriter, r *http.Request) {
+		enterOnce.Do(func() { close(entered) })
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-entered
+		cancel()
+	}()
+	start := time.Now()
+	err := f.c.reliableRequest(ctx, http.MethodGet, "test", makeDefaultRequest(&Dict{}))
+
+	s.ErrorIs(err, context.Canceled)
+	s.Less(time.Since(start), 5*time.Second)
+	s.EqualValues(1, f.APICalls())
+	s.EqualValues(1, f.JWTCalls())
+}
+
+// An error answer whose headers are flushed but whose body stalls must, once
+// the caller cancels, report the cancellation rather than a REST error built
+// from the interrupted body read.
+func (s *ClientAuthTestSuite) TestCancelWhileErrorBodyStalls() {
+	release := make(chan struct{})
+	flushed := make(chan struct{})
+	var flushOnce sync.Once
+	f := s.newAuthFixture(func(_ int32, w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.(http.Flusher).Flush()
+		flushOnce.Do(func() { close(flushed) })
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	})
+	defer f.Close()
+	defer close(release)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-flushed
+		cancel()
+	}()
+	start := time.Now()
+	err := f.c.reliableRequest(ctx, http.MethodGet, "test", makeDefaultRequest(&Dict{}))
+
+	s.True(errors.Is(err, context.Canceled), "got %v", err)
+	s.Less(time.Since(start), 5*time.Second)
+	s.EqualValues(1, f.APICalls())
 }
