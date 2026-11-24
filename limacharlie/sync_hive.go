@@ -3,6 +3,7 @@ package limacharlie
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -12,6 +13,66 @@ import (
 // syncHivePageSize is the page size used when reading hives for a sync. The
 // server still bounds the byte size of each page.
 const syncHivePageSize = 500
+
+// serverManagedTagPrefixes are tags Hive writes onto a record itself. Sync
+// leaves them out of what it reads, exports and compares, and never sends
+// them: Hive stamps them again on every write. Without this, a record written
+// without the tag (the normal way to write one) would never compare equal to
+// what Hive stores, and every sync would rewrite it.
+//
+// mailsec_provider: Hive tags each connection "mailsec:provider:<provider>"
+// from its provider field, for routing and the one-enabled-connection-per-
+// provider check.
+var serverManagedTagPrefixes = map[string][]string{
+	"mailsec_provider": {"mailsec:provider:"},
+}
+
+// withoutServerManagedTags returns tags minus the ones Hive manages for hive.
+// It never modifies tags in place.
+func withoutServerManagedTags(hive string, tags []string) []string {
+	prefixes := serverManagedTagPrefixes[hive]
+	if len(prefixes) == 0 || len(tags) == 0 {
+		return tags
+	}
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		managed := false
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(tag, prefix) {
+				managed = true
+				break
+			}
+		}
+		if !managed {
+			out = append(out, tag)
+		}
+	}
+	return out
+}
+
+// orderedSyncHiveNames returns the hives of a configuration in the order
+// syncHive applies them: KnownHives order first (which puts a product's
+// provider records before the records that use them), then any other hive by
+// name. Map order would make which hive fails first, and what was already
+// applied when it does, differ from one run to the next.
+func orderedSyncHiveNames(hives orgSyncHives) []string {
+	names := make([]string, 0, len(hives))
+	seen := make(map[string]struct{}, len(hives))
+	for _, hive := range KnownHives {
+		if _, ok := hives[hive]; ok {
+			names = append(names, hive)
+			seen[hive] = struct{}{}
+		}
+	}
+	var rest []string
+	for hive := range hives {
+		if _, ok := seen[hive]; !ok {
+			rest = append(rest, hive)
+		}
+	}
+	sort.Strings(rest)
+	return append(names, rest...)
+}
 
 type SyncHiveConfigData map[string]SyncHiveData
 type SyncHiveData struct {
@@ -81,7 +142,8 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 	}
 
 	var orgOps []OrgSyncOperation
-	for hiveName, newConfigData := range hiveConfigData {
+	for _, hiveName := range orderedSyncHiveNames(hiveConfigData) {
+		newConfigData := hiveConfigData[hiveName]
 
 		// Only sync hives that are specified.
 		if opts.SyncHives == nil || !opts.SyncHives[hiveName] {
@@ -99,6 +161,9 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 
 		// now check if we need to update or add new data for this particular hive
 		for hiveKey, ncd := range newConfigData {
+			// A tag Hive manages is never sent, so a configuration exported
+			// before sync dropped it still compares equal.
+			ncd.UsrMtd.Tags = withoutServerManagedTags(hiveName, ncd.UsrMtd.Tags)
 			// if key does not exist in current config data
 			// new data needs to be added
 			if _, ok := currentConfigData[hiveKey]; !ok {
@@ -116,7 +181,7 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 				if isInvestigationSyncHive(hiveName) {
 					err = org.writeInvestigationHive(ha, ncd, "")
 				} else {
-					err = org.addHiveConfigData(ha, newConfigData[hiveKey])
+					err = org.addHiveConfigData(ha, ncd)
 				}
 				if err != nil {
 					return orgOps, err
@@ -218,7 +283,7 @@ func (org *Organization) fetchHiveConfigData(args HiveArgs) (SyncHiveConfigData,
 				UsrMtd: UsrMtd{
 					Enabled: v.UsrMtd.Enabled,
 					Expiry:  v.UsrMtd.Expiry,
-					Tags:    v.UsrMtd.Tags,
+					Tags:    withoutServerManagedTags(args.HiveName, v.UsrMtd.Tags),
 					Comment: v.UsrMtd.Comment,
 				},
 			}

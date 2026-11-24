@@ -1220,6 +1220,7 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			existing.UsrMtd = usrMtd
+			existing.UsrMtd.Tags = mockStampServerTags(hiveName, existing.Data, usrMtd.Tags)
 			existing.SysMtd.Etag = uuid.New().String()
 			existing.SysMtd.LastAuthor = "mock"
 			existing.SysMtd.LastMod = time.Now().Unix()
@@ -1238,6 +1239,7 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 
 		guid := uuid.New().String()
 		etag := uuid.New().String()
+		usrMtd.Tags = mockStampServerTags(hiveName, data, usrMtd.Tags)
 
 		ms.HiveStore[storeKey][key] = HiveData{
 			Data:   data,
@@ -1262,6 +1264,27 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 		}
 		ms.writeJSON(w, Dict{"success": true})
 	}
+}
+
+// mockStampServerTags mirrors the tags Hive writes onto a record itself
+// (legion_config_hive PreIngestMailSecProvider): a mailsec_provider record is
+// tagged "mailsec:provider:<provider>", replacing any tag with that prefix the
+// writer sent, on data and metadata writes alike.
+func mockStampServerTags(hiveName string, data map[string]interface{}, tags []string) []string {
+	if hiveName != "mailsec_provider" {
+		return tags
+	}
+	provider, _ := data["provider"].(string)
+	if provider == "" {
+		return tags
+	}
+	out := make([]string, 0, len(tags)+1)
+	for _, tag := range tags {
+		if !strings.HasPrefix(tag, "mailsec:provider:") {
+			out = append(out, tag)
+		}
+	}
+	return append(out, "mailsec:provider:"+provider)
 }
 
 func (ms *MockServer) handleHiveBatch(w http.ResponseWriter, r *http.Request) {

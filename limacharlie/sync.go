@@ -73,6 +73,18 @@ var KnownHives = []string{
 	"app_control_rule",
 	"investigation_policy",
 	"investigation_plan",
+	// Cloud Security. Providers come before the records that use them, and
+	// syncHive applies hives in this order.
+	"cloudsec_provider",
+	"cloudsec_policy",
+	"cloudsec_query",
+	"cloudsec_code_rule",
+	// Email Security: the connection, then policy, then the dr-mail rules.
+	"mailsec_provider",
+	"mailsec_policy",
+	"dr-mail",
+	// Host Posture rules.
+	"host_posture_rule",
 }
 
 // SyncAll selects all supported hives for export/apply. Force deletion still
@@ -114,6 +126,14 @@ func SyncAll() SyncOptions {
 			"app_control_rule":     true,
 			"investigation_policy": true,
 			"investigation_plan":   true,
+			"cloudsec_provider":    true,
+			"cloudsec_policy":      true,
+			"cloudsec_query":       true,
+			"cloudsec_code_rule":   true,
+			"mailsec_provider":     true,
+			"mailsec_policy":       true,
+			"dr-mail":              true,
+			"host_posture_rule":    true,
 		},
 	}
 }

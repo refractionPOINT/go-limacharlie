@@ -10,6 +10,12 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Added
 
+- **Sync carries Cloud Security, Email Security and Host Posture configuration.** `KnownHives` and `SyncAll()` now include `cloudsec_provider`, `cloudsec_policy`, `cloudsec_query`, `cloudsec_code_rule`, `mailsec_provider`, `mailsec_policy`, `dr-mail` and `host_posture_rule`. None of these records holds a credential: provider records hold only `hive://secret/<name>` references, which Hive enforces. The `secret` hive is synced before them, as before.
+
+- **Hives are applied in a fixed order.** `syncHive` applies hives in `KnownHives` order, with any other hive after them by name. Map order used to decide which hive failed first and what was already written when it did. A product's provider records now come before the records that use them.
+
+- **Tags Hive stamps are left out of sync.** Hive tags every `mailsec_provider` record `mailsec:provider:<provider>`. Sync no longer reads, exports or compares that tag, and never sends it. Before this, a connection written without the tag differed from the stored record on every sync and was rewritten each time.
+
 - **Search API submission.** `limacharlie/search.go` adds the calls that start a search and read its pages, which the SDK previously had no way to do. `Organization.ListOpenQueries` and `Organization.GetSearchLimits` could already report on searches, but nothing could submit one.
 
   | Call | Endpoint |
