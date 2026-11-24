@@ -237,6 +237,14 @@ func (s *Sensor) Task(task string, options ...TaskingOptions) error {
 	return nil
 }
 
+// Delete deletes the sensor from its organization. The sensor is
+// disconnected and refused when it tries to connect again.
+//
+// A deleted sensor can be restored for 30 days after its deletion, from the
+// web app, the API or an "undelete sensor" response action. After that the
+// deletion is permanent: the sensor can no longer be restored, its tags are
+// removed (except tags in the reserved acl: namespace), and the endpoint has
+// to be enrolled again.
 func (s *Sensor) Delete() error {
 	resp := Dict{}
 	req := makeDefaultRequest(&resp)
