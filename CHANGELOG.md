@@ -53,6 +53,8 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Changed
 
+- **`Sensor.Delete` documents the restore window.** A deleted sensor can be restored for 30 days after its deletion. After that the deletion is permanent, the sensor's tags are removed (except tags in the reserved `acl:` namespace) and the endpoint has to be enrolled again. `Delete` had no doc comment; it now says this. No behavior change.
+
 - **A search submitted through this SDK asks for batch mode unless the caller says otherwise.** This is listed apart from the entry above because it is the one part of the new surface that decides something on the caller's behalf instead of passing their input through, and because it means the request this SDK sends is not the request a hand-written call with the same criteria would send.
 
   `POST /v1/search` treats `mode` as optional and resolves an absent one from the organization's own default. A `SearchRequest` with no mode set fills the field in with `"batch"` rather than leaving it out. The reasoning is the audience: what calls a Go SDK is a program that reads every page and pays a fixed cost per round trip, not a person watching one page at a time.
