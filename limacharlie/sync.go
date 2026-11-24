@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -1144,6 +1145,15 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 	return ops, nil
 }
 
+func sortedOrgValueNames(values map[OrgValueName]OrgValue) []OrgValueName {
+	names := make([]OrgValueName, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(values) == 0 {
 		return nil, nil
@@ -1158,7 +1168,12 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		values = orgSyncOrgValues{}
 	}
 
-	for name, val := range values {
+	// Names are applied in order, and a failure names the value: one of them
+	// (sensor_auto_upgrade) takes a permission the others do not, so a push can
+	// fail on that value alone, and what was written before it must not depend
+	// on map order.
+	for _, name := range sortedOrgValueNames(values) {
+		val := values[name]
 		if v, ok := existingVals[name]; ok && v == val {
 			ops = append(ops, OrgSyncOperation{
 				ElementType: OrgSyncOperationElementType.OrgValue,
@@ -1177,7 +1192,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		}
 
 		if err := org.OrgValueSet(name, val); err != nil {
-			return ops, err
+			return ops, fmt.Errorf("%s: %w", name, err)
 		}
 		ops = append(ops, OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.OrgValue,
@@ -1196,7 +1211,8 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		return ops, err
 	}
 
-	for name, v := range existingVals {
+	for _, name := range sortedOrgValueNames(existingVals) {
+		v := existingVals[name]
 		_, found := values[name]
 		if found || v == "" {
 			continue
@@ -1215,7 +1231,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		}
 
 		if err := org.OrgValueSet(name, ""); err != nil {
-			return ops, err
+			return ops, fmt.Errorf("%s: %w", name, err)
 		}
 		ops = append(ops, OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.OrgValue,

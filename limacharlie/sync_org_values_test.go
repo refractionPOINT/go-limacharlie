@@ -1,6 +1,7 @@
 package limacharlie
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -86,4 +87,27 @@ func TestSyncSensorAutoUpgradeUnknownToAPI(t *testing.T) {
 	_, err = org.SyncPush(orgValuesConf(t, "org-value:\n  otx: kept\n"), SyncOptions{SyncOrgValues: true, IsForce: true})
 	require.NoError(t, err)
 	require.NotContains(t, ms.OrgValues, "sensor_auto_upgrade")
+}
+
+// A push that fails on one value says which, and stops at the same place
+// every time: the values before it in name order are written, the ones after
+// are not.
+func TestSyncOrgValueFailureNamesTheValue(t *testing.T) {
+	ms := NewMockServer("00000000-0000-0000-0000-000000000001")
+	defer ms.Close()
+	org, err := ms.NewOrganization()
+	require.NoError(t, err)
+	// The key lacks module.update: only sensor_auto_upgrade is refused.
+	ms.CustomHandlers["/v1/configs/"+ms.OID+"/sensor_auto_upgrade"] = func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized, missing permission: module.update"}`))
+	}
+
+	conf := orgValuesConf(t, "org-value:\n  otx: a\n  sensor_auto_upgrade: \"true\"\n  twilio: b\n")
+	_, err = org.SyncPush(conf, SyncOptions{SyncOrgValues: true})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "sensor_auto_upgrade")
+	require.Equal(t, "a", ms.OrgValues["otx"], "written before the failure")
+	require.NotContains(t, ms.OrgValues, "twilio", "not reached")
 }
