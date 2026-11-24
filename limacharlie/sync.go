@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -153,6 +154,21 @@ var supportedOrgValues []string = []string{
 	"hybrid_analysis",
 	"echotrail",
 	"greynoise",
+	orgValueSensorAutoUpgrade,
+}
+
+// orgValueSensorAutoUpgrade keeps an org's sensors on the stable sensor
+// version when set to "true". Unset, empty and "false" all mean off. Setting
+// it takes the module.update permission as well as org.conf.set.
+const orgValueSensorAutoUpgrade = "sensor_auto_upgrade"
+
+// orgValuesKeptOnForce are the org values a forced push never clears. A forced
+// push removes what the config does not mention, which is right for an API
+// key, but these are settings an org's owner chose: a template that predates
+// one, or simply does not name it, must not turn it off. To turn one off, the
+// config says so explicitly (sensor_auto_upgrade: "false").
+var orgValuesKeptOnForce = map[OrgValueName]struct{}{
+	orgValueSensorAutoUpgrade: {},
 }
 
 type DRRuleName = string
@@ -1129,6 +1145,15 @@ func (org *Organization) SyncPush(conf OrgConfig, options SyncOptions) ([]OrgSyn
 	return ops, nil
 }
 
+func sortedOrgValueNames(values map[OrgValueName]OrgValue) []OrgValueName {
+	names := make([]OrgValueName, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOptions) ([]OrgSyncOperation, error) {
 	if !options.IsForce && len(values) == 0 {
 		return nil, nil
@@ -1143,7 +1168,12 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		values = orgSyncOrgValues{}
 	}
 
-	for name, val := range values {
+	// Names are applied in order, and a failure names the value: one of them
+	// (sensor_auto_upgrade) takes a permission the others do not, so a push can
+	// fail on that value alone, and what was written before it must not depend
+	// on map order.
+	for _, name := range sortedOrgValueNames(values) {
+		val := values[name]
 		if v, ok := existingVals[name]; ok && v == val {
 			ops = append(ops, OrgSyncOperation{
 				ElementType: OrgSyncOperationElementType.OrgValue,
@@ -1162,7 +1192,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		}
 
 		if err := org.OrgValueSet(name, val); err != nil {
-			return ops, err
+			return ops, fmt.Errorf("%s: %w", name, err)
 		}
 		ops = append(ops, OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.OrgValue,
@@ -1181,9 +1211,13 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		return ops, err
 	}
 
-	for name, v := range existingVals {
+	for _, name := range sortedOrgValueNames(existingVals) {
+		v := existingVals[name]
 		_, found := values[name]
 		if found || v == "" {
+			continue
+		}
+		if _, kept := orgValuesKeptOnForce[name]; kept {
 			continue
 		}
 
@@ -1197,7 +1231,7 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 		}
 
 		if err := org.OrgValueSet(name, ""); err != nil {
-			return ops, err
+			return ops, fmt.Errorf("%s: %w", name, err)
 		}
 		ops = append(ops, OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.OrgValue,
