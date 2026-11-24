@@ -153,6 +153,21 @@ var supportedOrgValues []string = []string{
 	"hybrid_analysis",
 	"echotrail",
 	"greynoise",
+	orgValueSensorAutoUpgrade,
+}
+
+// orgValueSensorAutoUpgrade keeps an org's sensors on the stable sensor
+// version when set to "true". Unset, empty and "false" all mean off. Setting
+// it takes the module.update permission as well as org.conf.set.
+const orgValueSensorAutoUpgrade = "sensor_auto_upgrade"
+
+// orgValuesKeptOnForce are the org values a forced push never clears. A forced
+// push removes what the config does not mention, which is right for an API
+// key, but these are settings an org's owner chose: a template that predates
+// one, or simply does not name it, must not turn it off. To turn one off, the
+// config says so explicitly (sensor_auto_upgrade: "false").
+var orgValuesKeptOnForce = map[OrgValueName]struct{}{
+	orgValueSensorAutoUpgrade: {},
 }
 
 type DRRuleName = string
@@ -1184,6 +1199,9 @@ func (org *Organization) syncOrgValues(values orgSyncOrgValues, options SyncOpti
 	for name, v := range existingVals {
 		_, found := values[name]
 		if found || v == "" {
+			continue
+		}
+		if _, kept := orgValuesKeptOnForce[name]; kept {
 			continue
 		}
 

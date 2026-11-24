@@ -513,6 +513,11 @@ func TestSyncOrgValues(t *testing.T) {
 
 	// Start by zeroing out all values.
 	for _, v := range supportedOrgValues {
+		if _, kept := orgValuesKeptOnForce[v]; kept {
+			// A forced push never clears these, so they need no zeroing, and
+			// setting one takes more than this test's key is meant to hold.
+			continue
+		}
 		err := org.OrgValueSet(v, "")
 		a.NoError(err)
 	}
