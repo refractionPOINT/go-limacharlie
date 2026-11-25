@@ -10,7 +10,7 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Added
 
-- **Sync carries the `sensor_auto_upgrade` org value.** `SyncFetch` and `SyncPush` with `SyncOrgValues` now read and write `sensor_auto_upgrade`, which keeps an org's sensors on the stable sensor version when set to `"true"`. Unset, empty and `"false"` all mean off. Setting it takes the `module.update` permission as well as `org.conf.set`. An API that does not know the value yet answers the read with an error, which sync already treats as "not set", so this is safe against any deployment.
+- **Sync carries the `sensor_auto_upgrade` org value.** `SyncFetch` and `SyncPush` with `SyncOrgValues` now read and write `sensor_auto_upgrade`, which keeps an org's sensors on a sensor release channel. The value names the channel, `"stable"` or `"latest"`; `"true"` means stable. Unset, empty and `"false"` all mean off. Sync passes the value through as written, and the API refuses a value it does not know: an API from before channels accepts only `"true"` and `"false"`. Setting it takes the `module.update` permission as well as `org.conf.set`. An API that does not know the value yet answers the read with an error, which sync already treats as "not set", so this is safe against any deployment.
 
 - **A forced push never clears `sensor_auto_upgrade`.** `SyncPush` with `IsForce` removes the org values a config does not mention. `sensor_auto_upgrade` is exempt: a config that does not name it leaves the org's value alone, so a template written before the value existed cannot turn off what an org's owner turned on. To turn it off, name it: `sensor_auto_upgrade: "false"`.
 
