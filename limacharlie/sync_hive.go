@@ -89,6 +89,10 @@ type SyncHiveData struct {
 // UNAUTHORIZED error) is left out of the result entirely and reported in the
 // returned list, sorted by hive name; any other failure is still fatal.
 //
+// A hive the API does not know (UNKNOWN_HIVE: the deployment has it disabled)
+// holds nothing to back up, so it is always skipped, whatever skipUnauthorized
+// says, and reported with reason SyncSkipReasonUnknownHive.
+//
 // Every fetch is waited for before returning, so no goroutine outlives the
 // call and the outcome does not depend on which request failed first.
 func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool, skipUnauthorized bool) (orgSyncHives, []SyncSkippedHive, error) {
@@ -128,10 +132,19 @@ func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool, skipUnautho
 	for i, hiveName := range names {
 		res := results[i]
 		if res.err != nil {
+			if unknownHiveAPIError(res.err) {
+				skipped = append(skipped, SyncSkippedHive{
+					Hive:   hiveName,
+					Reason: SyncSkipReasonUnknownHive,
+					Error:  res.err.Error(),
+				})
+				continue
+			}
 			if skipUnauthorized {
 				if permission, ok := unauthorizedAPIError(res.err); ok {
 					skipped = append(skipped, SyncSkippedHive{
 						Hive:       hiveName,
+						Reason:     SyncSkipReasonUnauthorized,
 						Permission: permission,
 						Error:      res.err.Error(),
 					})

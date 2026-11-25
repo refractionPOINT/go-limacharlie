@@ -679,10 +679,21 @@ func (o OrgSyncOperation) String() string {
 	return fmt.Sprintf("%s %s %s", op, o.ElementType, o.ElementName)
 }
 
-// SyncSkippedHive describes a hive that SyncFetchWithReport left out because
-// the credentials in use may not read it.
+// Values of SyncSkippedHive.Reason.
+const (
+	// SyncSkipReasonUnauthorized: the credentials may not read the hive.
+	SyncSkipReasonUnauthorized = "unauthorized"
+	// SyncSkipReasonUnknownHive: the API does not know the hive, so there is
+	// nothing to back up.
+	SyncSkipReasonUnknownHive = "unknown_hive"
+)
+
+// SyncSkippedHive describes a hive that SyncFetchWithReport left out, because
+// the credentials in use may not read it or because the API does not know it.
 type SyncSkippedHive struct {
 	Hive string `json:"hive"`
+	// Reason is SyncSkipReasonUnauthorized or SyncSkipReasonUnknownHive.
+	Reason string `json:"reason"`
 	// Permission is the permission the API said is missing, when it named one.
 	Permission string `json:"permission,omitempty"`
 	// Error is the error the API returned.
@@ -692,7 +703,8 @@ type SyncSkippedHive struct {
 // SyncFetchReport describes what SyncFetchWithReport could not read.
 type SyncFetchReport struct {
 	// SkippedHives lists, sorted by hive name, the hives left out of the
-	// returned OrgConfig. Always empty unless SkipUnauthorizedHives is set.
+	// returned OrgConfig: unknown hives always, unauthorized ones only when
+	// SkipUnauthorizedHives is set.
 	SkippedHives []SyncSkippedHive `json:"skipped_hives"`
 }
 
@@ -703,7 +715,8 @@ func (org *Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
 }
 
 // SyncFetchWithReport reads the org configuration and also reports the hives
-// that were skipped because of SyncOptions.SkipUnauthorizedHives. A skipped
+// that were skipped: unauthorized ones (SyncOptions.SkipUnauthorizedHives) and
+// hives the API does not know (always). A skipped
 // hive has no key in OrgConfig.Hives.
 func (org *Organization) SyncFetchWithReport(options SyncOptions) (orgConfig OrgConfig, report SyncFetchReport, err error) {
 	report.SkippedHives = []SyncSkippedHive{}
