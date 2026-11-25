@@ -10,11 +10,39 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Added
 
+- **`SyncFetchWithReport` skips hives the credentials may not read.** With `SyncOptions.SkipUnauthorizedHives` set, a hive in `SyncHives` whose read fails with the API's `lc_error_code:UNAUTHORIZED` error is left out of `OrgConfig.Hives` (no key at all, not an empty map) instead of failing the whole fetch, and is listed in `SyncFetchReport.SkippedHives` (sorted by hive name) with the hive, the missing permission when the message names one, and the error. Any other error stays fatal, and with the option unset behaviour is unchanged. This is for callers that expand "all hives" and so cannot know which hives a key covers: each new hive added to `KnownHives` otherwise breaks every backup run with a key that predates its permission. `SyncFetch` keeps its signature and calls `SyncFetchWithReport`. The unauthorized error is recognised from the structured error code in the response body, never from loose text. `syncFetchHive` now waits for every fetch and reports the first failure by hive name, so which error is returned no longer depends on timing.
+
 - **Sync carries the `sensor_auto_upgrade` org value.** `SyncFetch` and `SyncPush` with `SyncOrgValues` now read and write `sensor_auto_upgrade`, which keeps an org's sensors on a sensor release channel. The value names the channel, `"stable"` or `"latest"`; `"true"` means stable. Unset, empty and `"false"` all mean off. Sync passes the value through as written, and the API refuses a value it does not know: an API from before channels accepts only `"true"` and `"false"`. Setting it takes the `module.update` permission as well as `org.conf.set`. An API that does not know the value yet answers the read with an error, which sync already treats as "not set", so this is safe against any deployment.
 
 - **A forced push never clears `sensor_auto_upgrade`.** `SyncPush` with `IsForce` removes the org values a config does not mention. `sensor_auto_upgrade` is exempt: a config that does not name it leaves the org's value alone, so a template written before the value existed cannot turn off what an org's owner turned on. To turn it off, name it: `sensor_auto_upgrade: "false"`.
 
 - **Sync carries Cloud Security, Email Security and Host Posture configuration.** `KnownHives` and `SyncAll()` now include `cloudsec_provider`, `cloudsec_policy`, `cloudsec_query`, `cloudsec_code_rule`, `mailsec_provider`, `mailsec_policy`, `dr-mail` and `host_posture_rule`. None of these records holds a credential: provider records hold only `hive://secret/<name>` references, which Hive enforces. The `secret` hive is synced before them, as before.
+
+- **New permissions for the hives added to `KnownHives` and `SyncAll()`.** A "sync everything" run (`SyncAll()`, `SyncFetch`, `SyncPush`) now reads and writes the hives below. A key that predates this version lacks their permissions, and a full `SyncFetch` with such a key fails on the first hive it cannot read, unless `SyncOptions.SkipUnauthorizedHives` is set. With that option, unreadable hives are left out of the result and listed in `SyncFetchReport.SkippedHives`, with the missing permission when the API names one. Listing a hive's records needs its metadata permission (`.get.mtd`) and reading each record's data needs its `.get` permission; without the latter the record's data comes back `null`. Writing needs the set permission (plus `.set.mtd` where listed), and removing a record, which only a forced push does, needs the delete permission where one is listed. Where the read column lists a single permission (for example `cloudsec.get`), it covers both listing and reading data; where the write column lists no delete permission (for example `cloudsec.set`), the set permission also covers deletes.
+
+  | Hive | Read (`SyncFetch`) | Write (`SyncPush`) |
+  |---|---|---|
+  | `cloudsec_provider` | `cloudsec_provider.get.mtd`, `cloudsec_provider.get` | `cloudsec_provider.set` (+ `cloudsec_provider.set.mtd`), `cloudsec_provider.del` |
+  | `cloudsec_policy` | `cloudsec.get` | `cloudsec.set` |
+  | `cloudsec_query` | `cloudsec.get` | `cloudsec.set` |
+  | `cloudsec_code_rule` | `cloudsec.get` | `cloudsec.set` |
+  | `mailsec_provider` | `mailsec_provider.get.mtd`, `mailsec_provider.get` | `mailsec_provider.set` (+ `mailsec_provider.set.mtd`), `mailsec_provider.del` |
+  | `mailsec_policy` | `mailsec.get` | `mailsec.set` |
+  | `dr-mail` | `mailsec.get` | `mailsec.set` |
+  | `host_posture_rule` | `host_posture.get` | `host_posture.set` and `sensor.task` (removing a record needs only `host_posture.set`) |
+
+  Some hives that were already in `KnownHives` before this changelog began follow the same rule, and a key made before they were added needs the same grants:
+
+  | Hive | Read (`SyncFetch`) | Write (`SyncPush`) |
+  |---|---|---|
+  | `app_control_policy` | `app_control.get` | `app_control.set` |
+  | `app_control_rule` | `app_control.get` | `app_control.set` |
+  | `investigation_policy` | `investigation_policy.get.mtd`, `investigation_policy.get` | `investigation_policy.set` (+ `investigation_policy.set.mtd`), `investigation_policy.del` |
+  | `investigation_plan` | `investigation_plan.get.mtd`, `investigation_plan.get` | `investigation_plan.set` (+ `investigation_plan.set.mtd`), `investigation_plan.del` |
+  | `org_notes` | `org_notes.get.mtd`, `org_notes.get` | `org_notes.set` (+ `org_notes.set.mtd`), `org_notes.del` |
+  | `sop` | `sop.get.mtd`, `sop.get` | `sop.set` (+ `sop.set.mtd`), `sop.del` |
+
+  The `investigation_*` hives exist only in orgs where the Investigation Engine is enabled.
 
 - **Hives are applied in a fixed order.** `syncHive` applies hives in `KnownHives` order, with any other hive after them by name. Map order used to decide which hive failed first and what was already written when it did. A product's provider records now come before the records that use them.
 

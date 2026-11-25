@@ -82,57 +82,67 @@ type SyncHiveData struct {
 	UsrMtd UsrMtd                 `json:"usr_mtd" yaml:"usr_mtd"`
 }
 
-func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool) (orgSyncHives, error) {
+// syncFetchHive reads every hive enabled in syncHiveOpts, concurrently.
+//
+// With skipUnauthorized false, the first failure (in hive name order) fails
+// the fetch. With it true, a hive the credentials may not read (the API's
+// UNAUTHORIZED error) is left out of the result entirely and reported in the
+// returned list, sorted by hive name; any other failure is still fatal.
+//
+// Every fetch is waited for before returning, so no goroutine outlives the
+// call and the outcome does not depend on which request failed first.
+func (org *Organization) syncFetchHive(syncHiveOpts map[string]bool, skipUnauthorized bool) (orgSyncHives, []SyncSkippedHive, error) {
 	orgInfo, err := org.GetInfo()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	m := sync.Mutex{}
+	names := make([]string, 0, len(syncHiveOpts))
+	for hiveName, enabled := range syncHiveOpts {
+		if enabled {
+			names = append(names, hiveName)
+		}
+	}
+	sort.Strings(names)
+
+	type fetchResult struct {
+		data SyncHiveConfigData
+		err  error
+	}
+	// One slot per hive, each written by exactly one goroutine, and read only
+	// after wg.Wait().
+	results := make([]fetchResult, len(names))
 	var wg sync.WaitGroup
-	waitCh := make(chan struct{})
-	// The receiver below returns as soon as one fetch reports an error, so
-	// errCh must have room for every fetch to report without blocking. On an
-	// unbuffered channel the goroutines that fail afterwards stay blocked on
-	// the send forever, leaking for the lifetime of the process.
-	nHives := 0
-	for hiveName := range syncHiveOpts {
-		if syncHiveOpts[hiveName] {
-			nHives++
-		}
+	for i, hiveName := range names {
+		wg.Add(1)
+		go func(i int, hive string) {
+			defer wg.Done()
+			data, err := org.fetchHiveConfigData(HiveArgs{HiveName: hive, PartitionKey: orgInfo.OID})
+			results[i] = fetchResult{data: data, err: err}
+		}(i, hiveName)
 	}
-	errCh := make(chan error, nHives)
+	wg.Wait()
+
 	hiveSync := orgSyncHives{}
-	go func() {
-		for hiveName := range syncHiveOpts {
-			if syncHiveOpts[hiveName] {
-				wg.Add(1)
-				go func(hive string) {
-					defer wg.Done()
-					hiveConfigData, err := org.fetchHiveConfigData(HiveArgs{HiveName: hive, PartitionKey: orgInfo.OID})
-					if err != nil {
-						errCh <- err
-					}
-
-					m.Lock()
-					defer m.Unlock()
-					hiveSync[hive] = hiveConfigData
-				}(hiveName)
+	skipped := []SyncSkippedHive{}
+	for i, hiveName := range names {
+		res := results[i]
+		if res.err != nil {
+			if skipUnauthorized {
+				if permission, ok := unauthorizedAPIError(res.err); ok {
+					skipped = append(skipped, SyncSkippedHive{
+						Hive:       hiveName,
+						Permission: permission,
+						Error:      res.err.Error(),
+					})
+					continue
+				}
 			}
+			return nil, nil, res.err
 		}
-
-		wg.Wait()
-		close(waitCh)
-	}()
-
-	// if all calls are successful then return sync data
-	// if a sync op fails return right away
-	select {
-	case <-waitCh:
-		return hiveSync, nil
-	case err := <-errCh:
-		return nil, err
+		hiveSync[hiveName] = res.data
 	}
+	return hiveSync, skipped, nil
 }
 
 func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions) ([]OrgSyncOperation, error) {
