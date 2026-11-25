@@ -155,7 +155,15 @@ var supportedOrgValues []string = []string{
 	"echotrail",
 	"greynoise",
 	orgValueSensorAutoUpgrade,
+	orgValueRetentionMonths,
 }
+
+// orgValueRetentionMonths is the org's data retention in months: "12" (the
+// default, also what an unset value means), "18", "24" or "36". Setting a
+// value above 12 takes a paid plan and the billing.ctrl permission as well as
+// org.conf.set, so the API may refuse it; the push then fails and names this
+// value. A reduction is applied by the API after a delay, not immediately.
+const orgValueRetentionMonths = "retention_months"
 
 // orgValueSensorAutoUpgrade keeps an org's sensors on the stable sensor
 // version when set to "true". Unset, empty and "false" all mean off. Setting
@@ -169,6 +177,10 @@ const orgValueSensorAutoUpgrade = "sensor_auto_upgrade"
 // config says so explicitly (sensor_auto_upgrade: "false").
 var orgValuesKeptOnForce = map[OrgValueName]struct{}{
 	orgValueSensorAutoUpgrade: {},
+	// Clearing it is not possible (the API only accepts 12, 18, 24 or 36), and
+	// a template that does not name it must not shorten an org's retention.
+	// To go back to the default, name it: retention_months: "12".
+	orgValueRetentionMonths: {},
 }
 
 type DRRuleName = string

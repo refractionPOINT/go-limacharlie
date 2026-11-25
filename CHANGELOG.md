@@ -10,6 +10,8 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ### Added
 
+- **Sync carries the `retention_months` org value.** `SyncFetch` and `SyncPush` with `SyncOrgValues` now read and write `retention_months`, the org's data retention in months (`"12"`, `"18"`, `"24"` or `"36"`; unset means `"12"`). Setting a value above `"12"` takes a paid plan and the `billing.ctrl` permission as well as `org.conf.set`: when the API refuses, `SyncPush` fails with an error that names `retention_months` and carries the API's message. A forced push never clears it, since the API only accepts the four values: a config that does not name it leaves the org's value alone, and `retention_months: "12"` is how a config goes back to the default.
+
 - **Sync carries the `sensor_auto_upgrade` org value.** `SyncFetch` and `SyncPush` with `SyncOrgValues` now read and write `sensor_auto_upgrade`, which keeps an org's sensors on the stable sensor version when set to `"true"`. Unset, empty and `"false"` all mean off. Setting it takes the `module.update` permission as well as `org.conf.set`. An API that does not know the value yet answers the read with an error, which sync already treats as "not set", so this is safe against any deployment.
 
 - **A forced push never clears `sensor_auto_upgrade`.** `SyncPush` with `IsForce` removes the org values a config does not mention. `sensor_auto_upgrade` is exempt: a config that does not name it leaves the org's value alone, so a template written before the value existed cannot turn off what an org's owner turned on. To turn it off, name it: `sensor_auto_upgrade: "false"`.
