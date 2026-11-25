@@ -31,7 +31,7 @@ This file starts at the entry below. Changes made before it are not reconstructe
   | `dr-mail` | `mailsec.get` | `mailsec.set` |
   | `host_posture_rule` | `host_posture.get` | `host_posture.set` and `sensor.task` (removing a record needs only `host_posture.set`) |
 
-  The two hive families that were already in `KnownHives` before this changelog began follow the same rule, and a key made before they were added needs the same grants:
+  Some hives that were already in `KnownHives` before this changelog began follow the same rule, and a key made before they were added needs the same grants:
 
   | Hive | Read (`SyncFetch`) | Write (`SyncPush`) |
   |---|---|---|
@@ -39,6 +39,8 @@ This file starts at the entry below. Changes made before it are not reconstructe
   | `app_control_rule` | `app_control.get` | `app_control.set` |
   | `investigation_policy` | `investigation_policy.get.mtd`, `investigation_policy.get` | `investigation_policy.set` (+ `investigation_policy.set.mtd`), `investigation_policy.del` |
   | `investigation_plan` | `investigation_plan.get.mtd`, `investigation_plan.get` | `investigation_plan.set` (+ `investigation_plan.set.mtd`), `investigation_plan.del` |
+  | `org_notes` | `org_notes.get.mtd`, `org_notes.get` | `org_notes.set` (+ `org_notes.set.mtd`), `org_notes.del` |
+  | `sop` | `sop.get.mtd`, `sop.get` | `sop.set` (+ `sop.set.mtd`), `sop.del` |
 
   The `investigation_*` hives exist only in orgs where the Investigation Engine is enabled.
 
