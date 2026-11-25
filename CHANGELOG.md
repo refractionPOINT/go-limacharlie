@@ -31,7 +31,7 @@ This file starts at the entry below. Changes made before it are not reconstructe
   | `dr-mail` | `mailsec.get` | `mailsec.set` |
   | `host_posture_rule` | `host_posture.get` | `host_posture.set` and `sensor.task` (removing a record needs only `host_posture.set`) |
 
-  The hives that were already in `KnownHives` before this changelog began follow the same rule, and a key made before they were added needs the same grants:
+  Some hives that were already in `KnownHives` before this changelog began follow the same rule, and a key made before they were added needs the same grants:
 
   | Hive | Read (`SyncFetch`) | Write (`SyncPush`) |
   |---|---|---|
