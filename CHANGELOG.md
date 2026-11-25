@@ -8,6 +8,12 @@ This file starts at the entry below. Changes made before it are not reconstructe
 
 ## Unreleased
 
+### Fixed
+
+- **A fetch always skips a hive the API does not know.** `SyncFetch` and `SyncFetchWithReport` used to fail the whole org when a requested hive was one the API does not serve: some deployments have hives disabled (the investigation hives, for instance), so "sync everything" with an SDK or CLI that lists them failed there with `lc_error_code:UNKNOWN_HIVE`. A hive the API does not know holds nothing to back up, so it is now left out of `OrgConfig.Hives` and listed in `SyncFetchReport.SkippedHives` whether or not `SyncOptions.SkipUnauthorizedHives` is set. It is recognised from the structured `lc_error_code:UNKNOWN_HIVE` code in the response body, never from loose text. Every other error is unchanged, including `UNAUTHORIZED`, which stays fatal unless `SkipUnauthorizedHives` is set. `SyncPush` is unchanged too: a config with records for a hive the API does not know still fails, so a restore never silently drops data.
+
+- **`SyncSkippedHive` has a `Reason`.** `SyncSkippedHive.Reason` (`json:"reason"`) is `"unauthorized"` (the credentials may not read the hive; `Permission` names the missing permission when the API gave one) or `"unknown_hive"` (the API does not know the hive; no `Permission`). The constants are `SyncSkipReasonUnauthorized` and `SyncSkipReasonUnknownHive`. This adds a field to the report, so callers that decode it keep working. No new permission is needed.
+
 ### Added
 
 - **`SyncFetchWithReport` skips hives the credentials may not read.** With `SyncOptions.SkipUnauthorizedHives` set, a hive in `SyncHives` whose read fails with the API's `lc_error_code:UNAUTHORIZED` error is left out of `OrgConfig.Hives` (no key at all, not an empty map) instead of failing the whole fetch, and is listed in `SyncFetchReport.SkippedHives` (sorted by hive name) with the hive, the missing permission when the message names one, and the error. Any other error stays fatal, and with the option unset behaviour is unchanged. This is for callers that expand "all hives" and so cannot know which hives a key covers: each new hive added to `KnownHives` otherwise breaks every backup run with a key that predates its permission. `SyncFetch` keeps its signature and calls `SyncFetchWithReport`. The unauthorized error is recognised from the structured error code in the response body, never from loose text. `syncFetchHive` now waits for every fetch and reports the first failure by hive name, so which error is returned no longer depends on timing.

@@ -100,6 +100,31 @@ func unauthorizedAPIError(err error) (permission string, ok bool) {
 	return permission, true
 }
 
+// unknownHiveErrorCode is the error code the Hive service puts at the start of
+// the "error" field when a hive name is not one it serves (a hive that only
+// some deployments have enabled).
+const unknownHiveErrorCode = "lc_error_code:UNKNOWN_HIVE"
+
+// unknownHiveAPIError reports whether err is the API saying it does not know
+// the hive that was asked for. Like unauthorizedAPIError it relies on the
+// structured error code of the response body, never on loose text matching.
+func unknownHiveAPIError(err error) bool {
+	var restErr RESTError
+	if !errors.As(err, &restErr) {
+		return false
+	}
+	if restErr.status < 400 || restErr.status >= 500 {
+		return false
+	}
+	var body struct {
+		Error string `json:"error"`
+	}
+	if jerr := json.Unmarshal([]byte(restErr.body), &body); jerr != nil {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(body.Error), unknownHiveErrorCode)
+}
+
 // NewRESTError makes a new RESTError
 func NewRESTError(err string) RESTError {
 	return RESTError{s: err}

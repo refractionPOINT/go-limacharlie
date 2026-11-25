@@ -254,3 +254,110 @@ func TestUnauthorizedAPIError(t *testing.T) {
 	_, ok = unauthorizedAPIError(nil)
 	r.False(ok)
 }
+
+// The Hive service answers an unknown hive name with a 400 and this body.
+const unknownHiveBody = `{"data":{},"error":"lc_error_code:UNKNOWN_HIVE","retry":false}`
+
+// A hive the API does not know holds nothing to back up: it is skipped and
+// reported whether or not SkipUnauthorizedHives is set.
+func TestSyncFetchSkipsUnknownHiveWithAndWithoutOption(t *testing.T) {
+	for _, skipUnauthorized := range []bool{false, true} {
+		t.Run(fmt.Sprintf("skip_unauthorized=%v", skipUnauthorized), func(t *testing.T) {
+			r := require.New(t)
+			org := newHiveFetchOrg(t, map[string]hiveReply{
+				"investigation_policy": {http.StatusBadRequest, unknownHiveBody},
+				"investigation_plan":   {http.StatusBadRequest, unknownHiveBody},
+			})
+			opts := SyncOptions{
+				SyncHives:             map[string]bool{"yara": true, "investigation_policy": true, "investigation_plan": true, "lookup": true},
+				SkipUnauthorizedHives: skipUnauthorized,
+			}
+
+			cfg, report, err := org.SyncFetchWithReport(opts)
+			r.NoError(err)
+			r.Len(cfg.Hives, 2)
+			r.Contains(cfg.Hives, "yara")
+			r.Contains(cfg.Hives, "lookup")
+			r.NotContains(cfg.Hives, "investigation_policy")
+			r.Len(report.SkippedHives, 2)
+			r.Equal("investigation_plan", report.SkippedHives[0].Hive, "sorted by hive name")
+			r.Equal("investigation_policy", report.SkippedHives[1].Hive)
+			for _, s := range report.SkippedHives {
+				r.Equal(SyncSkipReasonUnknownHive, s.Reason)
+				r.Empty(s.Permission)
+				r.Contains(s.Error, "UNKNOWN_HIVE")
+			}
+
+			// SyncFetch (no report) succeeds too.
+			_, err = org.SyncFetch(opts)
+			r.NoError(err)
+		})
+	}
+}
+
+// An UNAUTHORIZED hive is still fatal without the option, and carries the
+// "unauthorized" reason when skipped with it, next to an unknown hive.
+func TestSyncFetchUnauthorizedStrictAndReasonsMixed(t *testing.T) {
+	r := require.New(t)
+	org := newHiveFetchOrg(t, map[string]hiveReply{
+		"host_posture_rule":    {http.StatusBadRequest, hostPostureDenied},
+		"investigation_policy": {http.StatusBadRequest, unknownHiveBody},
+	})
+	hives := map[string]bool{"yara": true, "host_posture_rule": true, "investigation_policy": true}
+
+	_, report, err := org.SyncFetchWithReport(SyncOptions{SyncHives: hives})
+	r.Error(err, "unauthorized stays fatal without the option")
+	r.Contains(err.Error(), "requires host_posture.get")
+	r.Empty(report.SkippedHives)
+
+	cfg, report, err := org.SyncFetchWithReport(SyncOptions{SyncHives: hives, SkipUnauthorizedHives: true})
+	r.NoError(err)
+	r.Contains(cfg.Hives, "yara")
+	r.Len(report.SkippedHives, 2)
+	r.Equal("host_posture_rule", report.SkippedHives[0].Hive)
+	r.Equal(SyncSkipReasonUnauthorized, report.SkippedHives[0].Reason)
+	r.Equal("host_posture.get", report.SkippedHives[0].Permission)
+	r.Equal("investigation_policy", report.SkippedHives[1].Hive)
+	r.Equal(SyncSkipReasonUnknownHive, report.SkippedHives[1].Reason)
+}
+
+// Only the structured UNKNOWN_HIVE code is forgiven; other errors, even ones
+// mentioning an unknown hive in free text, stay fatal.
+func TestSyncFetchUnknownHiveOnlyOnStructuredCode(t *testing.T) {
+	for name, tc := range map[string]struct {
+		status int
+		body   string
+	}{
+		"server error with the code": {http.StatusInternalServerError, unknownHiveBody},
+		"free text":                  {http.StatusBadRequest, `{"error":"unknown hive foo"}`},
+		"other code":                 {http.StatusBadRequest, `{"error":"lc_error_code:INVALID_ARGUMENT - UNKNOWN_HIVE"}`},
+		"not json":                   {http.StatusBadRequest, `lc_error_code:UNKNOWN_HIVE`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			org := newHiveFetchOrg(t, map[string]hiveReply{"host_posture_rule": {tc.status, tc.body}})
+			_, report, err := org.SyncFetchWithReport(SyncOptions{
+				SyncHives:             map[string]bool{"yara": true, "host_posture_rule": true},
+				SkipUnauthorizedHives: true,
+			})
+			r.Error(err)
+			r.Empty(report.SkippedHives)
+		})
+	}
+}
+
+// Push is unchanged: records for a hive the API does not know must fail, not be
+// silently dropped on a restore.
+func TestSyncPushUnknownHiveWithRecordsStillFails(t *testing.T) {
+	r := require.New(t)
+	org := newHiveFetchOrg(t, map[string]hiveReply{
+		"investigation_policy": {http.StatusBadRequest, unknownHiveBody},
+	})
+	_, err := org.syncHive(orgSyncHives{
+		"investigation_policy": {
+			"rec": {Data: map[string]interface{}{"a": "b"}, UsrMtd: UsrMtd{Enabled: true}},
+		},
+	}, SyncOptions{SyncHives: map[string]bool{"investigation_policy": true}, SkipUnauthorizedHives: true})
+	r.Error(err)
+	r.Contains(err.Error(), "UNKNOWN_HIVE")
+}
