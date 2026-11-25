@@ -573,6 +573,7 @@ func (c *Client) request(ctx context.Context, verb string, path string, request 
 		}
 		restErr := NewRESTError(fmt.Sprintf("%s: %s", resp.Status, errorStr))
 		restErr.status = resp.StatusCode
+		restErr.body = errorStr
 		return resp.StatusCode, restErr
 	}
 

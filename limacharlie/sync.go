@@ -48,7 +48,15 @@ type SyncOptions struct {
 	SyncHives            map[string]bool `json:"sync_hives"`
 	SyncInstallationKeys bool            `json:"sync_installation_keys"`
 	SyncYara             bool            `json:"sync_yara"`
-	IncludeLoader        IncludeLoaderCB `json:"-"`
+
+	// SkipUnauthorizedHives makes SyncFetch leave out any hive in SyncHives
+	// that the credentials in use are not permitted to read, instead of
+	// failing the whole fetch. Skipped hives are reported by
+	// SyncFetchWithReport. Any other error is still fatal. Meant for callers
+	// that expand "all hives" and so cannot know in advance which ones the
+	// credentials cover; a caller that names a hive wants it strict.
+	SkipUnauthorizedHives bool            `json:"skip_unauthorized_hives"`
+	IncludeLoader         IncludeLoaderCB `json:"-"`
 }
 
 var KnownHives = []string{
@@ -669,86 +677,113 @@ func (o OrgSyncOperation) String() string {
 	return fmt.Sprintf("%s %s %s", op, o.ElementType, o.ElementName)
 }
 
-func (org *Organization) SyncFetch(options SyncOptions) (orgConfig OrgConfig, err error) {
+// SyncSkippedHive describes a hive that SyncFetchWithReport left out because
+// the credentials in use may not read it.
+type SyncSkippedHive struct {
+	Hive string `json:"hive"`
+	// Permission is the permission the API said is missing, when it named one.
+	Permission string `json:"permission,omitempty"`
+	// Error is the error the API returned.
+	Error string `json:"error"`
+}
+
+// SyncFetchReport describes what SyncFetchWithReport could not read.
+type SyncFetchReport struct {
+	// SkippedHives lists, sorted by hive name, the hives left out of the
+	// returned OrgConfig. Always empty unless SkipUnauthorizedHives is set.
+	SkippedHives []SyncSkippedHive `json:"skipped_hives"`
+}
+
+// SyncFetch reads the org configuration. See SyncFetchWithReport.
+func (org *Organization) SyncFetch(options SyncOptions) (OrgConfig, error) {
+	cfg, _, err := org.SyncFetchWithReport(options)
+	return cfg, err
+}
+
+// SyncFetchWithReport reads the org configuration and also reports the hives
+// that were skipped because of SyncOptions.SkipUnauthorizedHives. A skipped
+// hive has no key in OrgConfig.Hives.
+func (org *Organization) SyncFetchWithReport(options SyncOptions) (orgConfig OrgConfig, report SyncFetchReport, err error) {
+	report.SkippedHives = []SyncSkippedHive{}
 	if options.SyncResources {
 		orgConfig.Resources, err = org.syncFetchResources()
 		if err != nil {
-			return orgConfig, fmt.Errorf("resources: %v", err)
+			return orgConfig, report, fmt.Errorf("resources: %v", err)
 		}
 	}
 	if options.SyncExtensions {
 		orgConfig.Extensions, err = org.syncFetchExtensions()
 		if err != nil {
-			return orgConfig, fmt.Errorf("extensions: %v", err)
+			return orgConfig, report, fmt.Errorf("extensions: %v", err)
 		}
 	}
 	if options.SyncDRRules {
 		who, err := org.client.WhoAmI()
 		if err != nil {
-			return orgConfig, fmt.Errorf("dr-rule: %v", err)
+			return orgConfig, report, fmt.Errorf("dr-rule: %v", err)
 		}
 		orgConfig.DRRules, err = org.syncFetchDRRules(who)
 		if err != nil {
-			return orgConfig, fmt.Errorf("dr-rule: %v", err)
+			return orgConfig, report, fmt.Errorf("dr-rule: %v", err)
 		}
 	}
 	if options.SyncFPRules {
 		orgConfig.FPRules, err = org.syncFetchFPRules()
 		if err != nil {
-			return orgConfig, fmt.Errorf("fp-rule: %v", err)
+			return orgConfig, report, fmt.Errorf("fp-rule: %v", err)
 		}
 	}
 	if options.SyncOutputs {
 		orgConfig.Outputs, err = org.syncFetchOutputs()
 		if err != nil {
-			return orgConfig, fmt.Errorf("outputs: %v", err)
+			return orgConfig, report, fmt.Errorf("outputs: %v", err)
 		}
 	}
 	if options.SyncIntegrity {
 		orgConfig.Integrity, err = org.syncFetchIntegrity()
 		if err != nil {
-			return orgConfig, fmt.Errorf("integrity: %v", err)
+			return orgConfig, report, fmt.Errorf("integrity: %v", err)
 		}
 	}
 	if options.SyncArtifacts {
 		orgConfig.Artifacts, err = org.syncFetchArtifacts()
 		if err != nil {
-			return orgConfig, fmt.Errorf("artifact: %v", err)
+			return orgConfig, report, fmt.Errorf("artifact: %v", err)
 		}
 	}
 	if options.SyncExfil {
 		orgConfig.Exfil, err = org.syncFetchExfil()
 		if err != nil {
-			return orgConfig, fmt.Errorf("exfil: %v", err)
+			return orgConfig, report, fmt.Errorf("exfil: %v", err)
 		}
 	}
 	if options.SyncOrgValues {
 		orgConfig.OrgValues, err = org.syncFetchOrgValues()
 		if err != nil {
-			return orgConfig, fmt.Errorf("org-value: %v", err)
+			return orgConfig, report, fmt.Errorf("org-value: %v", err)
 		}
 	}
 	if options.SyncHives != nil || len(options.SyncHives) != 0 {
-		orgConfig.Hives, err = org.syncFetchHive(options.SyncHives)
+		orgConfig.Hives, report.SkippedHives, err = org.syncFetchHive(options.SyncHives, options.SkipUnauthorizedHives)
 		if err != nil {
-			return orgConfig, fmt.Errorf("sync_hives: %v", err)
+			return orgConfig, report, fmt.Errorf("sync_hives: %v", err)
 		}
 	}
 	if options.SyncInstallationKeys {
 		orgConfig.InstallationKeys, err = org.syncFetchInstallationKeys()
 		if err != nil {
-			return orgConfig, fmt.Errorf("installation_keys: %v", err)
+			return orgConfig, report, fmt.Errorf("installation_keys: %v", err)
 		}
 	}
 	if options.SyncYara {
 		orgConfig.Yara, err = org.syncFetchYara()
 		if err != nil {
-			return orgConfig, fmt.Errorf("integrity: %v", err)
+			return orgConfig, report, fmt.Errorf("integrity: %v", err)
 		}
 	}
 
 	orgConfig.Version = OrgConfigLatestVersion
-	return orgConfig, nil
+	return orgConfig, report, nil
 }
 
 func (org *Organization) syncFetchOrgValues() (orgSyncOrgValues, error) {
