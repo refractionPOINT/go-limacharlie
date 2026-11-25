@@ -35,6 +35,19 @@ func TestSyncSensorAutoUpgradeOrgValue(t *testing.T) {
 	ops, err = org.SyncPush(orgValuesConf(t, "org-value:\n  sensor_auto_upgrade: \"true\"\n"), SyncOptions{SyncOrgValues: true})
 	require.NoError(t, err)
 	require.Equal(t, []OrgSyncOperation{{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "sensor_auto_upgrade"}}, ops)
+
+	// The value names a release channel. Sync does not interpret it: a channel
+	// is pushed and fetched as written, and it is the API that refuses a value
+	// it does not know.
+	for _, channel := range []string{"latest", "stable"} {
+		ops, err = org.SyncPush(orgValuesConf(t, "org-value:\n  sensor_auto_upgrade: "+channel+"\n"), SyncOptions{SyncOrgValues: true})
+		require.NoError(t, err)
+		require.Equal(t, []OrgSyncOperation{{ElementType: OrgSyncOperationElementType.OrgValue, ElementName: "sensor_auto_upgrade", IsAdded: true}}, ops, channel)
+		require.Equal(t, channel, ms.OrgValues["sensor_auto_upgrade"])
+		fetched, err = org.SyncFetch(SyncOptions{SyncOrgValues: true})
+		require.NoError(t, err)
+		require.Equal(t, channel, fetched.OrgValues["sensor_auto_upgrade"])
+	}
 }
 
 // A forced push removes the org values the config does not mention, except

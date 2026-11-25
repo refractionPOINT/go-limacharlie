@@ -165,9 +165,11 @@ var supportedOrgValues []string = []string{
 	orgValueSensorAutoUpgrade,
 }
 
-// orgValueSensorAutoUpgrade keeps an org's sensors on the stable sensor
-// version when set to "true". Unset, empty and "false" all mean off. Setting
-// it takes the module.update permission as well as org.conf.set.
+// orgValueSensorAutoUpgrade keeps an org's sensors on a sensor release
+// channel. Its value names the channel: "stable" or "latest". "true" means
+// stable. Unset, empty and "false" all mean off. Sync passes the value through
+// as written and the API refuses one it does not know. Setting it takes the
+// module.update permission as well as org.conf.set.
 const orgValueSensorAutoUpgrade = "sensor_auto_upgrade"
 
 // orgValuesKeptOnForce are the org values a forced push never clears. A forced
