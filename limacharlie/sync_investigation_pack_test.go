@@ -41,9 +41,11 @@ func (l *hiveWriteLog) snapshot() []string {
 	return append([]string(nil), l.events...)
 }
 
-// watchHiveWrites wraps the mock's Hive handler. A write to a plan that uses
-// "fictional_pack" is refused unless that pack is stored: the apply order, not
-// luck, is then what lets a template and its pack land in one sync.
+// watchHiveWrites wraps the mock's Hive handler. The real Hive does not check
+// that a pack exists when a template is written (the engine resolves it when it
+// loads the template), so this stand-in simulates a stricter hive: it refuses a
+// write to a plan that uses "fictional_pack" unless that pack is stored. The
+// order of the writes is then checked by outcome as well as by the log.
 func watchHiveWrites(ms *MockServer) *hiveWriteLog {
 	log := &hiveWriteLog{}
 	ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
@@ -224,4 +226,55 @@ func TestInvestigationPackDryRunReportsWithoutWriting(t *testing.T) {
 	require.Len(t, ops, 3)
 	require.Empty(t, log.snapshot())
 	require.Empty(t, ms.HiveStore["investigation_pack/"+testOID])
+}
+
+// Removals wait for hives that come after the investigation hives in KnownHives
+// too: their writes land first, and a refused write there removes nothing.
+func TestInvestigationRemovalsWaitForLaterHives(t *testing.T) {
+	cfg := OrgConfig{Version: 3, Hives: orgSyncHives{
+		"investigation_pack":   {},
+		"investigation_plan":   {},
+		"host_posture_rule":    {"rule": {Data: Dict{"value": "x"}}},
+		"investigation_policy": {},
+	}}
+	opts := SyncOptions{IsForce: true, SyncHives: map[string]bool{"investigation_policy": true, "investigation_pack": true, "investigation_plan": true, "host_posture_rule": true}}
+	seed := func(ms *MockServer) {
+		ms.HiveStore["investigation_policy/"+testOID] = map[string]HiveData{"default": {Data: Dict{"x": true}}}
+		ms.HiveStore["investigation_pack/"+testOID] = map[string]HiveData{"fictional_pack": {Data: Dict{"yaml": "x"}}}
+		ms.HiveStore["investigation_plan/"+testOID] = map[string]HiveData{"fictional-triage": {Data: Dict{"x": true}}}
+	}
+
+	t.Run("later hive applied first", func(t *testing.T) {
+		ms, org := setupMock(t)
+		seed(ms)
+		log := watchHiveWrites(ms)
+		_, err := org.SyncPush(cfg, opts)
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"write host_posture_rule/rule",
+			"delete investigation_plan/fictional-triage",
+			"delete investigation_pack/fictional_pack",
+			"delete investigation_policy/default",
+		}, log.snapshot())
+	})
+
+	t.Run("later hive refused", func(t *testing.T) {
+		ms, org := setupMock(t)
+		seed(ms)
+		log := watchHiveWrites(ms)
+		inner := ms.CustomHandlers["/v1/hive/"]
+		ms.CustomHandlers["/v1/hive/"] = func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/v1/hive/host_posture_rule/") {
+				ms.writeError(w, http.StatusBadRequest, "refused")
+				return
+			}
+			inner(w, req)
+		}
+		_, err := org.SyncPush(cfg, opts)
+		require.Error(t, err)
+		require.Empty(t, log.snapshot())
+		require.Contains(t, ms.HiveStore["investigation_plan/"+testOID], "fictional-triage")
+		require.Contains(t, ms.HiveStore["investigation_pack/"+testOID], "fictional_pack")
+		require.Contains(t, ms.HiveStore["investigation_policy/"+testOID], "default")
+	})
 }
