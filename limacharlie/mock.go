@@ -1193,7 +1193,7 @@ func (ms *MockServer) handleHive(w http.ResponseWriter, r *http.Request) {
 
 		// Match native Hive CAS semantics only for investigation sync fixtures.
 		// Missing records accept any etag; existing records check nonempty ones.
-		if hiveName == "investigation_policy" || hiveName == "investigation_plan" {
+		if isInvestigationSyncHive(hiveName) {
 			presented := form.Get("etag")
 			if presented == "" {
 				presented = sysMtd.Etag

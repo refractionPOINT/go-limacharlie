@@ -165,6 +165,7 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 	}
 
 	var orgOps []OrgSyncOperation
+	var deferredRemovals []func() error
 	for _, hiveName := range orderedSyncHiveNames(hiveConfigData) {
 		newConfigData := hiveConfigData[hiveName]
 
@@ -261,32 +262,25 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 
 		// now that keys have been added or updated for this hive
 		// identify what keys should be removed
-		for k, _ := range currentConfigData {
-			if _, ok := newConfigData[k]; !ok {
-				op := OrgSyncOperation{
-					ElementType: OrgSyncOperationElementType.Hives,
-					ElementName: hiveName + "/" + k,
-					IsAdded:     false,
-					IsRemoved:   true,
-				}
-				// If tags are passed ensure all tags match before removing
-				if len(opts.Tags) != 0 {
-					if !slicesContainSameItems(currentConfigData[k].UsrMtd.Tags, opts.Tags) {
-						continue // tags do not match do not remove
-					}
-				}
-
-				if opts.IsDryRun {
-					orgOps = append(orgOps, op)
-					continue
-				}
-
-				err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: orgInfo.OID, HiveName: hiveName})
-				if err != nil {
-					return orgOps, err
-				}
-				orgOps = append(orgOps, op)
-			}
+		removeStale := func() error {
+			var err error
+			orgOps, err = org.removeStaleHiveRecords(orgInfo.OID, hiveName, currentConfigData, newConfigData, opts, orgOps)
+			return err
+		}
+		if isInvestigationSyncHive(hiveName) {
+			// A template may use a pack, so what the other hives wrote is
+			// settled before anything is removed, and removals run in the
+			// reverse of the apply order (see KnownHives).
+			deferredRemovals = append(deferredRemovals, removeStale)
+			continue
+		}
+		if err := removeStale(); err != nil {
+			return orgOps, err
+		}
+	}
+	for i := len(deferredRemovals) - 1; i >= 0; i-- {
+		if err := deferredRemovals[i](); err != nil {
+			return orgOps, err
 		}
 	}
 	return orgOps, nil
@@ -469,7 +463,7 @@ func (hd HiveData) AsSyncData() SyncHiveData {
 }
 
 func isInvestigationSyncHive(hive string) bool {
-	return hive == "investigation_policy" || hive == "investigation_plan"
+	return hive == "investigation_policy" || hive == "investigation_pack" || hive == "investigation_plan"
 }
 
 // writeInvestigationHive uses the version from the listing used to compute
@@ -496,4 +490,38 @@ func (org *Organization) writeInvestigationHive(ha HiveArgs, hd SyncHiveData, et
 		}
 	}
 	return err
+}
+
+// removeStaleHiveRecords removes the records of a hive that the new
+// configuration does not name, honoring the tag filter and dry run. It returns
+// orgOps extended with what it did (or would do).
+func (org *Organization) removeStaleHiveRecords(oid string, hiveName string, current, desired SyncHiveConfigData, opts SyncOptions, orgOps []OrgSyncOperation) ([]OrgSyncOperation, error) {
+	for k := range current {
+		if _, ok := desired[k]; ok {
+			continue
+		}
+		op := OrgSyncOperation{
+			ElementType: OrgSyncOperationElementType.Hives,
+			ElementName: hiveName + "/" + k,
+			IsAdded:     false,
+			IsRemoved:   true,
+		}
+		// If tags are passed ensure all tags match before removing
+		if len(opts.Tags) != 0 {
+			if !slicesContainSameItems(current[k].UsrMtd.Tags, opts.Tags) {
+				continue // tags do not match do not remove
+			}
+		}
+
+		if opts.IsDryRun {
+			orgOps = append(orgOps, op)
+			continue
+		}
+
+		if err := org.removeHiveConfigData(HiveArgs{Key: k, PartitionKey: oid, HiveName: hiveName}); err != nil {
+			return orgOps, err
+		}
+		orgOps = append(orgOps, op)
+	}
+	return orgOps, nil
 }

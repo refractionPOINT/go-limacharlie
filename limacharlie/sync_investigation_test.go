@@ -20,7 +20,7 @@ func TestInvestigationSyncFixture(t *testing.T) {
 	var cfg OrgConfig
 	require.NoError(t, yaml.Unmarshal(raw, &cfg))
 	cfg.Version = OrgConfigLatestVersion
-	for _, h := range []string{"investigation_policy", "investigation_plan"} {
+	for _, h := range investigationSyncHives {
 		require.Contains(t, KnownHives, h)
 		require.True(t, SyncAll().SyncHives[h])
 	}
@@ -32,7 +32,7 @@ func TestInvestigationSyncFixture(t *testing.T) {
 	rec.UsrMtd.Enabled = false
 	cfg.Hives["investigation_policy"]["default"] = rec
 	ms, org := setupMock(t)
-	opts := SyncOptions{SyncHives: map[string]bool{"investigation_policy": true, "investigation_plan": true}}
+	opts := SyncOptions{SyncHives: map[string]bool{"investigation_policy": true, "investigation_pack": true, "investigation_plan": true}}
 	_, err = org.SyncPush(cfg, opts)
 	require.NoError(t, err)
 	// Change an existing record, exercising the native version read/write path.
@@ -65,7 +65,7 @@ func TestInvestigationSyncFixture(t *testing.T) {
 
 // The listing is the diff baseline, not a later Get of the changed record.
 func TestInvestigationSyncNativeCASConflict(t *testing.T) {
-	for _, hive := range []string{"investigation_policy", "investigation_plan"} {
+	for _, hive := range investigationSyncHives {
 		t.Run(hive, func(t *testing.T) {
 			ms, org := setupMock(t)
 			key := hive + "/" + testOID
@@ -103,7 +103,7 @@ func TestInvestigationSyncNativeCASConflict(t *testing.T) {
 
 func TestInvestigationSyncNativeCreateAndMetadataOnly(t *testing.T) {
 	ms, org := setupMock(t)
-	for _, hive := range []string{"investigation_policy", "investigation_plan"} {
+	for _, hive := range investigationSyncHives {
 		ha := HiveArgs{HiveName: hive, PartitionKey: testOID, Key: "default"}
 		// Missing-record create follows native semantics, with an empty ETag.
 		require.NoError(t, org.writeInvestigationHive(ha, SyncHiveData{Data: Dict{"keep": "original"}}, ""))
@@ -121,7 +121,7 @@ func TestInvestigationSyncNativeCreateAndMetadataOnly(t *testing.T) {
 
 func TestInvestigationSyncAllForceOmittedHivesUntouched(t *testing.T) {
 	ms, org := setupMock(t)
-	for _, h := range []string{"investigation_policy", "investigation_plan"} {
+	for _, h := range investigationSyncHives {
 		ms.HiveStore[h+"/"+testOID] = map[string]HiveData{"default": {Data: Dict{"keep": true}}}
 	}
 	// SyncAll selects exports, but force deletion only visits config-present hives.
@@ -129,7 +129,7 @@ func TestInvestigationSyncAllForceOmittedHivesUntouched(t *testing.T) {
 	opts.IsForce = true
 	_, err := org.SyncPush(OrgConfig{Version: 3, Hives: orgSyncHives{"fp": {}}}, opts)
 	require.NoError(t, err)
-	for _, h := range []string{"investigation_policy", "investigation_plan"} {
+	for _, h := range investigationSyncHives {
 		require.Contains(t, ms.HiveStore[h+"/"+testOID], "default")
 	}
 }
@@ -196,7 +196,7 @@ func TestInvestigationSyncOtherHiveWriteProtocolUnchanged(t *testing.T) {
 // A timeout can hide a committed write. Replaying its old ETag must not
 // report a conflict unless the desired state differs or cannot be verified.
 func TestInvestigationSyncTimeoutReadback(t *testing.T) {
-	for _, hive := range []string{"investigation_policy", "investigation_plan"} {
+	for _, hive := range investigationSyncHives {
 		for _, scenario := range []string{"committed", "data changed", "metadata changed", "read denied"} {
 			t.Run(hive+"/"+scenario, func(t *testing.T) {
 				t.Parallel()

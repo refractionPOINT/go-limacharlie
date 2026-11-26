@@ -80,7 +80,11 @@ var KnownHives = []string{
 	"sop",
 	"app_control_policy",
 	"app_control_rule",
+	// Investigation Engine, in apply order: the settings record first (a pack
+	// write by an API key needs the tag it carries), then the packs of shared
+	// checks, then the templates that use them. Removals run in reverse.
 	"investigation_policy",
+	"investigation_pack",
 	"investigation_plan",
 	// Cloud Security. Providers come before the records that use them, and
 	// syncHive applies hives in this order.
@@ -134,6 +138,7 @@ func SyncAll() SyncOptions {
 			"app_control_policy":   true,
 			"app_control_rule":     true,
 			"investigation_policy": true,
+			"investigation_pack":   true,
 			"investigation_plan":   true,
 			"cloudsec_provider":    true,
 			"cloudsec_policy":      true,
