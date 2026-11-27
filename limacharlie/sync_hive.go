@@ -184,7 +184,8 @@ func (org *Organization) syncHive(hiveConfigData orgSyncHives, opts SyncOptions)
 		}
 
 		// now check if we need to update or add new data for this particular hive
-		for hiveKey, ncd := range newConfigData {
+		for _, hiveKey := range orderedSyncKeys(hiveName, newConfigData) {
+			ncd := newConfigData[hiveKey]
 			// A tag Hive manages is never sent, so a configuration exported
 			// before sync dropped it still compares equal.
 			ncd.UsrMtd.Tags = withoutServerManagedTags(hiveName, ncd.UsrMtd.Tags)
@@ -496,10 +497,7 @@ func (org *Organization) writeInvestigationHive(ha HiveArgs, hd SyncHiveData, et
 // configuration does not name, honoring the tag filter and dry run. It returns
 // orgOps extended with what it did (or would do).
 func (org *Organization) removeStaleHiveRecords(oid string, hiveName string, current, desired SyncHiveConfigData, opts SyncOptions, orgOps []OrgSyncOperation) ([]OrgSyncOperation, error) {
-	for k := range current {
-		if _, ok := desired[k]; ok {
-			continue
-		}
+	for _, k := range orderedStaleKeys(hiveName, current, desired) {
 		op := OrgSyncOperation{
 			ElementType: OrgSyncOperationElementType.Hives,
 			ElementName: hiveName + "/" + k,
